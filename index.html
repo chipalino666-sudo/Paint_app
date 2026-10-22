@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Заказ-наряд (Мой помощник)</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #f4f4f9; 
+            margin: 0; 
+            padding: 20px; 
+            height: 100vh; 
+            box-sizing: border-box; 
+            overflow: hidden; 
+        }
+        
+        .container { 
+            display: flex; 
+            gap: 20px; 
+            height: 100%; 
+        }
+        
+        .panel { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            width: 50%; 
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto; 
+            box-sizing: border-box;
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+        
+        h2 { margin-top: 0; font-size: 20px; border-bottom: 2px solid #ccc; padding-bottom: 5px; }
+        
+        input[type="text"], input[type="number"] { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
+        
+        .manual-add { background: #f8f9fa; border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+        .manual-add h4 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
+        .manual-inputs { display: flex; gap: 5px; margin-bottom: 5px; }
+        .manual-inputs input[type="text"] { margin-bottom: 0; font-size: 14px; padding: 6px; }
+        .manual-btns { display: flex; gap: 5px; }
+        .manual-btns button { flex: 1; padding: 8px; font-size: 13px; }
+
+        ul { list-style: none; padding: 0; margin: 0; max-height: 350px; overflow-y: auto; border: 1px solid #ddd; }
+        li { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+        li:hover { background: #eef; }
+        .code { color: #666; font-size: 13px; font-weight: bold; }
+        .btn-group { display: flex; gap: 5px; }
+        
+        button { cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; font-size: 12px;}
+        .btn-left { background: #007bff; padding: 6px 10px; }
+        .btn-right { background: #28a745; padding: 6px 10px; }
+        
+        .actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-pdf { background: #dc3545; flex: 2; padding: 15px; font-size: 18px; border-radius: 6px; }
+        .btn-clear { background: #6c757d; flex: 1; padding: 15px; font-size: 16px; border-radius: 6px; }
+        .hint { text-align: center; color: #666; font-size: 14px; margin-top: 8px; margin-bottom: 10px;}
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; table-layout: fixed; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+        th { background: #f8f9fa; font-size: 14px; }
+        
+        .print-col h3 { font-size: 20px; margin: 10px 0; }
+        .btn-del { background: red; padding: 2px 5px; margin-left: 5px;}
+
+        #table-paint th:nth-child(1), #table-materials th:nth-child(1) { width: 90px; }
+        #table-paint th:nth-child(2), #table-materials th:nth-child(2) { width: auto; }
+        #table-paint th:nth-child(3), #table-materials th:nth-child(3) { width: 70px; }
+        #table-paint th:nth-child(4), #table-materials th:nth-child(4) { width: 40px; }
+
+        .print-header { text-align: left; margin-bottom: 20px; display: none; }
+        .print-header h1 { font-size: 20px; margin: 5px 0; }
+        .print-header p { margin: 4px 0; font-size: 14px; }
+
+        .mobile-tabs { display: none; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { flex-direction: column; gap: 10px; }
+            
+            .panel { width: 100%; padding: 15px 15px 70px 15px; } 
+            
+            .panel { display: none; }
+            .panel.active { display: flex; }
+
+            .mobile-tabs {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 10px;
+                width: 100%;
+            }
+            .mobile-tabs button {
+                flex: 1;
+                padding: 12px;
+                font-size: 16px;
+                border-radius: 6px;
+                background: #e0e0e0;
+                color: #333;
+            }
+            .mobile-tabs button.active {
+                background: #007bff;
+                color: white;
+            }
+            
+            .btn-left, .btn-right { padding: 10px; font-size: 14px; }
+            input[type="text"], input[type="number"] { font-size: 16px; padding: 12px; }
+            
+            .actions { 
+                position: sticky; 
+                bottom: 0; 
+                background: white; 
+                padding-top: 10px;
+                padding-bottom: env(safe-area-inset-bottom, 10px);
+                z-index: 10;
+            }
+        }
+
+        @media print {
+            @page { size: A4; margin: 5mm; }
+            body { background: white; margin: 0; padding: 0; height: auto; overflow: visible; }
+            .container { display: block; height: auto; }
+            .panel { width: 100% !important; box-shadow: none; padding: 0; overflow: visible; height: auto; display: block !important; }
+            
+            .panel:first-child { display: none !important; }
+            .mobile-tabs { display: none !important; }
+            #header-inputs, .actions, .btn-del { display: none; }
+            
+            .print-header { display: block !important; margin-bottom: 10px; }
+            .print-header h1 { font-size: 18px; }
+            .print-header p { font-size: 13px; }
+            
+            .print-layout { display: flex; gap: 10px; }
+            .print-col { width: 50%; }
+            
+            table { font-size: 10px; margin-top: 5px; table-layout: fixed; border-collapse: collapse; }
+            th, td { padding: 0px 2px; border: 1px solid #000; line-height: 1.1; }
+            th { font-size: 11px; text-align: center; padding: 1px 2px;}
+            .print-col h3 { font-size: 15px; margin: 3px 0; }
+            
+            #table-paint th:nth-child(1), #table-materials th:nth-child(1) { width: 65px; }
+            #table-paint th:nth-child(2), #table-materials th:nth-child(2) { width: auto; }
+            #table-paint th:nth-child(3), #table-materials th:nth-child(3) { width: 35px; text-align: center; }
+            
+            .action-col, td:last-child, th:last-child { display: none !important; }
+            
+            input[type=number]::-webkit-inner-spin-button, 
+            input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+            input[type=number] { -moz-appearance: textfield; border: none; background: transparent; width: 100%; text-align: center; font-size: 10px; font-weight: bold; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="mobile-tabs">
+    <button id="tabSearch" class="active" onclick="switchTab('search')">🔍 Поиск</button>
+    <button id="tabForm" onclick="switchTab('form')">📋 Бланк</button>
+</div>
+
+<div class="container">
+    <div class="panel active" id="panelSearch">
+        <h2>1. Поиск материала</h2>
+        
+        <input type="text" id="search" placeholder="Введите код (SE...) или название..." oninput="searchItems()">
+        
+        <div class="manual-add">
+            <h4>➕ Добавить вручную</h4>
+            <div class="manual-inputs">
+                <input type="text" id="manualCode" placeholder="Код (не обяз.)" style="width: 35%;">
+                <input type="text" id="manualName" placeholder="Наименование" style="width: 65%;">
+            </div>
+            <div class="manual-btns">
+                <button class="btn-left" onclick="addManual('paint')">◀ В Эмаль</button>
+                <button class="btn-right" onclick="addManual('materials')">В Материалы ▶</button>
+            </div>
+        </div>
+
+        <ul id="results"></ul>
+    </div>
+
+    <div class="panel" id="panelForm">
+        <div id="header-inputs">
+            <h2>2. Данные для наряда</h2>
+            <input type="text" id="orderNum" placeholder="№ Заказ-наряда" style="margin-bottom: 5px;">
+            <input type="text" id="carModel" placeholder="Автомобиль" style="margin-bottom: 5px;">
+            <input type="text" id="vin" placeholder="VIN / Номер" style="margin-bottom: 5px;">
+            <input type="text" id="master" placeholder="Маляр" style="margin-bottom: 5px;" value="Альберт">
+        </div>
+
+        <div class="print-header" id="document-header">
+            <h1>Малярный цех</h1>
+            <p id="print-order"></p>
+            <p id="print-car"></p>
+            <p id="print-master"></p>
+            <p id="print-date" style="color: #555; font-size: 12px; margin-top: 10px;"></p>
+        </div>
+
+        <div class="print-layout">
+            <div class="print-col">
+                <h3 style="text-align:center;">Автоэмаль</h3>
+                <table id="table-paint">
+                    <thead>
+                        <tr><th>Код</th><th>Наименование</th><th>Кол-во</th><th class="action-col">Удалить</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            
+            <div class="print-col">
+                <h3 style="text-align:center;">Материалы</h3>
+                <table id="table-materials">
+                    <thead>
+                        <tr><th>Код</th><th>Наименование</th><th>Кол-во</th><th class="action-col">Удалить</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn-pdf" onclick="preparePrint()">📄 СФОРМИРОВАТЬ PDF</button>
+            <button class="btn-clear" onclick="clearAll()">🗑️ Очистить</button>
+        </div>
+        <div class="hint">В окне печати выберите <b>«Сохранить как PDF»</b></div>
+    </div>
+</div>
+
+<script src="database.js"></script>
+
+<script>
+    function switchTab(tab) {
+        document.getElementById('panelSearch').classList.remove('active');
+        document.getElementById('panelForm').classList.remove('active');
+        document.getElementById('tabSearch').classList.remove('active');
+        document.getElementById('tabForm').classList.remove('active');
+
+        if (tab === 'search') {
+            document.getElementById('panelSearch').classList.add('active');
+            document.getElementById('tabSearch').classList.add('active');
+            document.getElementById('search').focus();
+        } else {
+            document.getElementById('panelForm').classList.add('active');
+            document.getElementById('tabForm').classList.add('active');
+        }
+    }
+
+    function saveState() {
+        const state = {
+            orderNum: document.getElementById('orderNum').value,
+            carModel: document.getElementById('carModel').value,
+            vin: document.getElementById('vin').value,
+            master: document.getElementById('master').value,
+            paintRows: [],
+            materialRows: []
+        };
+
+        document.querySelectorAll('#table-paint tbody tr').forEach(tr => {
+            state.paintRows.push({
+                code: tr.cells[0].innerText,
+                name: tr.cells[1].innerText,
+                fullName: tr.cells[1].getAttribute('title'),
+                qty: tr.querySelector('input').value
+            });
+        });
+
+        document.querySelectorAll('#table-materials tbody tr').forEach(tr => {
+            state.materialRows.push({
+                code: tr.cells[0].innerText,
+                name: tr.cells[1].innerText,
+                fullName: tr.cells[1].getAttribute('title'),
+                qty: tr.querySelector('input').value
+            });
+        });
+
+        localStorage.setItem('paintShopFormData', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const saved = localStorage.getItem('paintShopFormData');
+        if (!saved) return;
+
+        try {
+            const state = JSON.parse(saved);
+
+            document.getElementById('orderNum').value = state.orderNum || '';
+            document.getElementById('carModel').value = state.carModel || '';
+            document.getElementById('vin').value = state.vin || '';
+            document.getElementById('master').value = state.master || 'Альберт';
+
+            const paintTbody = document.querySelector('#table-paint tbody');
+            paintTbody.innerHTML = '';
+            state.paintRows.forEach(row => {
+                addRowToTable(paintTbody, row.code, row.name, row.fullName, row.qty);
+            });
+
+            const matTbody = document.querySelector('#table-materials tbody');
+            matTbody.innerHTML = '';
+            state.materialRows.forEach(row => {
+                addRowToTable(matTbody, row.code, row.name, row.fullName, row.qty);
+            });
+
+        } catch (e) {
+            console.error("Ошибка восстановления данных", e);
+        }
+    }
+
+    function clearAll() {
+        if (confirm("Вы уверены, что хотите начать новый наряд? Все текущие данные сотрутся.")) {
+            document.getElementById('orderNum').value = '';
+            document.getElementById('carModel').value = '';
+            document.getElementById('vin').value = '';
+            document.getElementById('master').value = 'Альберт';
+            document.querySelector('#table-paint tbody').innerHTML = '';
+            document.querySelector('#table-materials tbody').innerHTML = '';
+            localStorage.removeItem('paintShopFormData');
+        }
+    }
+
+    function addRowToTable(tbody, code, shortName, fullName, qty = 1) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-size:13px;">${code}</td>
+            <td style="font-size:13px;" title="${fullName}">${shortName}</td>
+            <td><input type="number" step="0.01" value="${qty}" style="width: 100%; box-sizing: border-box; padding: 4px;" oninput="saveState()"></td>
+            <td class="action-col" style="text-align:center;"><button class="btn-del" onclick="this.closest('tr').remove(); saveState();">X</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function searchItems() {
+        const query = document.getElementById('search').value.toLowerCase();
+        const resultsList = document.getElementById('results');
+        resultsList.innerHTML = '';
+
+        if (query.length < 2) return;
+
+        const filtered = database.filter(item => 
+            item.name.toLowerCase().includes(query) || 
+            item.code.toLowerCase().includes(query)
+        );
+
+        filtered.slice(0, 30).forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div style="flex: 1; padding-right: 10px;">
+                    <strong>${item.name}</strong><br>
+                    <span class="code">${item.code}</span>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-left" onclick="addToReport('${item.code}', '${item.name.replace(/'/g, "&#39;").replace(/"/g, '&quot;')}', 'paint')">◀ Эмаль</button>
+                    <button class="btn-right" onclick="addToReport('${item.code}', '${item.name.replace(/'/g, "&#39;").replace(/"/g, '&quot;')}', 'materials')">Матер ▶</button>
+                </div>
+            `;
+            resultsList.appendChild(li);
+        });
+    }
+
+    function addToReport(code, name, type) {
+        const tableId = type === 'paint' ? '#table-paint tbody' : '#table-materials tbody';
+        const tbody = document.querySelector(tableId);
+        
+        let shortName = name;
+        shortName = shortName.replace(/^Краска\s+(Brulex|Normex)\s+MIX\s+/i, '$1 ');
+        shortName = shortName.replace(/^Краска\s+/i, '');
+        
+        addRowToTable(tbody, code, shortName, name, 1);
+        
+        document.getElementById('search').value = ''; 
+        document.getElementById('results').innerHTML = ''; 
+        saveState();
+        
+        if (window.innerWidth <= 768) {
+            switchTab('form');
+        }
+    }
+
+    function addManual(type) {
+        const codeInput = document.getElementById('manualCode');
+        const nameInput = document.getElementById('manualName');
+        
+        let code = codeInput.value.trim();
+        let name = nameInput.value.trim();
+
+        if (!name) {
+            alert("Пожалуйста, введите наименование материала.");
+            return;
+        }
+
+        if (!code) {
+            code = "—"; 
+        }
+
+        addToReport(code, name, type);
+
+        codeInput.value = '';
+        nameInput.value = '';
+    }
+
+    function preparePrint() {
+        const order = document.getElementById('orderNum').value || "";
+        const car = document.getElementById('carModel').value || "";
+        const vin = document.getElementById('vin').value || "";
+        const master = document.getElementById('master').value || "";
+
+        document.getElementById('print-order').innerHTML = order ? `<strong>Заказ-наряд №</strong> ${order}` : ``;
+        
+        let carStr = `<strong>Автомобиль:</strong> ${car}`;
+        if (vin) {
+            carStr += ` | <strong>VIN/Номер:</strong> ${vin}`;
+        }
+        document.getElementById('print-car').innerHTML = (car || vin) ? carStr : ``;
+        
+        document.getElementById('print-master').innerHTML = `<strong>Маляр:</strong> ${master}`;
+        
+        const today = new Date().toLocaleDateString('ru-RU');
+        document.getElementById('print-date').innerHTML = `Дата: ${today}`;
+
+        window.print();
+    }
+
+    document.querySelectorAll('#header-inputs input').forEach(input => {
+        input.addEventListener('input', saveState);
+    });
+
+    window.onload = loadState;
+</script>
+</body>
+</html>
