@@ -38,6 +38,22 @@
         
         input[type="text"], input[type="number"] { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
         
+        /* Стили для переключателя очистки */
+        .clear-toggle {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            color: #0056b3;
+            font-weight: bold;
+            background: #eef;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        .clear-toggle input { margin-right: 10px; width: 20px; height: 20px; cursor: pointer; }
+
         .manual-add { background: #f8f9fa; border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
         .manual-add h4 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
         .manual-inputs { display: flex; gap: 5px; margin-bottom: 5px; }
@@ -127,7 +143,7 @@
             
             .panel:first-child { display: none !important; }
             .mobile-tabs { display: none !important; }
-            #header-inputs, .actions, .btn-del { display: none; }
+            #header-inputs, .actions, .btn-del, .clear-toggle { display: none; }
             
             .print-header { display: block !important; margin-bottom: 10px; }
             .print-header h1 { font-size: 18px; }
@@ -164,6 +180,12 @@
     <div class="panel active" id="panelSearch">
         <h2>1. Поиск материала</h2>
         
+        <!-- Переключатель режима очистки -->
+        <label class="clear-toggle">
+            <input type="checkbox" id="clearSearchToggle" checked>
+            Очищать поиск при добавлении
+        </label>
+
         <input type="text" id="search" placeholder="Введите код (SE...) или название..." oninput="searchItems()">
         
         <div class="manual-add">
@@ -368,13 +390,19 @@
         
         addRowToTable(tbody, code, shortName, name, 1);
         
-        document.getElementById('search').value = ''; 
-        document.getElementById('results').innerHTML = ''; 
-        saveState();
-        
-        if (window.innerWidth <= 768) {
-            switchTab('form');
+        // Логика очистки поиска
+        const shouldClear = document.getElementById('clearSearchToggle').checked;
+        if (shouldClear) {
+            document.getElementById('search').value = ''; 
+            document.getElementById('results').innerHTML = ''; 
+            
+            // Если на телефоне, перекидываем на бланк
+            if (window.innerWidth <= 768) {
+                switchTab('form');
+            }
         }
+        
+        saveState();
     }
 
     function addManual(type) {
