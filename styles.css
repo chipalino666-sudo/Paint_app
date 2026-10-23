@@ -1,0 +1,731 @@
+/* ==========================================================================
+   Заказ-наряд малярного цеха — стили
+   ========================================================================== */
+
+:root {
+  --blue: #007bff;
+  --green: #28a745;
+  --red: #dc3545;
+  --grey: #6c757d;
+  --border: #ccc;
+  --border-soft: #ddd;
+  --bg: #f4f4f9;
+  --ink-soft: #666;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 20px;
+  height: 100vh;
+  overflow: hidden;
+  color: #222;
+}
+
+/* ---------- Каркас ------------------------------------------------------- */
+
+.container {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+}
+
+.panel {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .1);
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ---------- Поля и кнопки ------------------------------------------------ */
+
+input[type=text],
+input[type=number],
+select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #fff;
+}
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] { -moz-appearance: textfield; }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+button:active { transform: translateY(1px); }
+
+.btn-left   { background: var(--blue);  padding: 6px 10px; }
+.btn-right  { background: var(--green); padding: 6px 10px; }
+.btn-pdf    { background: var(--red);   flex: 2; padding: 15px; font-size: 18px; border-radius: 6px; }
+.btn-clear  { background: var(--grey);  flex: 1; padding: 15px; font-size: 16px; border-radius: 6px; }
+.btn-del    { background: var(--red);   padding: 2px 5px; margin-left: 5px; }
+
+/* Нейтральная кнопка: «Шаблоны», «Отмена», «Экспорт» */
+.btn-ghost {
+  background: #eef1f5;
+  color: #2c3e50;
+  border: 1px solid #d3d9e0;
+  padding: 9px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.btn-ghost:hover { background: #e3e8ee; }
+
+.btn-primary {
+  background: var(--blue);
+  padding: 12px 18px;
+  font-size: 15px;
+  border-radius: 6px;
+}
+
+.btn-sm { padding: 5px 9px; font-size: 12px; }
+
+/* ---------- Поиск -------------------------------------------------------- */
+
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.search-row input[type=text] { margin-bottom: 10px; }
+
+.clear-toggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #0056b3;
+  font-weight: bold;
+  background: #eef;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.clear-toggle input {
+  margin: 0 10px 0 0;
+  width: 20px;
+  height: 20px;
+}
+
+details.manual-add {
+  background: #f8f9fa;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+}
+
+details.manual-add summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  color: #555;
+  padding: 2px 0;
+}
+
+details.manual-add[open] summary { margin-bottom: 10px; }
+
+.manual-inputs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.manual-inputs input[type=text] {
+  margin-bottom: 0;
+  font-size: 14px;
+  padding: 8px;
+}
+
+.manual-btns { display: flex; gap: 5px; }
+.manual-btns button { flex: 1; padding: 8px; font-size: 13px; }
+
+/* ---------- Категории ---------------------------------------------------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar { display: none; }
+
+.chip {
+  background: #eef1f5;
+  color: #33475b;
+  border: 1px solid #d3d9e0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  font-weight: normal;
+}
+
+.chip.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-weight: bold;
+}
+
+.section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--ink-soft);
+  font-weight: bold;
+  margin: 14px 0 6px;
+}
+
+/* ---------- Списки результатов ------------------------------------------- */
+
+ul.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  overflow-y: auto;
+  max-height: 380px;
+}
+
+ul.list:empty { display: none; }
+
+ul.list li {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  gap: 8px;
+}
+
+ul.list li:last-child { border-bottom: none; }
+ul.list li:hover { background: #eef; }
+
+.item-text { flex: 1; min-width: 0; }
+.item-name { word-wrap: break-word; }
+.code { color: var(--ink-soft); font-size: 13px; font-weight: bold; }
+.btn-group { display: flex; gap: 5px; flex-shrink: 0; }
+
+/* ---------- Карточка готового цвета -------------------------------------- */
+
+.recipe-card {
+  border: 1px solid #b8daff;
+  background: #f2f8ff;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.recipe-card:hover { background: #eaf4ff; }
+
+.badge {
+  display: inline-block;
+  background: #0d6efd;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: .05em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
+.recipe-card .recipe-name {
+  font-weight: bold;
+  font-size: 15px;
+  margin-left: 4px;
+}
+
+.recipe-card .recipe-mixes {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 4px 0 8px;
+}
+
+.recipe-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.recipe-add input[type=number] {
+  width: 90px;
+  margin-bottom: 0;
+  padding: 7px 8px;
+  font-size: 15px;
+  text-align: center;
+}
+
+.recipe-add .unit { font-size: 13px; color: var(--ink-soft); }
+
+.recipe-preview {
+  font-size: 11px;
+  color: #0b5ed7;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ---------- Таблицы бланка ----------------------------------------------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 15px;
+  table-layout: fixed;
+}
+
+th, td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th { background: #f8f9fa; font-size: 14px; }
+
+#print-area th:nth-child(1) { width: 90px; }
+#print-area th:nth-child(2) { width: auto; }
+#print-area th:nth-child(3) { width: 70px; }
+#print-area th:nth-child(4) { width: 40px; }
+
+.print-layout { display: block; }
+.print-col h3 { font-size: 20px; margin: 10px 0 0; text-align: center; }
+
+.cell-code, .cell-name { font-size: 13px; }
+.cell-name { word-wrap: break-word; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.hint {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.empty-note {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px 8px;
+}
+
+/* ---------- Шапка документа (только для печати) -------------------------- */
+
+.print-header {
+  display: none;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.print-header h1 { font-size: 20px; margin: 5px 0; }
+.print-header p { margin: 4px 0; font-size: 14px; }
+
+/* ---------- Мобильные вкладки -------------------------------------------- */
+
+.mobile-tabs { display: none; }
+
+/* ---------- Модальные окна ----------------------------------------------- */
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.modal.open { display: flex; align-items: flex-start; justify-content: center; }
+
+.modal-box {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 760px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+  margin: auto;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.modal-head h2 {
+  border: none;
+  margin: 0;
+  padding: 0;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: #eef1f5;
+  color: #333;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 11px;
+  border-radius: 6px;
+}
+
+.modal-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* ---------- Список шаблонов ---------------------------------------------- */
+
+.recipe-item {
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recipe-item .meta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+.recipe-item .title { font-weight: bold; font-size: 15px; }
+
+/* ---------- Редактор шаблона --------------------------------------------- */
+
+.field-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 6px;
+}
+
+.field { flex: 1; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.field-base { width: 130px; flex: 0 0 auto; }
+
+.mix-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.mix-row .mix-name {
+  flex: 1;
+  font-size: 13px;
+  background: #f6f8fa;
+  border: 1px solid #e3e8ee;
+  border-radius: 4px;
+  padding: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mix-row input[type=number] {
+  width: 100px;
+  margin-bottom: 0;
+  padding: 7px 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.mix-row .unit { font-size: 13px; color: var(--ink-soft); }
+
+.mix-sum {
+  font-size: 13px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: #f1f3f5;
+}
+
+.mix-sum.ok { background: #e6f6ea; color: #1a7f37; }
+.mix-sum.warn { background: #fff4e5; color: #b35c00; }
+
+/* Выпадающий список выбора микса */
+.picker { position: relative; }
+
+.picker-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 20;
+  display: none;
+}
+
+.picker-list.open { display: block; }
+
+.picker-list div {
+  padding: 9px 11px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.picker-list div:hover,
+.picker-list div.sel { background: #eef; }
+.picker-list .pk-code { color: var(--ink-soft); font-weight: bold; font-size: 12px; }
+
+.editor-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+/* ---------- Сообщение об ошибке ------------------------------------------ */
+
+#error-log {
+  display: none;
+  background: var(--red);
+  color: #fff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  font-weight: bold;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 9999;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+
+.toast.show { opacity: .95; }
+
+/* ---------- Мобильная вёрстка -------------------------------------------- */
+
+@media (max-width: 768px) {
+  body { padding: 10px; }
+
+  .container { flex-direction: column; gap: 10px; }
+
+  .panel {
+    width: 100%;
+    padding: 15px;
+    display: none;
+  }
+
+  .panel.active { display: flex; }
+
+  .mobile-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    width: 100%;
+  }
+
+  .mobile-tabs button {
+    flex: 1;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 6px;
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .mobile-tabs button.active { background: var(--blue); color: #fff; }
+
+  .btn-left, .btn-right { padding: 10px; font-size: 14px; }
+
+  .chips { flex-wrap: nowrap; overflow-x: auto; }
+
+  input[type=text], input[type=number] { font-size: 16px; padding: 12px; }
+
+  .recipe-add input[type=number] { width: 80px; padding: 9px; }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 10px;
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+    z-index: 10;
+  }
+
+  .modal { padding: 0; }
+
+  .modal-box {
+    border-radius: 0;
+    min-height: 100%;
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  ul.list { max-height: none; }
+
+  .mix-row input[type=number] { width: 80px; }
+}
+
+/* ---------- Печать / PDF -------------------------------------------------- */
+
+@page { size: A4; margin: 5mm; }
+
+@media print {
+  body {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  .container { display: block; height: auto; }
+
+  .panel {
+    width: 100% !important;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+    height: auto;
+    display: block !important;
+  }
+
+  #panelSearch { display: none !important; }
+  .mobile-tabs { display: none !important; }
+  #header-inputs, .actions, .btn-del, .clear-toggle, details.manual-add, .chips, .hint { display: none; }
+  .action-col, td:last-child, th:last-child { display: none !important; }
+
+  .print-header {
+    display: block !important;
+    margin-bottom: 10px;
+  }
+
+  .print-header h1 { font-size: 18px; }
+  .print-header p { font-size: 13px; }
+
+  .print-layout { display: flex; gap: 10px; }
+  .print-col { width: 50%; }
+
+  table {
+    font-size: 10px;
+    margin-top: 5px;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    padding: 0 2px;
+    border: 1px solid #000;
+    line-height: 1.1;
+    overflow: visible;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+
+  th { font-size: 11px; text-align: center; padding: 1px 2px; white-space: nowrap; }
+
+  .print-col h3 { font-size: 15px; margin: 3px 0; }
+
+  #print-area th:nth-child(1) { width: 65px; }
+  #print-area th:nth-child(2) { width: auto; }
+  #print-area th:nth-child(3) { width: 46px; text-align: center; }
+
+  input[type=number] {
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 0;
+  }
+
+  .cell-code, .cell-name { font-size: 10px; }
+
+  .modal { display: none !important; }
+}
