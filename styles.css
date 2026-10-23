@@ -461,6 +461,32 @@ th { background: #f8f9fa; font-size: 14px; }
 
 /* ---------- Список шаблонов ---------------------------------------------- */
 
+.backup-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 9px 11px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.backup-notice.warn {
+  background: #fff8e1;
+  border: 1px solid #f0d48a;
+  color: #8a5a00;
+}
+
+.backup-notice.ok {
+  background: #f1f3f5;
+  border: 1px solid #e3e8ee;
+  color: #6c757d;
+}
+
+.backup-notice .backup-text { flex: 1; min-width: 200px; }
+
 .recipe-item {
   border: 1px solid var(--border-soft);
   border-radius: 6px;

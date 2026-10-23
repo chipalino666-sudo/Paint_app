@@ -22,6 +22,8 @@
   const LS_USAGE = 'paintShopUsage';         // счётчик частых материалов
   const LS_TOGGLE = 'paintShopClearToggle';  // галочка «очищать поиск»
   const LS_MODE = 'paintShopSearchMode';     // выбранный режим поиска
+  const LS_DIRTY = 'paintShopDirty';         // сколько изменений без резервной копии
+  const LS_EXPORTED = 'paintShopLastExport'; // когда последний раз выгружали копию
 
   const MAX_RESULTS = 30;
   const MAX_FREQUENT = 8;
@@ -477,6 +479,8 @@
      ---------------------------------------------------------------------- */
 
   let recipes = [];
+  let backupDirty = 0;    // изменений, которых нет в файле-копии
+  let lastExportAt = 0;   // время последнего экспорта (0 — копии не было)
 
   function loadRecipes() {
     const saved = store.get(LS_RECIPES, null);
@@ -618,9 +622,69 @@
     $('#editorView').style.display = '';
   }
 
+  function markDirty() {
+    backupDirty += 1;
+    store.set(LS_DIRTY, backupDirty);
+  }
+
+  function plural(n, one, few, many) {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+    return many;
+  }
+
+  /**
+   * Напоминание о резервной копии.
+   * Краски хранятся только в браузере, поэтому пока в файл не выгружено —
+   * висит жёлтая полоса с кнопкой. Выгрузили — полоса становится серой.
+   */
+  function renderBackupNotice() {
+    const box = $('#backupNotice');
+    if (!box) return;
+
+    box.innerHTML = '';
+
+    if (backupDirty > 0) {
+      box.className = 'backup-notice warn';
+
+      const text = document.createElement('div');
+      text.className = 'backup-text';
+
+      if (lastExportAt) {
+        const date = new Date(lastExportAt).toLocaleDateString('ru-RU');
+        text.textContent =
+          `⚠ С последней копии (${date}) ${backupDirty} ` +
+          plural(backupDirty, 'изменение', 'изменения', 'изменений') +
+          '. Шаблоны хранятся только в этом браузере.';
+      } else {
+        text.textContent =
+          '⚠ Резервной копии ещё нет. Шаблоны хранятся только в этом браузере — ' +
+          'если почистить данные, они пропадут.';
+      }
+
+      const button = document.createElement('button');
+      button.className = 'btn-ghost btn-sm';
+      button.textContent = '⬇ Скачать копию';
+      button.addEventListener('click', exportRecipes);
+
+      box.append(text, button);
+      return;
+    }
+
+    if (lastExportAt) {
+      box.className = 'backup-notice ok';
+      const date = new Date(lastExportAt).toLocaleDateString('ru-RU');
+      box.textContent = `Копия от ${date} — шаблоны сохранены в файл.`;
+    }
+  }
+
   function renderRecipesList() {
     const box = $('#recipesList');
     box.innerHTML = '';
+
+    renderBackupNotice();
 
     if (!recipes.length) {
       const note = document.createElement('div');
@@ -664,6 +728,7 @@
         if (!confirm(`Удалить шаблон «${recipe.name}»?`)) return;
         recipes = recipes.filter((r) => r.id !== recipe.id);
         persistRecipes();
+        markDirty();
         renderRecipesList();
         toast('Шаблон удалён');
       });
@@ -861,6 +926,7 @@
     }
 
     const payload = { name, base: round2(base), unit, mixes };
+    const isNew = !editingId;
 
     if (editingId) {
       const index = recipes.findIndex((r) => r.id === editingId);
@@ -870,9 +936,16 @@
     }
 
     persistRecipes();
+    markDirty();
     showRecipesList();
     renderSearchView();
-    toast(editingId ? 'Шаблон обновлён' : 'Шаблон сохранён');
+
+    if (isNew && !lastExportAt) {
+      toast(`«${name}» сохранён. Резервной копии нет — нажмите «Скачать копию».`);
+    } else {
+      toast(isNew ? `«${name}» сохранён` : 'Шаблон обновлён');
+    }
+
     editingId = null;
   }
 
@@ -904,6 +977,12 @@
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    backupDirty = 0;
+    lastExportAt = Date.now();
+    store.set(LS_DIRTY, backupDirty);
+    store.set(LS_EXPORTED, lastExportAt);
+    renderBackupNotice();
 
     toast(`Выгружено шаблонов: ${recipes.length}`);
   }
@@ -1135,6 +1214,8 @@
     loadRecipes();
     usage = store.get(LS_USAGE, {}) || {};
     searchMode = store.get(LS_MODE, 'materials') === 'recipes' ? 'recipes' : 'materials';
+    backupDirty = store.get(LS_DIRTY, 0) || 0;
+    lastExportAt = store.get(LS_EXPORTED, 0) || 0;
 
     const toggle = store.get(LS_TOGGLE, true);
     $('#clearSearchToggle').checked = toggle !== false;
