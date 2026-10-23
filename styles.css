@@ -125,6 +125,28 @@ button:active { transform: translateY(1px); }
   align-items: flex-start;
 }
 
+.search-mode {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mode-btn {
+  flex: 1;
+  background: #eef1f5;
+  color: #33475b;
+  border: 1px solid #d3d9e0;
+  padding: 10px 8px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.mode-btn.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
 .search-row input[type=text] { margin-bottom: 10px; }
 
 .clear-toggle {

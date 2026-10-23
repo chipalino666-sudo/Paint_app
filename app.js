@@ -15,11 +15,13 @@
   'use strict';
 
   const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => [...document.querySelectorAll(sel)];
 
   const LS_FORM = 'paintShopFormData';       // черновик бланка
   const LS_RECIPES = 'paintShopRecipes';     // шаблоны готовых красок
   const LS_USAGE = 'paintShopUsage';         // счётчик частых материалов
   const LS_TOGGLE = 'paintShopClearToggle';  // галочка «очищать поиск»
+  const LS_MODE = 'paintShopSearchMode';     // выбранный режим поиска
 
   const MAX_RESULTS = 30;
   const MAX_FREQUENT = 8;
@@ -230,7 +232,25 @@
      ---------------------------------------------------------------------- */
 
   let activeCategory = 'all';
+  let searchMode = 'materials';
   let usage = {};
+
+  function applyModeUi() {
+    $$('.mode-btn').forEach((button) => {
+      button.classList.toggle('active', button.dataset.mode === searchMode);
+    });
+
+    $('#search').placeholder =
+      searchMode === 'recipes' ? 'Название цвета или код микса…' : 'Код, название материала…';
+  }
+
+  function setSearchMode(mode) {
+    searchMode = mode === 'recipes' ? 'recipes' : 'materials';
+    store.set(LS_MODE, searchMode);
+    $('#search').value = '';
+    applyModeUi();
+    renderSearchView();
+  }
 
   function rememberUsage(code, name, table) {
     if (!code || code === '—') return;
@@ -346,8 +366,21 @@
     const query = $('#search').value.trim();
     const resultsWrap = $('#resultsWrap');
     const frequentWrap = $('#frequentWrap');
+    const chips = $('#categoryChips');
 
     resultsWrap.innerHTML = '';
+
+    // Готовые краски живут в отдельном режиме поиска и не мешают материалам
+    if (searchMode === 'recipes') {
+      chips.style.display = 'none';
+      frequentWrap.style.display = 'none';
+      $('#manualBlock').style.display = 'none';
+      renderRecipeList(query);
+      return;
+    }
+
+    chips.style.display = '';
+    $('#manualBlock').style.display = '';
 
     const showFrequent = !query && activeCategory === 'all';
     frequentWrap.style.display = showFrequent ? '' : 'none';
@@ -356,17 +389,59 @@
     if (!query && activeCategory === 'all') return;
 
     if (query) {
-      // Готовые краски ищутся по названию и показываются над обычными материалами
-      const q = query.toLowerCase();
-      recipes
-        .filter((r) => r.name.toLowerCase().includes(q))
-        .forEach((r) => resultsWrap.appendChild(makeRecipeCard(r)));
-
       appendItemList(resultsWrap, filteredItems(query), 'Ничего не найдено. Проверьте код или добавьте вручную.');
       return;
     }
 
     appendItemList(resultsWrap, filteredItems(''), null);
+  }
+
+  function renderRecipeList(query) {
+    const resultsWrap = $('#resultsWrap');
+    const q = query.toLowerCase();
+
+    if (!recipes.length) {
+      resultsWrap.appendChild(recipeEmptyState());
+      return;
+    }
+
+    // Ищем и по названию цвета, и по миксам — так видно, куда входит нужный пигмент
+    const matched = recipes.filter((recipe) => {
+      if (!q) return true;
+      if (recipe.name.toLowerCase().includes(q)) return true;
+      return recipe.mixes.some((mix) => (mix.code + ' ' + mix.name).toLowerCase().includes(q));
+    });
+
+    if (!matched.length) {
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = 'Такого готового цвета нет. Проверьте название или код микса.';
+      resultsWrap.appendChild(note);
+      return;
+    }
+
+    matched.forEach((recipe) => resultsWrap.appendChild(makeRecipeCard(recipe)));
+  }
+
+  function recipeEmptyState() {
+    const box = document.createElement('div');
+    box.className = 'empty-note';
+
+    const text = document.createElement('div');
+    text.textContent =
+      'Шаблонов пока нет. Соберите первый готовый цвет — дальше его миксы будут считаться сами.';
+
+    const button = document.createElement('button');
+    button.className = 'btn-primary';
+    button.style.marginTop = '12px';
+    button.textContent = '＋ Новый шаблон';
+    button.addEventListener('click', () => {
+      openRecipesModal();
+      startEdit(null);
+    });
+
+    box.append(text, button);
+    return box;
   }
 
   function appendItemList(container, items, emptyText) {
@@ -975,6 +1050,10 @@
   function bindEvents() {
     $('#search').addEventListener('input', renderSearchView);
 
+    $$('.mode-btn').forEach((button) => {
+      button.addEventListener('click', () => setSearchMode(button.dataset.mode));
+    });
+
     $('#clearSearchToggle').addEventListener('change', (e) => {
       store.set(LS_TOGGLE, e.target.checked);
     });
@@ -1055,12 +1134,14 @@
 
     loadRecipes();
     usage = store.get(LS_USAGE, {}) || {};
+    searchMode = store.get(LS_MODE, 'materials') === 'recipes' ? 'recipes' : 'materials';
 
     const toggle = store.get(LS_TOGGLE, true);
     $('#clearSearchToggle').checked = toggle !== false;
 
     loadForm();
     renderChips();
+    applyModeUi();
     renderSearchView();
     bindEvents();
   }

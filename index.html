@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -26,7 +26,12 @@
       <button class="btn-ghost btn-sm" id="btnOpenRecipes">🧪 Мои краски</button>
     </h2>
 
-    <input type="text" id="search" placeholder="Код, название или готовый цвет…" autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="search-mode">
+      <button class="mode-btn active" data-mode="materials">🔧 Материалы</button>
+      <button class="mode-btn" data-mode="recipes">🎨 Готовые краски</button>
+    </div>
+
+    <input type="text" id="search" placeholder="Код, название материала…" autocomplete="off" autocorrect="off" spellcheck="false">
 
     <label class="clear-toggle">
       <input type="checkbox" id="clearSearchToggle" checked>
