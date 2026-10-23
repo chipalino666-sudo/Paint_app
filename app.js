@@ -804,17 +804,20 @@
   /* ---- Экспорт / импорт базы шаблонов ---------------------------------- */
 
   function exportRecipes() {
-    if (!recipes.length) {
-      toast('Шаблонов пока нет — нечего выгружать');
+    if (!recipes.length && !Object.keys(usage).length) {
+      toast('Нечего выгружать: нет ни шаблонов, ни истории');
       return;
     }
 
     const payload = {
       app: 'paint-app',
       kind: 'recipes',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      recipes
+      recipes,
+      // Вместе с шаблонами переносим историю «часто используемых»,
+      // чтобы на новом устройстве список не пришлось набирать заново.
+      usage
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -879,8 +882,37 @@
 
       persistRecipes();
       renderRecipesList();
+
+      // История «часто используемых» приезжает вместе с файлом
+      let usageMerged = 0;
+
+      if (parsed && typeof parsed === 'object' && parsed.usage && typeof parsed.usage === 'object') {
+        Object.entries(parsed.usage).forEach(([code, info]) => {
+          if (!info || !(info.n > 0)) return;
+
+          const prev = usage[code];
+
+          if (!prev) {
+            usage[code] = {
+              n: info.n,
+              table: info.table === 'materials' ? 'materials' : 'paint',
+              name: String(info.name || '')
+            };
+            usageMerged++;
+          } else if (info.n > prev.n) {
+            prev.n = info.n;
+            if (info.name) prev.name = String(info.name);
+          }
+        });
+
+        if (usageMerged) store.set(LS_USAGE, usage);
+      }
+
       renderSearchView();
-      toast(`Добавлено: ${added}. Пропущено: ${skipped} (уже есть или битые).`);
+
+      let message = `Добавлено шаблонов: ${added}, пропущено: ${skipped} (уже есть или битые).`;
+      if (usageMerged) message += ` Частых материалов: +${usageMerged}.`;
+      toast(message);
     };
 
     reader.onerror = () => toast('Не удалось прочитать файл');
