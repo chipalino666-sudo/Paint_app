@@ -21,10 +21,7 @@
 
   <!-- ======================= ПОИСК ======================= -->
   <section class="panel active" id="panelSearch">
-    <h2>
-      1. Поиск
-      <button class="btn-ghost btn-sm" id="btnOpenRecipes">🧪 Мои краски</button>
-    </h2>
+    <h2>1. Поиск</h2>
 
     <div class="search-mode">
       <button class="mode-btn active" data-mode="materials">🔧 Материалы</button>
@@ -49,6 +46,17 @@
         <button class="btn-right" id="btnManualMaterials">В Материалы ▶</button>
       </div>
     </details>
+
+    <!-- Управление готовыми красками: только в режиме «Готовые краски» -->
+    <div id="recipesBar" style="display:none">
+      <div class="modal-toolbar">
+        <button class="btn-primary" id="btnNewRecipe">＋ Новая краска</button>
+        <button class="btn-ghost" id="btnExport">⬇ Копия</button>
+        <button class="btn-ghost" id="btnImport">⬆ Загрузить</button>
+        <input type="file" id="fileImport" accept=".json,application/json" hidden>
+      </div>
+      <div id="backupNotice"></div>
+    </div>
 
     <div class="chips" id="categoryChips"></div>
 
@@ -110,29 +118,16 @@
 
 </div>
 
-<!-- ======================= ОКНО ШАБЛОНОВ ======================= -->
+<!-- ======================= РЕДАКТОР ГОТОВОЙ КРАСКИ ======================= -->
 <div class="modal" id="recipesModal">
   <div class="modal-box">
 
     <div class="modal-head">
-      <h2>🧪 Мои готовые краски</h2>
-      <button class="modal-close" id="btnCloseRecipes">×</button>
+      <h2 id="editorTitle">Готовая краска</h2>
+      <button class="modal-close" id="btnCloseEditor">×</button>
     </div>
 
-    <!-- Список шаблонов -->
-    <div id="recipesView">
-      <div class="modal-toolbar">
-        <button class="btn-primary" id="btnNewRecipe">＋ Новый шаблон</button>
-        <button class="btn-ghost" id="btnExport">⬇ Экспорт</button>
-        <button class="btn-ghost" id="btnImport">⬆ Импорт</button>
-        <input type="file" id="fileImport" accept=".json,application/json" hidden>
-      </div>
-      <div id="backupNotice"></div>
-      <div id="recipesList"></div>
-    </div>
-
-    <!-- Редактор шаблона -->
-    <div id="editorView" style="display:none">
+    <div id="editorView">
       <div class="field-row">
         <div class="field">
           <label for="recName">Название готового цвета</label>
@@ -164,6 +159,7 @@
       <div class="mix-sum" id="mixSum"></div>
 
       <div class="editor-actions">
+        <button class="btn-ghost btn-danger" id="btnDeleteRecipe" style="display:none">🗑 Удалить</button>
         <button class="btn-ghost" id="btnCancelEdit">Отмена</button>
         <button class="btn-primary" id="btnSaveRecipe">Сохранить</button>
       </div>

@@ -115,6 +115,13 @@ button:active { transform: translateY(1px); }
   border-radius: 6px;
 }
 
+.btn-danger {
+  color: #b02a37;
+  border-color: #f0b4bb;
+}
+
+.btn-danger:hover { background: #fdeef0; }
+
 .btn-sm { padding: 5px 9px; font-size: 12px; }
 
 /* ---------- Поиск -------------------------------------------------------- */
@@ -286,6 +293,33 @@ ul.list li:hover { background: #eef; }
 }
 
 .recipe-card:hover { background: #eaf4ff; }
+
+.recipe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recipe-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.recipe-edit {
+  background: #fff;
+  color: #0b5ed7;
+  border: 1px solid #b8daff;
+  padding: 4px 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.recipe-edit:hover { background: #eaf4ff; }
 
 .badge {
   display: inline-block;
@@ -599,6 +633,8 @@ th { background: #f8f9fa; font-size: 14px; }
   margin-top: 16px;
   justify-content: flex-end;
 }
+
+.editor-actions .btn-danger { margin-right: auto; }
 
 /* ---------- Сообщение об ошибке ------------------------------------------ */
 

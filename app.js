@@ -377,12 +377,15 @@
       chips.style.display = 'none';
       frequentWrap.style.display = 'none';
       $('#manualBlock').style.display = 'none';
+      $('#recipesBar').style.display = '';
+      renderBackupNotice();
       renderRecipeList(query);
       return;
     }
 
     chips.style.display = '';
     $('#manualBlock').style.display = '';
+    $('#recipesBar').style.display = 'none';
 
     const showFrequent = !query && activeCategory === 'all';
     frequentWrap.style.display = showFrequent ? '' : 'none';
@@ -436,11 +439,8 @@
     const button = document.createElement('button');
     button.className = 'btn-primary';
     button.style.marginTop = '12px';
-    button.textContent = '＋ Новый шаблон';
-    button.addEventListener('click', () => {
-      openRecipesModal();
-      startEdit(null);
-    });
+    button.textContent = '＋ Новая краска';
+    button.addEventListener('click', () => openEditor(null));
 
     box.append(text, button);
     return box;
@@ -536,13 +536,27 @@
     card.className = 'recipe-card';
 
     const head = document.createElement('div');
+    head.className = 'recipe-head';
+
+    const title = document.createElement('div');
+    title.className = 'recipe-title';
+
     const badge = document.createElement('span');
     badge.className = 'badge';
     badge.textContent = 'готовый цвет';
     const name = document.createElement('span');
     name.className = 'recipe-name';
     name.textContent = recipe.name;
-    head.append(badge, name);
+    title.append(badge, name);
+
+    const edit = document.createElement('button');
+    edit.className = 'recipe-edit';
+    edit.textContent = '✎';
+    edit.title = 'Изменить состав';
+    edit.setAttribute('aria-label', 'Изменить состав краски ' + recipe.name);
+    edit.addEventListener('click', () => openEditor(recipe));
+
+    head.append(title, edit);
 
     const mixes = document.createElement('div');
     mixes.className = 'recipe-mixes';
@@ -566,7 +580,7 @@
     unit.textContent = recipe.unit;
 
     const button = document.createElement('button');
-    button.className = 'btn-left';
+    button.className = 'btn-left recipe-add-btn';
     button.textContent = '→ В бланк';
 
     const preview = document.createElement('div');
@@ -601,25 +615,29 @@
   let editingId = null;
   let draftMixes = [];
 
-  function openRecipesModal() {
+  function openEditor(recipe) {
+    editingId = recipe ? recipe.id : null;
+    draftMixes = recipe ? JSON.parse(JSON.stringify(recipe.mixes)) : [];
+
+    $('#editorTitle').textContent = recipe ? 'Изменить краску' : 'Новая готовая краска';
+    $('#btnDeleteRecipe').style.display = recipe ? '' : 'none';
+
+    $('#recName').value = recipe ? recipe.name : '';
+    $('#recBase').value = recipe ? fmt(recipe.base) : '100';
+    $('#recUnit').value = recipe ? recipe.unit : 'г';
+    $('#mixPicker').value = '';
+    $('#mixPickerList').classList.remove('open');
+
+    renderMixRows();
+    updateMixSum();
+
     $('#recipesModal').classList.add('open');
-    showRecipesList();
+    $('#recName').focus();
   }
 
-  function closeRecipesModal() {
+  function closeEditor() {
     $('#recipesModal').classList.remove('open');
-    showRecipesList();
-  }
-
-  function showRecipesList() {
-    $('#editorView').style.display = 'none';
-    $('#recipesView').style.display = '';
-    renderRecipesList();
-  }
-
-  function showEditor() {
-    $('#recipesView').style.display = 'none';
-    $('#editorView').style.display = '';
+    editingId = null;
   }
 
   function markDirty() {
@@ -678,81 +696,6 @@
       const date = new Date(lastExportAt).toLocaleDateString('ru-RU');
       box.textContent = `Копия от ${date} — шаблоны сохранены в файл.`;
     }
-  }
-
-  function renderRecipesList() {
-    const box = $('#recipesList');
-    box.innerHTML = '';
-
-    renderBackupNotice();
-
-    if (!recipes.length) {
-      const note = document.createElement('div');
-      note.className = 'empty-note';
-      note.textContent = 'Шаблонов пока нет. Нажмите «Новый шаблон», чтобы собрать первый готовый цвет.';
-      box.appendChild(note);
-      return;
-    }
-
-    recipes.forEach((recipe) => {
-      const row = document.createElement('div');
-      row.className = 'recipe-item';
-
-      const info = document.createElement('div');
-      const title = document.createElement('div');
-      title.className = 'title';
-      title.textContent = recipe.name;
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent =
-        `База ${fmt(recipe.base)} ${recipe.unit} · ${recipe.mixes.length} ` +
-        (recipe.mixes.length === 1 ? 'микс' : 'микса') + ' · ' +
-        recipe.mixes.map((m) => `${shortenName(m.name)} ${fmt(m.amount)}`).join(', ');
-
-      info.append(title, meta);
-
-      const actions = document.createElement('div');
-      actions.className = 'btn-group';
-
-      const edit = document.createElement('button');
-      edit.className = 'btn-left btn-sm';
-      edit.textContent = 'Изменить';
-      edit.addEventListener('click', () => startEdit(recipe));
-
-      const del = document.createElement('button');
-      del.className = 'btn-del btn-sm';
-      del.style.padding = '5px 9px';
-      del.textContent = 'Удалить';
-      del.addEventListener('click', () => {
-        if (!confirm(`Удалить шаблон «${recipe.name}»?`)) return;
-        recipes = recipes.filter((r) => r.id !== recipe.id);
-        persistRecipes();
-        markDirty();
-        renderRecipesList();
-        toast('Шаблон удалён');
-      });
-
-      actions.append(edit, del);
-      row.append(info, actions);
-      box.appendChild(row);
-    });
-  }
-
-  function startEdit(recipe) {
-    editingId = recipe ? recipe.id : null;
-    draftMixes = recipe ? JSON.parse(JSON.stringify(recipe.mixes)) : [];
-
-    $('#recName').value = recipe ? recipe.name : '';
-    $('#recBase').value = recipe ? fmt(recipe.base) : '100';
-    $('#recUnit').value = recipe ? recipe.unit : 'г';
-    $('#mixPicker').value = '';
-    $('#mixPickerList').classList.remove('open');
-
-    renderMixRows();
-    updateMixSum();
-    showEditor();
-    $('#recName').focus();
   }
 
   function renderMixRows() {
@@ -899,6 +842,20 @@
     list.classList.add('open');
   }
 
+  function deleteEditingRecipe() {
+    const recipe = recipes.find((r) => r.id === editingId);
+    if (!recipe) return;
+
+    if (!confirm(`Удалить краску «${recipe.name}»?`)) return;
+
+    recipes = recipes.filter((r) => r.id !== recipe.id);
+    persistRecipes();
+    markDirty();
+    closeEditor();
+    renderSearchView();
+    toast('Краска удалена');
+  }
+
   function saveRecipeFromEditor() {
     const name = $('#recName').value.trim();
     const base = parseFloat($('#recBase').value);
@@ -937,7 +894,7 @@
 
     persistRecipes();
     markDirty();
-    showRecipesList();
+    closeEditor();
     renderSearchView();
 
     if (isNew && !lastExportAt) {
@@ -945,8 +902,6 @@
     } else {
       toast(isNew ? `«${name}» сохранён` : 'Шаблон обновлён');
     }
-
-    editingId = null;
   }
 
   /* ---- Экспорт / импорт базы шаблонов ---------------------------------- */
@@ -1035,7 +990,6 @@
       });
 
       persistRecipes();
-      renderRecipesList();
 
       // История «часто используемых» приезжает вместе с файлом
       let usageMerged = 0;
@@ -1152,12 +1106,12 @@
     $('#btnPdf').addEventListener('click', preparePrint);
     $('#btnClear').addEventListener('click', clearAll);
 
-    // Шаблоны
-    $('#btnOpenRecipes').addEventListener('click', openRecipesModal);
-    $('#btnCloseRecipes').addEventListener('click', closeRecipesModal);
-    $('#btnNewRecipe').addEventListener('click', () => startEdit(null));
-    $('#btnCancelEdit').addEventListener('click', showRecipesList);
+    // Готовые краски
+    $('#btnNewRecipe').addEventListener('click', () => openEditor(null));
+    $('#btnCloseEditor').addEventListener('click', closeEditor);
+    $('#btnCancelEdit').addEventListener('click', closeEditor);
     $('#btnSaveRecipe').addEventListener('click', saveRecipeFromEditor);
+    $('#btnDeleteRecipe').addEventListener('click', deleteEditingRecipe);
     $('#btnExport').addEventListener('click', exportRecipes);
     $('#btnImport').addEventListener('click', () => $('#fileImport').click());
 
@@ -1181,9 +1135,9 @@
       if (!e.target.closest('.picker')) $('#mixPickerList').classList.remove('open');
     });
 
-    // Закрытие окна шаблонов по Esc
+    // Закрытие редактора по Esc
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && $('#recipesModal').classList.contains('open')) closeRecipesModal();
+      if (e.key === 'Escape' && $('#recipesModal').classList.contains('open')) closeEditor();
     });
   }
 
