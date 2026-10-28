@@ -1353,3 +1353,15 @@ td.empty-line,
 
 [data-theme="dark"] td.empty-line,
 [data-theme="dark"] .empty-line { background: rgba(255, 255, 255, .03); }
+
+/* Ловушка для автозаполнения: невидима и недоступна */
+.autofill-trap {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

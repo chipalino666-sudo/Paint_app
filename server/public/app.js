@@ -35,7 +35,8 @@
 
   /**
    * Браузер любит подставлять сохранённый логин в первое текстовое поле страницы.
-   * Держим поле «закрытым» до первого касания, а значение без ввода стираем.
+   * Держим поле «закрытым» до первого касания и стираем всё, что появилось без ввода.
+   * Opera умеет вставлять значение молча, без событий, поэтому ещё и проверяем таймером.
    */
   function shieldInput(input) {
     if (!input || input.dataset.shielded === '1') return;
@@ -48,21 +49,43 @@
     input.setAttribute('readonly', '');
 
     let typed = false;
+    let guard = null;
+
+    const clearIfForeign = () => {
+      if (!typed && input.value) {
+        input.value = '';
+        return true;
+      }
+      return false;
+    };
 
     const unlock = () => {
       input.removeAttribute('readonly');
-      input.removeEventListener('focus', unlock);
-      input.removeEventListener('pointerdown', unlock);
+      clearIfForeign();
+
+      // Менеджер паролей может вписать логин уже после фокуса
+      if (!guard) {
+        guard = setInterval(() => {
+          clearIfForeign();
+          if (typed || document.activeElement !== input) {
+            clearInterval(guard);
+            guard = null;
+          }
+        }, 300);
+      }
     };
 
     input.addEventListener('focus', unlock);
     input.addEventListener('pointerdown', unlock);
-    input.addEventListener('keydown', () => { typed = true; });
-    input.addEventListener('paste', () => { typed = true; });
 
-    input.addEventListener('input', () => {
-      if (!typed && input.value) input.value = '';
+    input.addEventListener('keydown', (event) => {
+      // Стрелки и Tab — не ввод, но и не повод стирать
+      if (event.key.length === 1) typed = true;
     });
+
+    input.addEventListener('paste', () => { typed = true; });
+    input.addEventListener('beforeinput', () => { typed = true; });
+    input.addEventListener('input', clearIfForeign);
   }
 
   function shieldInputs(root) {
