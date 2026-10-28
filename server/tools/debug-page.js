@@ -101,7 +101,7 @@ async function main() {
     await sleep(3500);
 
     const result = await send('Runtime.evaluate', {
-      expression: `JSON.stringify({
+      expression: process.env.PAINT_EXPR || `JSON.stringify({
         name: document.getElementById('userName')?.textContent, navButtons: [...document.querySelectorAll('#nav .btn')].map(b => b.textContent.trim()), cards: document.querySelectorAll('.order-card').length,
         rows: document.querySelectorAll('#ordersBody tr').length,
         bodyText: (document.getElementById('ordersBody')?.innerText || '').slice(0, 200),

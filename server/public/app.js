@@ -8,6 +8,28 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+  /** Светлая и тёмная тема: выбор запоминается в браузере. */
+  function setTheme(name) {
+    if (name === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+
+    try { localStorage.setItem('theme', name); } catch (error) { /* приватный режим */ }
+
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', name === 'dark' ? '#0b1220' : '#2563eb');
+
+    const button = document.getElementById('btnTheme');
+    if (button) {
+      const label = name === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    }
+  }
+
+  function applyStoredTheme() {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    setTheme(dark ? 'dark' : 'light');
+  }
   /** Телефон или узкое окно — тот же порог, что в стилях. */
   const isMobile = () => window.innerWidth <= 780;
 
@@ -2518,6 +2540,16 @@
     $('#recipeMixPicker').addEventListener('input', renderMixPicker);
 
     $('#btnAddUser').addEventListener('click', addUser);
+    const themeButton = $('#btnTheme');
+    if (themeButton) {
+      themeButton.addEventListener('click', () => {
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        setTheme(dark ? 'light' : 'dark');
+      });
+    }
+
+    applyStoredTheme();
+
     setupInstall();
     $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
     $('#btnResetRoleLabels').addEventListener('click', () => saveRoleLabels(true));

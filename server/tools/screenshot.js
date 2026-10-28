@@ -164,6 +164,17 @@ async function main() {
       mobile
     });
 
+    if (process.env.PAINT_THEME) {
+      await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `try { localStorage.setItem('theme', '${process.env.PAINT_THEME}'); } catch (e) {}`
+      });
+    }
+    if (process.env.PAINT_DARK === '1') {
+      await cdp.send('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-color-scheme', value: 'dark' }]
+      });
+    }
+
     if (!anon) {
       await cdp.send('Network.setCookie', {
         name: 'psid', value: token, domain: '127.0.0.1', path: '/'
