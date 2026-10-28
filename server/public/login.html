@@ -90,9 +90,13 @@
   const submitBtn = document.getElementById('submitBtn');
 
   // Если сессия ещё жива — возвращаем внутрь, чтобы кнопка «Назад»
-  // не показывала окно входа уже вошедшему человеку
+  // не показывала окно входа уже вошедшему человеку.
+  // Важно: /api/me отвечает 200 и без сессии (user: null) — смотрим на тело.
   fetch('/api/me', { credentials: 'same-origin' })
-    .then((response) => { if (response.ok) location.replace('/'); })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => {
+      if (data && data.user) location.replace('/');
+    })
     .catch(() => { /* не критично */ });
 
   // Служебный скрипт нужен, чтобы браузер предложил установку
