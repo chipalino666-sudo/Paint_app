@@ -168,6 +168,13 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_channel_idx ON messages(channel, id);
 
+CREATE TABLE IF NOT EXISTS order_reads (
+  user_id  INTEGER NOT NULL,
+  order_id INTEGER NOT NULL,
+  seen_at  TEXT NOT NULL,
+  PRIMARY KEY (user_id, order_id)
+);
+
 CREATE TABLE IF NOT EXISTS chat_reads (
   user_id  INTEGER NOT NULL,
   channel  TEXT NOT NULL,
@@ -433,6 +440,32 @@ function init() {
     UPDATE users SET specialty = 'painter'
      WHERE role = 'master' AND is_workstation = 0 AND (specialty IS NULL OR specialty = '')
   `).run();
+
+  // Кто ещё ни разу не открывал заказы — тому прошлое не показываем как «изменения».
+  // Один раз это делаем для всех: иначе после обновления все старые заказы «горят».
+  const now = new Date().toISOString();
+  const markSeen = db.prepare(`
+    INSERT OR IGNORE INTO order_reads (user_id, order_id, seen_at)
+    SELECT ?, id, ? FROM orders
+  `);
+
+  const done = db.prepare("SELECT value FROM settings WHERE key = 'order_reads_ready'").get();
+
+  if (!done) {
+    db.prepare(`
+      INSERT OR IGNORE INTO order_reads (user_id, order_id, seen_at)
+      SELECT u.id, o.id, ? FROM users u CROSS JOIN orders o
+    `).run(now);
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('order_reads_ready', '1')").run();
+  }
+
+  const freshUsers = db.prepare(`
+    SELECT u.id FROM users u
+     WHERE NOT EXISTS (SELECT 1 FROM order_reads r WHERE r.user_id = u.id)
+  `).all();
+
+  for (const user of freshUsers) markSeen.run(user.id, now);
 
   const works = seedWorks();
   const materials = seedMaterials();

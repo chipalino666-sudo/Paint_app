@@ -894,6 +894,22 @@ ul.history .muted { font-size: 11.5px; margin-bottom: 2px; }
 
 /* ---------- Заказ с новым сообщением ------------------------------------- */
 
+.notify-line { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.notify {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.notify-chat { background: var(--blue); }
+.notify-edit { background: #d97706; }
+
 tr.unread td { background: #eff6ff; }
 tr.unread td:first-child { box-shadow: inset 3px 0 0 var(--blue); }
 tr.unread:hover td { background: #e3efff; }

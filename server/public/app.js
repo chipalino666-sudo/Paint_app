@@ -190,9 +190,10 @@
     });
   }
 
-  async function loadOrders() {
+  /** silent = true — обновить в фоне, без надписи «Загрузка…» */
+  async function loadOrders(silent = false) {
     const body = $('#ordersBody');
-    body.innerHTML = '<tr><td colspan="6" class="spinner">Загрузка…</td></tr>';
+    if (!silent) body.innerHTML = '<tr><td colspan="6" class="spinner">Загрузка…</td></tr>';
 
     const params = new URLSearchParams();
 
@@ -207,8 +208,23 @@
       state.orders = data.orders;
       renderOrders();
     } catch (error) {
-      body.innerHTML = `<tr><td colspan="6" class="empty-line">${esc(error.message)}</td></tr>`;
+      if (!silent) body.innerHTML = `<tr><td colspan="6" class="empty-line">${esc(error.message)}</td></tr>`;
     }
+  }
+
+  /** Плашки у заказа: новое сообщение и/или изменения. */
+  function orderNotice(order) {
+    const parts = [];
+
+    if (Number(order.unread_chat) > 0) {
+      parts.push('<span class="notify notify-chat">Новое сообщение</span>');
+    }
+
+    if (Number(order.unread_changes) > 0) {
+      parts.push('<span class="notify notify-edit">Изменения</span>');
+    }
+
+    return parts.length ? '<div class="notify-line">' + parts.join('') + '</div>' : '';
   }
 
   function renderOrders() {
@@ -236,11 +252,16 @@
         card.className = 'order-card';
         card.dataset.id = order.id;
 
+        if (Number(order.unread_chat) > 0 || Number(order.unread_changes) > 0) {
+          card.classList.add('unread');
+        }
+
         card.innerHTML = `
           <div class="oc-top">
             <span class="order-number">${esc(order.number)}</span>
             <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
           </div>
+          ${orderNotice(order)}
           <div class="oc-car">${esc(order.plate)}<span class="muted"> ${esc([order.make, order.model].filter(Boolean).join(' '))}</span></div>
           <div class="oc-master">${esc(order.master_name || 'маляр не назначен')}${order.bodyworker_name
             ? `<span class="muted"> · кузовщик: ${esc(order.bodyworker_name)}</span>` : ''}</div>
@@ -255,13 +276,15 @@
       });
 
       empty.appendChild(list);
-      applyOrderUnreadHighlight();
       return;
     }
 
-    body.innerHTML = state.orders.map((order) => `
-      <tr data-id="${order.id}">
-        <td><span class="order-number">${esc(order.number)}</span></td>
+    body.innerHTML = state.orders.map((order) => {
+      const hasNews = Number(order.unread_chat) > 0 || Number(order.unread_changes) > 0;
+
+      return `
+      <tr data-id="${order.id}"${hasNews ? ' class="unread"' : ''}>
+        <td><span class="order-number">${esc(order.number)}</span>${orderNotice(order)}</td>
         <td>
           <div>${esc(order.plate)}</div>
           <div class="muted">${esc([order.make, order.model].filter(Boolean).join(' '))}</div>
@@ -271,14 +294,12 @@
         <td><span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span></td>
         <td class="muted">${dateText(order.created_at)}</td>
         <td class="num mono">${money(order.total)}</td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
 
     [...body.rows].forEach((row) => {
       row.addEventListener('click', () => openOrder(row.dataset.id));
     });
-
-    applyOrderUnreadHighlight();
   }
 
   /* ------------------------------------------------------------------------
@@ -738,15 +759,6 @@
     }
   }
 
-  /** Подсветить заказы, в обсуждении которых есть новые сообщения. */
-  function applyOrderUnreadHighlight() {
-    const byOrder = state.unreadOrders || {};
-
-    document.querySelectorAll('#ordersBody [data-id], #ordersEmpty [data-id]').forEach((element) => {
-      element.classList.toggle('unread', Boolean(byOrder[element.dataset.id]));
-    });
-  }
-
   async function refreshChatBadge() {
     const generalBadge = $('#chatBadge');
     const ordersBadge = $('#ordersBadge');
@@ -756,25 +768,19 @@
       const data = await api('/api/chat/unread');
       const channels = data.channels || {};
 
+      // Всё, что относится к заказам: сообщения в их обсуждениях
       let ordersTotal = 0;
-      const byOrder = {};
 
       for (const [channel, count] of Object.entries(channels)) {
         if (channel === 'general') continue;
-
-        const match = /^order:(\d+)$/.exec(channel);
-        if (!match) continue;
-
-        byOrder[match[1]] = count;
         ordersTotal += count;
       }
 
-      state.unreadOrders = byOrder;
+      // Плюс изменения заказов, которые человек ещё не видел
+      ordersTotal += Number(data.changes) || 0;
 
       setBadge(generalBadge, channels.general || 0);
       setBadge(ordersBadge, ordersTotal);
-
-      applyOrderUnreadHighlight();
     } catch (error) {
       /* на запертом рабочем месте просто не показываем */
     }
@@ -813,6 +819,9 @@
 
     setInterval(() => {
       if (state.view !== 'chat') refreshChatBadge();
+
+      // На списке заказов тихо обновляем его, чтобы плашки появлялись сами
+      if (state.view === 'orders') loadOrders(true);
     }, 20000);
   }
 

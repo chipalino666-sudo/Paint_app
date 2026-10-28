@@ -179,7 +179,25 @@ function orderList(user, query) {
     SELECT o.id, o.number, o.status, o.created_at, o.planned_date, o.ready_at, o.closed_at,
            c.plate, c.make, c.model, m.full_name AS master_name, b.full_name AS bodyworker_name,
            (SELECT COALESCE(SUM(qty * price), 0) FROM order_works w WHERE w.order_id = o.id) AS works_sum,
-           (SELECT COALESCE(SUM(qty * price), 0) FROM order_materials om WHERE om.order_id = o.id) AS materials_sum
+           (SELECT COALESCE(SUM(qty * price), 0) FROM order_materials om WHERE om.order_id = o.id) AS materials_sum,
+
+           -- новые сообщения в обсуждении этого заказа
+           (SELECT COUNT(*) FROM messages msg
+             WHERE msg.channel = 'order:' || o.id
+               AND msg.user_id <> ?
+               AND msg.id > COALESCE((SELECT cr.last_id FROM chat_reads cr
+                                       WHERE cr.user_id = ? AND cr.channel = 'order:' || o.id), 0)
+           ) AS unread_chat,
+
+           -- важные изменения заказа: работы, мастер, статус. Списание материала не считаем
+           (SELECT COUNT(*) FROM audit a
+             WHERE a.entity = 'order' AND a.entity_id = CAST(o.id AS TEXT)
+               AND a.user_id <> ?
+               AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove')
+               AND a.at > COALESCE((SELECT r.seen_at FROM order_reads r
+                                     WHERE r.user_id = ? AND r.order_id = o.id), '')
+           ) AS unread_changes
+
       FROM orders o
       JOIN cars c ON c.id = o.car_id
       LEFT JOIN users m ON m.id = o.master_id
@@ -189,7 +207,7 @@ function orderList(user, query) {
      LIMIT 500
   `;
 
-  return db.prepare(sql).all(...params).map((row) => ({
+  return db.prepare(sql).all(user.id, user.id, user.id, user.id, ...params).map((row) => ({
     ...row,
     works_sum: round2(row.works_sum),
     materials_sum: round2(row.materials_sum),
@@ -402,6 +420,12 @@ route('GET', '/api/orders/:id', async ({ user, params }) => {
   const order = orderView(params.id);
   if (!order) throw new ApiError(404, 'Заказ не найден');
   if (!canSeeOrder(user, order)) throw new ApiError(403, 'Это не ваш заказ');
+
+  // Заказ открыли — значит видели все его изменения на этот момент
+  db.prepare(`INSERT INTO order_reads (user_id, order_id, seen_at) VALUES (?, ?, ?)
+              ON CONFLICT(user_id, order_id) DO UPDATE SET seen_at = excluded.seen_at`)
+    .run(user.id, order.id, nowISO());
+
   return { order };
 });
 
@@ -1198,6 +1222,10 @@ route('POST', '/api/users', async ({ user, body }) => {
 
   audit(user.id, 'create', 'user', id, { login, role, specialty, isWorkstation });
 
+  // Новый сотрудник не должен видеть историю старых заказов как «непрочитанные изменения»
+  db.prepare(`INSERT OR IGNORE INTO order_reads (user_id, order_id, seen_at)
+              SELECT ?, id, ? FROM orders`).run(id, nowISO());
+
   return { id };
 });
 
@@ -1464,7 +1492,22 @@ route('GET', '/api/chat/unread', async ({ user }) => {
     }
   }
 
-  return { total, channels: perChannel };
+  // Плюс важные изменения заказов, которые человек ещё не видел
+  const masterScope = user.role === 'master' ? 'AND (o.master_id = ? OR o.bodyworker_id = ?)' : '';
+  const masterParams = user.role === 'master' ? [user.id, user.id] : [];
+
+  const changes = db.prepare(`
+    SELECT COUNT(*) AS n
+      FROM audit a
+      JOIN orders o ON CAST(o.id AS TEXT) = a.entity_id
+     WHERE a.entity = 'order'
+       AND a.user_id <> ?
+       AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove')
+       AND a.at > COALESCE((SELECT r.seen_at FROM order_reads r WHERE r.user_id = ? AND r.order_id = o.id), '')
+       ${masterScope}
+  `).get(user.id, user.id, ...masterParams).n;
+
+  return { total, channels: perChannel, changes };
 });
 
 /* --------------------------------------------------------------------------
