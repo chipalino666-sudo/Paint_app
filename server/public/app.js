@@ -759,8 +759,12 @@
   }
 
   function openLightbox(src) {
+    const previous = document.getElementById('lightbox');
+    if (previous) previous.remove();
+
     const box = document.createElement('div');
     box.className = 'lightbox';
+    box.id = 'lightbox';
     box.innerHTML = `<img src="${esc(src)}" alt="фотография">`;
 
     box.addEventListener('click', () => box.remove());
@@ -796,9 +800,10 @@
         <figcaption>${esc(photo.user_name || '')}${photo.user_name ? ' · ' : ''}${dateText(photo.created_at)}</figcaption>
       </figure>`).join('');
 
-    host.querySelectorAll('img').forEach((image) => {
-      image.addEventListener('click', () => openLightbox(image.src));
-    });
+    host.onclick = (event) => {
+      const image = event.target.closest('img');
+      if (image) openLightbox(image.src);
+    };
   }
 
   /** Кнопка «Добавить фото» в карточке заказа. */
@@ -2472,7 +2477,11 @@
       if ($('#passwordModal').classList.contains('open')) closePasswordModal();
       if ($('#editUserModal').classList.contains('open')) closeUserEditor();
       if ($('#installModal').classList.contains('open')) closeInstallHelp();
+      if ($('#lightbox') !== null) $('#lightbox').remove();
+    });
 
+    // Фото в переписке открывается крупно по клику
+    document.addEventListener('click', (event) => {
       const photo = event.target.closest && event.target.closest('.msg-photo');
       if (photo) openLightbox(photo.src);
     });
