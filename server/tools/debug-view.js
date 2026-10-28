@@ -96,7 +96,7 @@ async function main() {
       mobile: MOBILE
     });
     await send('Network.setCookie', { name: 'psid', value: /psid=([^;]+)/.exec(cookie)[1], domain: '127.0.0.1', path: '/' });
-    await send('Page.navigate', { url: BASE + '/' });
+    await send('Page.navigate', { url: BASE + (process.env.PAINT_PATH || '/') });
     await sleep(2600);
 
     await evaluate(`(() => {

@@ -101,6 +101,26 @@
 
   @page { size: A4; margin: 5mm; }
 
+  /* Акт осмотра в бланке */
+  .inspection { margin-top: 10px; page-break-inside: avoid; }
+
+  .inspection h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: 8px 0 4px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #000;
+  }
+
+  .inspect-print { display: flex; gap: 12px; align-items: flex-start; }
+  .inspect-col { width: 90px; flex: none; }
+  .inspect-col.wide { width: 240px; }
+  .inspect-col .cap { font-size: 8px; text-align: center; color: #666; }
+
+  .damage-print { margin-top: 4px; width: auto; }
+  .damage-print .num-cell { width: 16px; text-align: center; font-weight: 600; }
+
   @media print {
     body { background: #fff; padding: 0; }
     .sheet { width: auto; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
@@ -136,6 +156,37 @@
   const money = (value) => (Number(value) || 0)
     .toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' \u20BD';
 
+  /** Схема машины с отметками повреждений для акта осмотра. */
+  function carSvg(view, points) {
+    const isTop = view === 'top';
+    const width = isTop ? 160 : 300;
+    const height = isTop ? 300 : 120;
+
+    const marks = points
+      .map((point, index) => ({ point, index }))
+      .filter((item) => (item.point.view || 'top') === view)
+      .map((item) => `
+        <g transform="translate(${(item.point.x * width) / 100} ${(item.point.y * height) / 100})">
+          <circle r="8" fill="#c0392b"></circle>
+          <text text-anchor="middle" dy="4" fill="#fff" font-size="11" font-weight="600">${item.index + 1}</text>
+        </g>`)
+      .join('');
+
+    const body = isTop
+      ? `<rect x="24" y="6" width="112" height="288" rx="46" fill="none" stroke="#333" stroke-width="2"/>
+         <path d="M50 62 L110 62 L104 100 L56 100 Z" fill="none" stroke="#777"/>
+         <rect x="56" y="100" width="48" height="98" rx="8" fill="none" stroke="#777"/>
+         <path d="M56 198 L104 198 L110 244 L50 244 Z" fill="none" stroke="#777"/>
+         <rect x="8" y="88" width="16" height="8" rx="3" fill="#bbb"/>
+         <rect x="136" y="88" width="16" height="8" rx="3" fill="#bbb"/>`
+      : `<path d="M10 88 L10 70 Q10 60 22 57 L60 51 Q76 33 98 31 L186 31 Q210 33 226 51 L266 57 Q288 60 288 72 L288 88 Q288 95 280 95 L18 95 Q10 95 10 88 Z" fill="none" stroke="#333" stroke-width="2"/>
+         <path d="M96 51 L104 35 L142 35 L142 51 Z" fill="none" stroke="#777"/>
+         <path d="M150 51 L150 35 L184 35 Q199 38 211 51 Z" fill="none" stroke="#777"/>
+         <circle cx="74" cy="93" r="16" fill="none" stroke="#777" stroke-width="2"/>
+         <circle cx="226" cy="93" r="16" fill="none" stroke="#777" stroke-width="2"/>`;
+
+    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto">${body}${marks}</svg>`;
+  }
   function rows(list, unitLabel) {
     if (!list.length) return '<tr><td colspan="3" style="text-align:center;color:#666">—</td></tr>';
 
@@ -218,8 +269,22 @@
         <div><span>Итого</span><b>${money(order.total)}</b></div>
       </div>
 
-      <div class="signs">
-        <div>Выдал (склад)</div>
+      ${(order.inspection && order.inspection.length) ? `
+        <div class="inspection">
+          <h2>Акт осмотра при приёмке</h2>
+          <div class="inspect-print">
+            <div class="inspect-col">${carSvg('top', order.inspection)}<div class="cap">вид сверху</div></div>
+            <div class="inspect-col wide">${carSvg('side', order.inspection)}<div class="cap">вид сбоку</div></div>
+          </div>
+          <table class="damage-print">
+            <tbody>
+              ${order.inspection.map((point, index) => `
+                <tr><td class="num-cell">${index + 1}</td><td>${esc(point.type)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+      <div class="signs">        <div>Выдал (склад)</div>
         <div>Получил (мастер)</div>
         <div>Дата</div>
       </div>

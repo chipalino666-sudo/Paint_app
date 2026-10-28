@@ -218,7 +218,8 @@
     roleLabels: null,
     unreadOrders: {},
     orderTab: 'order',
-    codes: []
+    codes: [],
+    clients: []
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -335,6 +336,7 @@
     if (name === 'chat') openGeneralChat();
     if (name === 'report') loadReport();
     if (name === 'refs') loadRefs();
+    if (name === 'clients') loadClients();
     if (name === 'users') loadUsers();
     if (name === 'new') resetNewOrder();
   }
@@ -576,6 +578,7 @@
 
       <div class="order-tabs" id="orderTabs">
         <button class="order-tab" data-otab="order">Заказ</button>
+        <button class="order-tab" data-otab="inspection">Осмотр<span class="tab-count" id="tabInspectCount"></span></button>
         <button class="order-tab" data-otab="materials">Списание материала<span class="tab-count">${order.materials.length}</span></button>
         <button class="order-tab" data-otab="photos">Фото<span class="tab-count" id="tabPhotoCount"></span></button>
         <button class="order-tab" data-otab="history">История</button>
@@ -623,6 +626,16 @@
       </div>
       </section>
 
+      <section class="order-panel hidden" data-panel="inspection">
+        <div class="card">
+          <div class="card-head">
+            <h2>Акт осмотра при приёмке</h2>
+            <span class="muted">${isManager() ? 'Нажмите на машине, чтобы отметить повреждение' : 'что зафиксировали при приёмке'}</span>
+          </div>
+
+          <div id="inspectionBox"></div>
+        </div>
+      </section>
       <section class="order-panel hidden" data-panel="materials">
       <div class="card material-workspace">
         <div class="card-head">
@@ -719,11 +732,165 @@
     `;
 
     bindOrderEvents(order, canEdit, canEditPrices);
+    renderInspection();
     selectOrderTab(state.orderTab || 'order');
     shieldInputs(host);
     loadOrderPhotos(order.id);
     loadHistory(order.id);
     openOrderChat(order);
+  }
+
+  /* ---- Акт осмотра -------------------------------------------------------- */
+
+  const DAMAGE_TYPES = ['вмятина', 'царапина', 'скол', 'ржавчина', 'нет детали'];
+
+  let damageType = 'вмятина';
+  let inspectionTimer = null;
+
+  function inspectionSvg(view, points, canEdit) {
+    const isTop = view === 'top';
+    const width = isTop ? 160 : 300;
+    const height = isTop ? 300 : 120;
+
+    const marks = points
+      .map((point, index) => ({ point, index }))
+      .filter((item) => item.point.view === view)
+      .map((item) => `
+        <g class="damage" data-index="${item.index}"
+           transform="translate(${(item.point.x * width) / 100} ${(item.point.y * height) / 100})">
+          <circle r="7"></circle>
+          <text text-anchor="middle" dy="3.5">${item.index + 1}</text>
+        </g>`).join('');
+
+    const body = isTop
+      ? `<rect class="car-body" x="24" y="6" width="112" height="288" rx="46"></rect>
+         <path class="car-line" d="M50 62 L110 62 L104 100 L56 100 Z"></path>
+         <rect class="car-line" x="56" y="100" width="48" height="98" rx="8"></rect>
+         <path class="car-line" d="M56 198 L104 198 L110 244 L50 244 Z"></path>
+         <rect class="car-mirror" x="8" y="88" width="16" height="8" rx="3"></rect>
+         <rect class="car-mirror" x="136" y="88" width="16" height="8" rx="3"></rect>`
+      : `<path class="car-body" d="M10 88 L10 70 Q10 60 22 57 L60 51 Q76 33 98 31 L186 31 Q210 33 226 51 L266 57 Q288 60 288 72 L288 88 Q288 95 280 95 L18 95 Q10 95 10 88 Z"></path>
+         <path class="car-line" d="M96 51 L104 35 L142 35 L142 51 Z"></path>
+         <path class="car-line" d="M150 51 L150 35 L184 35 Q199 38 211 51 Z"></path>
+         <circle class="car-wheel" cx="74" cy="93" r="16"></circle>
+         <circle class="car-wheel" cx="226" cy="93" r="16"></circle>`;
+
+    return `
+      <svg class="inspect-svg${canEdit ? ' editable' : ''}" data-inspect-view="${view}"
+           viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
+        ${body}
+        ${marks}
+      </svg>`;
+  }
+
+  function renderInspection() {
+    const host = $('#inspectionBox');
+    if (!host || !state.order) return;
+
+    const points = state.order.inspection || [];
+    const canEdit = isManager();
+
+    host.innerHTML = `
+      ${canEdit ? `
+        <div class="damage-palette">
+          ${DAMAGE_TYPES.map((type) => `
+            <button class="damage-type${type === damageType ? ' active' : ''}" data-damage-type="${type}">${type}</button>`).join('')}
+        </div>` : ''}
+
+      <div class="inspect-layout">
+        <div class="inspect-scheme">
+          ${inspectionSvg('top', points, canEdit)}
+          <div class="inspect-hint">вид сверху</div>
+        </div>
+        <div class="inspect-scheme">
+          ${inspectionSvg('side', points, canEdit)}
+          <div class="inspect-hint">вид сбоку</div>
+        </div>
+      </div>
+
+      <div class="damage-list">
+        ${points.length
+          ? points.map((point, index) => `
+              <div class="damage-row">
+                <span class="damage-num">${index + 1}</span>
+                ${canEdit
+                  ? `<select data-damage-change="${index}">
+                       ${DAMAGE_TYPES.map((type) => `<option value="${type}"${type === point.type ? ' selected' : ''}>${type}</option>`).join('')}
+                     </select>
+                     <button class="row-del" data-damage-del="${index}" title="Убрать">×</button>`
+                  : `<span>${esc(point.type)}</span>`}
+              </div>`).join('')
+          : '<div class="empty-line">Повреждений не отмечено</div>'}
+      </div>
+    `;
+
+    const badge = $('#tabInspectCount');
+    if (badge) badge.textContent = points.length ? String(points.length) : '';
+
+    if (!canEdit) return;
+
+    host.querySelectorAll('[data-damage-type]').forEach((button) => {
+      button.addEventListener('click', () => {
+        damageType = button.dataset.damageType;
+        renderInspection();
+      });
+    });
+
+    host.querySelectorAll('.inspect-svg').forEach((svg) => {
+      svg.addEventListener('click', (event) => {
+        const box = svg.getBoundingClientRect();
+        const x = Math.round(((event.clientX - box.left) / box.width) * 1000) / 10;
+        const y = Math.round(((event.clientY - box.top) / box.height) * 1000) / 10;
+
+        if (x < 0 || y < 0 || x > 100 || y > 100) return;
+
+        state.order.inspection = [...(state.order.inspection || []), {
+          view: svg.dataset.inspectView,
+          x,
+          y,
+          type: damageType,
+          note: ''
+        }];
+
+        renderInspection();
+        saveInspection();
+      });
+    });
+
+    host.querySelectorAll('[data-damage-change]').forEach((select) => {
+      select.addEventListener('change', () => {
+        const index = Number(select.dataset.damageChange);
+        state.order.inspection[index].type = select.value;
+        renderInspection();
+        saveInspection();
+      });
+    });
+
+    host.querySelectorAll('[data-damage-del]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const index = Number(button.dataset.damageDel);
+        state.order.inspection.splice(index, 1);
+        renderInspection();
+        saveInspection();
+      });
+    });
+  }
+
+  function saveInspection() {
+    clearTimeout(inspectionTimer);
+
+    inspectionTimer = setTimeout(async () => {
+      try {
+        const data = await api(`/api/orders/${state.order.id}/inspection`, {
+          method: 'PATCH',
+          body: { inspection: state.order.inspection || [] }
+        });
+
+        state.order.inspection = data.order.inspection;
+      } catch (error) {
+        toast(error.message);
+      }
+    }, 350);
   }
 
   /** Вкладки внутри карточки заказа. */
@@ -907,6 +1074,12 @@
   }
 
   /* ---- История изменений -------------------------------------------------- */
+
+  /** Только дата: 2026-10-28T10:00 → 28.10.2026 */
+  function dateOnly(iso) {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('ru-RU');
+  }
 
   function formatDateTime(iso) {
     const d = new Date(iso);
@@ -1836,6 +2009,138 @@
     loadCodes();
   }
 
+  /* ------------------------------------------------------------------------
+     Клиенты
+     ------------------------------------------------------------------------ */
+
+  /** Телефон для показа: 79001234567 → +7 (900) 123-45-67 */
+  function prettyPhone(raw) {
+    const digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) return '—';
+
+    const last10 = digits.slice(-10);
+
+    if (last10.length === 10) {
+      return `+7 (${last10.slice(0, 3)}) ${last10.slice(3, 6)}-${last10.slice(6, 8)}-${last10.slice(8, 10)}`;
+    }
+
+    return digits;
+  }
+
+  const STATUS_NAMES = {
+    draft: 'Черновик',
+    accepted: 'Принят',
+    in_work: 'В работе',
+    ready: 'Готов',
+    closed: 'Закрыт',
+    cancelled: 'Отменён'
+  };
+
+  async function loadClients(search) {
+    const host = $('#clientsList');
+    if (!host) return;
+
+    host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      const query = search !== undefined
+        ? search
+        : ($('#clientSearch') ? $('#clientSearch').value.trim() : '');
+
+      const data = await api('/api/clients' + (query ? '?q=' + encodeURIComponent(query) : ''));
+
+      state.clients = data.clients;
+      renderClients();
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function renderClients() {
+    const host = $('#clientsList');
+    if (!host) return;
+
+    if (!state.clients.length) {
+      host.innerHTML = '<div class="empty-line">Клиентов пока нет — они появятся из заказов</div>';
+      return;
+    }
+
+    host.innerHTML = `
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Клиент</th><th>Телефон</th><th class="num">Машин</th>
+            <th class="num">Заказов</th><th>Был</th><th class="num">На сумму</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.clients.map((client) => `
+            <tr data-client="${esc(client.phone)}" style="cursor:pointer">
+              <td data-label="Клиент">${esc(client.name || 'Без имени')}</td>
+              <td class="mono" data-label="Телефон">${esc(prettyPhone(client.phone))}</td>
+              <td class="num" data-label="Машин">${client.cars}</td>
+              <td class="num" data-label="Заказов">${client.orders}</td>
+              <td class="muted" data-label="Был">${client.last_at ? dateOnly(client.last_at) : '—'}</td>
+              <td class="num mono" data-label="На сумму">${money(client.total)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    host.querySelectorAll('[data-client]').forEach((row) => {
+      row.addEventListener('click', () => openClient(row.dataset.client));
+    });
+  }
+
+  async function openClient(phone) {
+    const card = $('#clientCard');
+    const body = $('#clientCardBody');
+    const title = $('#clientCardTitle');
+
+    if (!card || !body) return;
+
+    card.classList.remove('hidden');
+    body.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      const data = await api('/api/clients/' + encodeURIComponent(phone));
+
+      title.textContent = `${data.client.name || 'Без имени'} · ${prettyPhone(data.client.phone)}`;
+
+      const cars = data.cars.length
+        ? data.cars.map((car) => `<span class="pill">${esc(car.plate)}${car.make ? ' · ' + esc([car.make, car.model].filter(Boolean).join(' ')) : ''}</span>`).join(' ')
+        : '<span class="muted">Машин нет</span>';
+
+      const orders = data.orders.length
+        ? data.orders.map((order) => `
+            <div class="client-order">
+              <div class="client-order-head">
+                <b>№ ${esc(order.number)}</b>
+                <span class="muted">${dateOnly(order.created_at)}</span>
+                <span class="order-status status-${esc(order.status)}">${esc(STATUS_NAMES[order.status] || order.status)}</span>
+                <b class="mono">${money(order.total)} ₽</b>
+              </div>
+              <div class="muted">${esc(order.works.join(', ') || 'работы не указаны')}</div>
+            </div>`).join('')
+        : '<div class="empty-line">Заказов пока не было</div>';
+
+      body.innerHTML = `
+        <div class="client-cars">${cars}</div>
+        <div class="section-head"><h3>Выполненные работы</h3></div>
+        ${orders}
+      `;
+
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      body.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function closeClient() {
+    const card = $('#clientCard');
+    if (card) card.classList.add('hidden');
+  }
+
   /* ---- Перевод кодов красок ------------------------------------------------ */
 
   async function loadCodes(search) {
@@ -2639,6 +2944,8 @@
     $('#btnNewOrder').classList.toggle('hidden', !isManager());
     $('#navUsers').classList.toggle('hidden', user.role !== 'admin');
 
+    if ($('#navClients')) $('#navClients').classList.toggle('hidden', user.role === 'master');
+
     if (state.workstation) $('#btnLock').classList.remove('hidden');
 
     // Отчёт — для начальства и склада; мастеру он пока не нужен
@@ -2760,6 +3067,20 @@
     $('#newOrderForm').addEventListener('submit', submitNewOrder);
 
     $('#btnReport').addEventListener('click', loadReport);
+
+    const clientSearch = $('#clientSearch');
+
+    if (clientSearch) {
+      let clientTimer = null;
+
+      clientSearch.addEventListener('input', () => {
+        clearTimeout(clientTimer);
+        const value = clientSearch.value.trim();
+        clientTimer = setTimeout(() => loadClients(value), 220);
+      });
+    }
+
+    if ($('#btnCloseClient')) $('#btnCloseClient').addEventListener('click', closeClient);
 
     const codesBulkButton = $('#btnImportCodes');
     if (codesBulkButton) codesBulkButton.addEventListener('click', importCodes);

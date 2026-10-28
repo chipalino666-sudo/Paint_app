@@ -249,6 +249,7 @@ addColumn('works', 'parts', 'REAL DEFAULT 1');
 addColumn('order_works', 'parts', 'REAL');
 addColumn('materials', 'paint_code', 'TEXT');
 addColumn('materials', 'aliases', 'TEXT');
+addColumn('orders', 'inspection', 'TEXT');
 addColumn('code_pairs', 'brand_a', "TEXT DEFAULT 'Brulex'");
 addColumn('code_pairs', 'brand_b', "TEXT DEFAULT 'Standox'");
 

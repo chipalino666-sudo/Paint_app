@@ -113,6 +113,13 @@ function orderView(id) {
   for (const row of order.works) row.sum = round2(row.qty * row.price);
   for (const row of order.materials) row.sum = round2(row.qty * row.price);
 
+  // Акт осмотра хранится как JSON: точки повреждений на схеме
+  try {
+    order.inspection = order.inspection ? JSON.parse(order.inspection) : [];
+  } catch (error) {
+    order.inspection = [];
+  }
+
   order.works_sum = round2(order.works.reduce((acc, row) => acc + row.sum, 0));
   order.materials_sum = round2(order.materials.reduce((acc, row) => acc + row.sum, 0));
   order.total = round2(order.works_sum + order.materials_sum);
@@ -766,6 +773,36 @@ function isPaintWork(name, category) {
   return /покраск/i.test(String(category || '')) || /^\s*покраск/i.test(String(name || ''));
 }
 
+route('PATCH', '/api/orders/:id/inspection', async ({ user, params, body }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Акт осмотра заполняет приёмщик');
+
+  const order = orderView(params.id);
+  if (!order) throw new ApiError(404, 'Заказ не найден');
+  assertEditable(order);
+
+  const list = Array.isArray(body.inspection) ? body.inspection.slice(0, 200) : [];
+
+  // Принимаем только понятные точки: схема, координаты в процентах, тип повреждения
+  const clean = list
+    .filter((item) => item && (item.view === 'top' || item.view === 'side'))
+    .map((item) => ({
+      view: item.view,
+      x: Math.min(100, Math.max(0, toNum(item.x, 50))),
+      y: Math.min(100, Math.max(0, toNum(item.y, 50))),
+      type: str(item.type, 30) || 'вмятина',
+      note: str(item.note, 120)
+    }));
+
+  db.prepare('UPDATE orders SET inspection = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(clean), nowISO(), order.id);
+
+  audit(user.id, 'inspection', 'order', order.id, {
+    text: `Акт осмотра: повреждений ${clean.length}`
+  });
+
+  return { order: orderView(order.id) };
+});
+
 /* ---- Работы в заказе --------------------------------------------------- */
 
 route('POST', '/api/orders/:id/works', async ({ user, params, body }) => {
@@ -1090,6 +1127,129 @@ route('PATCH', '/api/works/:id', async ({ user, params, body }) => {
       work.id);
 
   return { ok: true };
+});
+
+/* ---- Клиенты ------------------------------------------------------------- */
+
+/** Телефон приводим к одному виду: только цифры, 8 в начале → 7. */
+function normalizePhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+
+  if (!digits) return '';
+  if (digits.length === 11 && digits[0] === '8') return '7' + digits.slice(1);
+  if (digits.length === 10) return '7' + digits;
+
+  return digits;
+}
+
+/** Заказы и машины, разложенные по нормализованному телефону владельца. */
+function clientsIndex() {
+  const cars = db.prepare(`
+    SELECT id, plate, make, model, owner_name, owner_phone
+      FROM cars
+     WHERE owner_phone IS NOT NULL AND owner_phone <> ''
+  `).all();
+
+  const orders = db.prepare(`
+    SELECT o.id, o.number, o.status, o.created_at, o.closed_at, o.car_id,
+           (SELECT COALESCE(SUM(qty * price), 0) FROM order_works w WHERE w.order_id = o.id) AS works_sum,
+           (SELECT COALESCE(SUM(qty * price), 0) FROM order_materials m WHERE m.order_id = o.id) AS materials_sum
+      FROM orders o
+  `).all();
+
+  const byCar = new Map();
+
+  for (const order of orders) {
+    if (!byCar.has(order.car_id)) byCar.set(order.car_id, []);
+    byCar.get(order.car_id).push(order);
+  }
+
+  const clients = new Map();
+
+  for (const car of cars) {
+    const phone = normalizePhone(car.owner_phone);
+    if (!phone) continue;
+
+    if (!clients.has(phone)) {
+      clients.set(phone, { phone, name: '', cars: [], orders: [] });
+    }
+
+    const client = clients.get(phone);
+    if (!client.name && car.owner_name) client.name = car.owner_name;
+    client.cars.push(car);
+    client.orders.push(...(byCar.get(car.id) || []));
+  }
+
+  return clients;
+}
+
+function clientSummary(client) {
+  const done = client.orders.filter((order) => order.status !== 'cancelled');
+  const total = done.reduce((sum, order) => sum + order.works_sum + order.materials_sum, 0);
+  const dates = done.map((order) => order.closed_at || order.created_at).filter(Boolean).sort();
+
+  return {
+    phone: client.phone,
+    name: client.name,
+    cars: client.cars.length,
+    plates: client.cars.map((car) => car.plate).slice(0, 4),
+    orders: done.length,
+    total: round2(total),
+    first_at: dates[0] || null,
+    last_at: dates[dates.length - 1] || null
+  };
+}
+
+route('GET', '/api/clients', async ({ url }) => {
+  const q = normalizeSearch(str(url.searchParams.get('q'), 60));
+  const digits = q.replace(/\D/g, '');
+
+  const list = [];
+
+  for (const client of clientsIndex().values()) {
+    const haystack = normalizeSearch(client.name, client.phone, ...client.cars.map((car) => car.plate));
+
+    const matches = !q
+      || haystack.includes(q)
+      || (digits && client.phone.includes(digits));
+
+    if (matches) list.push(clientSummary(client));
+  }
+
+  list.sort((a, b) => String(b.last_at || '').localeCompare(String(a.last_at || '')));
+
+  return { clients: list.slice(0, 200) };
+});
+
+route('GET', '/api/clients/:phone', async ({ params }) => {
+  const phone = normalizePhone(params.phone);
+  const client = clientsIndex().get(phone);
+
+  if (!client) throw new ApiError(404, 'Клиент не найден');
+
+  const orders = client.orders.map((order) => {
+    const works = db.prepare('SELECT name FROM order_works WHERE order_id = ? ORDER BY id').all(order.id);
+
+    return {
+      id: order.id,
+      number: order.number,
+      status: order.status,
+      created_at: order.created_at,
+      closed_at: order.closed_at,
+      total: round2(order.works_sum + order.materials_sum),
+      works: works.map((row) => row.name)
+    };
+  });
+
+  return {
+    client: clientSummary(client),
+    cars: client.cars.map((car) => ({
+      plate: car.plate,
+      make: car.make,
+      model: car.model
+    })),
+    orders
+  };
 });
 
 /* ---- Перевод кодов красок ------------------------------------------------ */

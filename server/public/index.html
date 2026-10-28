@@ -77,6 +77,7 @@
     <button class="nav-btn active" data-view="orders">Заказы<span class="nav-badge hidden" id="ordersBadge">0</span></button>
     <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
     <button class="nav-btn" data-view="report">Отчёт</button>
+    <button class="nav-btn" data-view="clients" id="navClients">Клиенты</button>
     <button class="nav-btn" data-view="refs">Справочники</button>
     <button class="nav-btn hidden" data-view="users" id="navUsers">Сотрудники</button>
   </nav>
@@ -264,6 +265,28 @@
     </div>
 
     <div id="reportBody"></div>
+  </section>
+
+  <!-- ======================= КЛИЕНТЫ ======================= -->
+  <section class="view hidden" id="view-clients">
+    <h1 class="page-title">Клиенты</h1>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="clientSearch" placeholder="Телефон, фамилия или госномер…" autocomplete="off">
+      </div>
+
+      <div id="clientsList"></div>
+    </div>
+
+    <div class="card hidden" id="clientCard">
+      <div class="card-head">
+        <h2 id="clientCardTitle">Клиент</h2>
+        <button class="btn btn-outline" id="btnCloseClient">← К списку</button>
+      </div>
+
+      <div id="clientCardBody"></div>
+    </div>
   </section>
 
   <!-- ======================= СПРАВОЧНИКИ ======================= -->
