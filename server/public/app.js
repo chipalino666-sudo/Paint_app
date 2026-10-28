@@ -55,7 +55,8 @@
     newWorks: [],
     workstation: false,
     idleMinutes: 10,
-    roleLabels: null
+    roleLabels: null,
+    unreadOrders: {}
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -254,6 +255,7 @@
       });
 
       empty.appendChild(list);
+      applyOrderUnreadHighlight();
       return;
     }
 
@@ -275,6 +277,8 @@
     [...body.rows].forEach((row) => {
       row.addEventListener('click', () => openOrder(row.dataset.id));
     });
+
+    applyOrderUnreadHighlight();
   }
 
   /* ------------------------------------------------------------------------
@@ -723,19 +727,54 @@
       .catch(() => { /* не критично */ });
   }
 
+  function setBadge(element, count) {
+    if (!element) return;
+
+    if (count > 0) {
+      element.textContent = count > 99 ? '99+' : String(count);
+      element.classList.remove('hidden');
+    } else {
+      element.classList.add('hidden');
+    }
+  }
+
+  /** Подсветить заказы, в обсуждении которых есть новые сообщения. */
+  function applyOrderUnreadHighlight() {
+    const byOrder = state.unreadOrders || {};
+
+    document.querySelectorAll('#ordersBody [data-id], #ordersEmpty [data-id]').forEach((element) => {
+      element.classList.toggle('unread', Boolean(byOrder[element.dataset.id]));
+    });
+  }
+
   async function refreshChatBadge() {
-    const badge = $('#chatBadge');
-    if (!badge) return;
+    const generalBadge = $('#chatBadge');
+    const ordersBadge = $('#ordersBadge');
+    if (!generalBadge && !ordersBadge) return;
 
     try {
       const data = await api('/api/chat/unread');
+      const channels = data.channels || {};
 
-      if (data.total > 0) {
-        badge.textContent = data.total > 99 ? '99+' : String(data.total);
-        badge.classList.remove('hidden');
-      } else {
-        badge.classList.add('hidden');
+      let ordersTotal = 0;
+      const byOrder = {};
+
+      for (const [channel, count] of Object.entries(channels)) {
+        if (channel === 'general') continue;
+
+        const match = /^order:(\d+)$/.exec(channel);
+        if (!match) continue;
+
+        byOrder[match[1]] = count;
+        ordersTotal += count;
       }
+
+      state.unreadOrders = byOrder;
+
+      setBadge(generalBadge, channels.general || 0);
+      setBadge(ordersBadge, ordersTotal);
+
+      applyOrderUnreadHighlight();
     } catch (error) {
       /* на запертом рабочем месте просто не показываем */
     }
