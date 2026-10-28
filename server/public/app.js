@@ -749,36 +749,60 @@
 
   function inspectionSvg(view, points, canEdit) {
     const isTop = view === 'top';
-    const width = isTop ? 160 : 300;
-    const height = isTop ? 300 : 120;
+    const width = isTop ? 180 : 360;
+    const height = isTop ? 340 : 150;
 
     const marks = points
       .map((point, index) => ({ point, index }))
       .filter((item) => item.point.view === view)
       .map((item) => `
-        <g class="damage" data-index="${item.index}"
-           transform="translate(${(item.point.x * width) / 100} ${(item.point.y * height) / 100})">
-          <circle r="7"></circle>
-          <text text-anchor="middle" dy="3.5">${item.index + 1}</text>
+        <g class="damage" transform="translate(${(item.point.x * width) / 100} ${(item.point.y * height) / 100})">
+          <circle r="8"></circle>
+          <text text-anchor="middle" dy="4">${item.index + 1}</text>
         </g>`).join('');
 
-    const body = isTop
-      ? `<rect class="car-body" x="24" y="6" width="112" height="288" rx="46"></rect>
-         <path class="car-line" d="M50 62 L110 62 L104 100 L56 100 Z"></path>
-         <rect class="car-line" x="56" y="100" width="48" height="98" rx="8"></rect>
-         <path class="car-line" d="M56 198 L104 198 L110 244 L50 244 Z"></path>
-         <rect class="car-mirror" x="8" y="88" width="16" height="8" rx="3"></rect>
-         <rect class="car-mirror" x="136" y="88" width="16" height="8" rx="3"></rect>`
-      : `<path class="car-body" d="M10 88 L10 70 Q10 60 22 57 L60 51 Q76 33 98 31 L186 31 Q210 33 226 51 L266 57 Q288 60 288 72 L288 88 Q288 95 280 95 L18 95 Q10 95 10 88 Z"></path>
-         <path class="car-line" d="M96 51 L104 35 L142 35 L142 51 Z"></path>
-         <path class="car-line" d="M150 51 L150 35 L184 35 Q199 38 211 51 Z"></path>
-         <circle class="car-wheel" cx="74" cy="93" r="16"></circle>
-         <circle class="car-wheel" cx="226" cy="93" r="16"></circle>`;
+    const drawing = isTop
+      ? `
+        <path class="car-body" d="M50 12 C74 6 106 6 130 12 C142 18 146 42 146 64 L146 276 C146 298 142 322 130 328 C106 334 74 334 50 328 C38 322 34 298 34 276 L34 64 C34 42 38 18 50 12 Z"></path>
+        <path class="car-window" d="M56 112 L124 112 L120 134 L60 134 Z"></path>
+        <rect class="car-panel" x="60" y="134" width="60" height="76" rx="7"></rect>
+        <path class="car-window" d="M60 210 L120 210 L124 232 L56 232 Z"></path>
+        <path class="car-line" d="M52 70 C74 64 106 64 128 70"></path>
+        <path class="car-line" d="M52 272 C74 278 106 278 128 272"></path>
+        <rect class="car-lamp" x="12" y="116" width="20" height="9" rx="4"></rect>
+        <rect class="car-lamp" x="148" y="116" width="20" height="9" rx="4"></rect>
+        <rect class="zone" data-zone="капот" x="34" y="58" width="112" height="56"></rect>
+        <rect class="zone" data-zone="крыша" x="56" y="112" width="68" height="120"></rect>
+        <rect class="zone" data-zone="багажник" x="34" y="232" width="112" height="70"></rect>
+        <rect class="zone" data-zone="передний бампер" x="34" y="14" width="112" height="44"></rect>
+        <rect class="zone" data-zone="задний бампер" x="34" y="302" width="112" height="30"></rect>`
+      : `
+        <path class="car-body" d="M16 112 L16 96 C16 88 20 84 30 82 L88 72 C104 54 120 46 140 45 L232 45 C254 46 270 54 284 72 L336 82 C346 84 350 88 350 96 L350 112 Z"></path>
+        <path class="car-window" d="M104 70 L136 50 L176 50 L176 70 Z"></path>
+        <path class="car-window" d="M186 50 L230 50 C246 51 258 58 268 70 L186 70 Z"></path>
+        <path class="car-line" d="M181 45 L181 112"></path>
+        <path class="car-line" d="M104 70 L104 112"></path>
+        <path class="car-line" d="M268 70 L268 112"></path>
+        <rect class="car-line" x="150" y="78" width="16" height="4" rx="2"></rect>
+        <rect class="car-line" x="214" y="78" width="16" height="4" rx="2"></rect>
+        <circle class="car-wheel" cx="96" cy="112" r="24"></circle>
+        <circle class="car-wheel-inner" cx="96" cy="112" r="11"></circle>
+        <circle class="car-wheel" cx="272" cy="112" r="24"></circle>
+        <circle class="car-wheel-inner" cx="272" cy="112" r="11"></circle>
+        <rect class="car-lamp" x="18" y="88" width="14" height="9" rx="3"></rect>
+        <rect class="car-lamp" x="334" y="88" width="14" height="9" rx="3"></rect>
+        <rect class="zone" data-zone="капот" x="16" y="72" width="86" height="42"></rect>
+        <rect class="zone" data-zone="передняя дверь" x="104" y="44" width="77" height="70"></rect>
+        <rect class="zone" data-zone="задняя дверь" x="181" y="44" width="87" height="70"></rect>
+        <rect class="zone" data-zone="крыша" x="104" y="36" width="164" height="32"></rect>
+        <rect class="zone" data-zone="заднее крыло" x="268" y="72" width="82" height="42"></rect>
+        <rect class="zone" data-zone="передний бампер" x="10" y="82" width="28" height="32"></rect>
+        <rect class="zone" data-zone="задний бампер" x="326" y="82" width="30" height="32"></rect>`;
 
     return `
       <svg class="inspect-svg${canEdit ? ' editable' : ''}" data-inspect-view="${view}"
            viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
-        ${body}
+        ${drawing}
         ${marks}
       </svg>`;
   }
@@ -817,8 +841,9 @@
                   ? `<select data-damage-change="${index}">
                        ${DAMAGE_TYPES.map((type) => `<option value="${type}"${type === point.type ? ' selected' : ''}>${type}</option>`).join('')}
                      </select>
+                     <span class="damage-zone">${esc(point.zone || 'кузов')}</span>
                      <button class="row-del" data-damage-del="${index}" title="Убрать">×</button>`
-                  : `<span>${esc(point.type)}</span>`}
+                  : `<span>${esc(point.type)}${point.zone ? ' · ' + esc(point.zone) : ''}</span>`}
               </div>`).join('')
           : '<div class="empty-line">Повреждений не отмечено</div>'}
       </div>
@@ -844,11 +869,14 @@
 
         if (x < 0 || y < 0 || x > 100 || y > 100) return;
 
+        const panel = event.target.closest ? event.target.closest('[data-zone]') : null;
+
         state.order.inspection = [...(state.order.inspection || []), {
           view: svg.dataset.inspectView,
           x,
           y,
           type: damageType,
+          zone: panel ? panel.dataset.zone : '',
           note: ''
         }];
 

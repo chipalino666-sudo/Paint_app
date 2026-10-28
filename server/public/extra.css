@@ -1624,10 +1624,21 @@ td.empty-line,
 
 .inspect-svg.editable { cursor: crosshair; }
 
-.car-body { fill: none; stroke: currentColor; stroke-width: 2; opacity: .75; }
-.car-line { fill: none; stroke: currentColor; stroke-width: 1.5; opacity: .45; }
+.car-body { fill: none; stroke: currentColor; stroke-width: 2; opacity: .8; }
+.car-line { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .4; }
+.car-door { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .55; }
+.car-window { fill: currentColor; opacity: .12; stroke: currentColor; stroke-width: 1.2; }
+.car-panel { fill: none; stroke: currentColor; stroke-width: 1.2; opacity: .3; }
 .car-mirror { fill: currentColor; opacity: .35; }
-.car-wheel { fill: none; stroke: currentColor; stroke-width: 2; opacity: .55; }
+.car-lamp { fill: currentColor; opacity: .3; }
+.car-wheel { fill: none; stroke: currentColor; stroke-width: 2.2; opacity: .6; }
+.car-wheel-inner { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .4; }
+
+/* Кликабельные детали: подсвечиваются при наведении */
+.zone { fill: transparent; cursor: crosshair; }
+.inspect-svg.editable .zone:hover { fill: var(--blue); opacity: .14; }
+
+.damage { pointer-events: none; }
 
 .damage circle { fill: var(--red, #d9534f); stroke: var(--surface); stroke-width: 2; }
 .damage text { fill: #fff; font-size: 11px; font-weight: 600; }
@@ -1663,9 +1674,16 @@ td.empty-line,
   justify-content: center;
 }
 
+.damage-zone {
+  margin-left: auto;
+  margin-right: 8px;
+  font-size: 12px;
+  color: var(--grey);
+}
+
 .damage-row select {
   flex: 1;
-  max-width: 220px;
+  max-width: 200px;
   padding: 6px 9px;
   border: 1px solid var(--border);
   border-radius: 6px;

@@ -790,6 +790,7 @@ route('PATCH', '/api/orders/:id/inspection', async ({ user, params, body }) => {
       x: Math.min(100, Math.max(0, toNum(item.x, 50))),
       y: Math.min(100, Math.max(0, toNum(item.y, 50))),
       type: str(item.type, 30) || 'вмятина',
+      zone: str(item.zone, 40),
       note: str(item.note, 120)
     }));
 

@@ -159,8 +159,8 @@
   /** Схема машины с отметками повреждений для акта осмотра. */
   function carSvg(view, points) {
     const isTop = view === 'top';
-    const width = isTop ? 160 : 300;
-    const height = isTop ? 300 : 120;
+    const width = isTop ? 180 : 360;
+    const height = isTop ? 340 : 150;
 
     const marks = points
       .map((point, index) => ({ point, index }))
@@ -172,21 +172,35 @@
         </g>`)
       .join('');
 
-    const body = isTop
-      ? `<rect x="24" y="6" width="112" height="288" rx="46" fill="none" stroke="#333" stroke-width="2"/>
-         <path d="M50 62 L110 62 L104 100 L56 100 Z" fill="none" stroke="#777"/>
-         <rect x="56" y="100" width="48" height="98" rx="8" fill="none" stroke="#777"/>
-         <path d="M56 198 L104 198 L110 244 L50 244 Z" fill="none" stroke="#777"/>
-         <rect x="8" y="88" width="16" height="8" rx="3" fill="#bbb"/>
-         <rect x="136" y="88" width="16" height="8" rx="3" fill="#bbb"/>`
-      : `<path d="M10 88 L10 70 Q10 60 22 57 L60 51 Q76 33 98 31 L186 31 Q210 33 226 51 L266 57 Q288 60 288 72 L288 88 Q288 95 280 95 L18 95 Q10 95 10 88 Z" fill="none" stroke="#333" stroke-width="2"/>
-         <path d="M96 51 L104 35 L142 35 L142 51 Z" fill="none" stroke="#777"/>
-         <path d="M150 51 L150 35 L184 35 Q199 38 211 51 Z" fill="none" stroke="#777"/>
-         <circle cx="74" cy="93" r="16" fill="none" stroke="#777" stroke-width="2"/>
-         <circle cx="226" cy="93" r="16" fill="none" stroke="#777" stroke-width="2"/>`;
+    const drawing = isTop
+      ? `
+        <path d="M50 12 C74 6 106 6 130 12 C142 18 146 42 146 64 L146 276 C146 298 142 322 130 328 C106 334 74 334 50 328 C38 322 34 298 34 276 L34 64 C34 42 38 18 50 12 Z" fill="none" stroke="#333" stroke-width="2"/>
+        <path d="M56 112 L124 112 L120 134 L60 134 Z" fill="#e8edf2" stroke="#555"/>
+        <rect x="60" y="134" width="60" height="76" rx="7" fill="none" stroke="#8a8a8a"/>
+        <path d="M60 210 L120 210 L124 232 L56 232 Z" fill="#e8edf2" stroke="#555"/>
+        <path d="M52 70 C74 64 106 64 128 70" fill="none" stroke="#9a9a9a"/>
+        <path d="M52 272 C74 278 106 278 128 272" fill="none" stroke="#9a9a9a"/>
+        <path d="M38 188 L58 188 M122 188 L142 188 M38 256 L58 256 M122 256 L142 256" stroke="#9a9a9a"/>
+        <rect x="12" y="116" width="20" height="9" rx="4" fill="#c9d3dc"/>
+        <rect x="148" y="116" width="20" height="9" rx="4" fill="#c9d3dc"/>`
+      : `
+        <path d="M16 112 L16 96 C16 88 20 84 30 82 L88 72 C104 54 120 46 140 45 L232 45 C254 46 270 54 284 72 L336 82 C346 84 350 88 350 96 L350 112 Z" fill="none" stroke="#333" stroke-width="2"/>
+        <path d="M104 70 L136 50 L176 50 L176 70 Z" fill="#e8edf2" stroke="#555"/>
+        <path d="M186 50 L230 50 C246 51 258 58 268 70 L186 70 Z" fill="#e8edf2" stroke="#555"/>
+        <path d="M104 70 L104 108 Q104 112 110 112 L181 112 L181 70" fill="none" stroke="#8a8a8a"/>
+        <path d="M181 70 L181 112 L262 112 Q268 112 268 108 L268 70" fill="none" stroke="#8a8a8a"/>
+        <rect x="150" y="78" width="16" height="4" rx="2" fill="#9a9a9a"/>
+        <rect x="214" y="78" width="16" height="4" rx="2" fill="#9a9a9a"/>
+        <circle cx="96" cy="112" r="24" fill="none" stroke="#555" stroke-width="2"/>
+        <circle cx="96" cy="112" r="11" fill="none" stroke="#9a9a9a"/>
+        <circle cx="272" cy="112" r="24" fill="none" stroke="#555" stroke-width="2"/>
+        <circle cx="272" cy="112" r="11" fill="none" stroke="#9a9a9a"/>
+        <rect x="18" y="88" width="14" height="9" rx="3" fill="#c9d3dc"/>
+        <rect x="334" y="88" width="14" height="9" rx="3" fill="#c9d3dc"/>`;
 
-    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto">${body}${marks}</svg>`;
+    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto">${drawing}${marks}</svg>`;
   }
+
   function rows(list, unitLabel) {
     if (!list.length) return '<tr><td colspan="3" style="text-align:center;color:#666">—</td></tr>';
 
