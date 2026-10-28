@@ -306,6 +306,33 @@
 
       <div id="refMaterials"></div>
     </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Перевод кодов красок</h2>
+        <span class="muted">Brulex ↔ Standox: при списании ищется по обоим</span>
+      </div>
+
+      <div class="field">
+        <label for="codesBulk">Вставьте пары — по одной в строке</label>
+        <textarea id="codesBulk" rows="5" placeholder="132 812&#10;110 570&#10;101 562"></textarea>
+        <span class="hintline">
+          Два кода в строке: сначала Brulex, потом Standox. Подойдёт и копия двух колонок из Excel —
+          разделитель пробел, запятая или табуляция.
+        </span>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btnImportCodes">Добавить коды</button>
+        <span class="muted" id="codesStatus"></span>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="codesSearch" placeholder="Найти код…" autocomplete="off">
+      </div>
+
+      <div id="codesList"></div>
+    </div>
   </section>
 
   <!-- ======================= СОТРУДНИКИ ======================= -->

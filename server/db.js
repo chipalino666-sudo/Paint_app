@@ -128,6 +128,16 @@ CREATE TABLE IF NOT EXISTS recipes (
   updated_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS code_pairs (
+  id         INTEGER PRIMARY KEY,
+  code_a     TEXT NOT NULL,
+  code_b     TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS code_pairs_uniq ON code_pairs (code_a, code_b);
+CREATE INDEX IF NOT EXISTS code_pairs_a ON code_pairs (code_a);
+CREATE INDEX IF NOT EXISTS code_pairs_b ON code_pairs (code_b);
+
 CREATE TABLE IF NOT EXISTS norms (
   id      INTEGER PRIMARY KEY,
   work_id INTEGER NOT NULL REFERENCES works(id) ON DELETE CASCADE,
@@ -237,6 +247,7 @@ addColumn('users', 'specialty', 'TEXT');
 addColumn('messages', 'photo_id', 'INTEGER');
 addColumn('works', 'parts', 'REAL DEFAULT 1');
 addColumn('order_works', 'parts', 'REAL');
+addColumn('materials', 'paint_code', 'TEXT');
 
 // В заказе два исполнителя: маляр и кузовщик
 addColumn('orders', 'bodyworker_id', 'INTEGER');
@@ -482,6 +493,19 @@ function init() {
   `).all();
 
   for (const user of freshUsers) markSeen.run(user.id, now);
+
+  // Код цвета берём из названия краски: «563 Schwarz B 3.5 ltr» → 563
+  const paintsWithoutCode = db.prepare(`
+    SELECT code, name FROM materials
+     WHERE category = 'paint' AND (paint_code IS NULL OR paint_code = '')
+  `).all();
+
+  const setPaintCode = db.prepare('UPDATE materials SET paint_code = ? WHERE code = ?');
+
+  for (const paint of paintsWithoutCode) {
+    const match = /\b(\d{3})\b/.exec(paint.name);
+    if (match) setPaintCode.run(match[1], paint.code);
+  }
 
   // Работы измеряются в деталях: капот — 1, большой капот — 1,5
   db.prepare('UPDATE works SET parts = 1 WHERE parts IS NULL OR parts <= 0').run();

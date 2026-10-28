@@ -965,7 +965,22 @@ route('GET', '/api/materials', async ({ url }) => {
   const where = ['active = 1'];
   const params = [];
 
-  if (q) {
+  // Если ищут код краски — находим и по соответствиям другой системы
+  const isCode = /^\d{2,4}$/.test(q);
+
+  if (q && isCode) {
+    const codes = new Set([q]);
+
+    for (const row of db.prepare('SELECT code_a, code_b FROM code_pairs WHERE code_a = ? OR code_b = ?').all(q, q)) {
+      codes.add(row.code_a);
+      codes.add(row.code_b);
+    }
+
+    const list = [...codes].filter(Boolean);
+
+    where.push(`(paint_code IN (${list.map(() => '?').join(',')}) OR search LIKE ?)`);
+    params.push(...list, `%${q}%`);
+  } else if (q) {
     // Ищем по каждому слову отдельно: «краска 563» найдёт «Краска MIX 563 Schwarz»
     for (const word of q.split(/\s+/).filter(Boolean)) {
       where.push('search LIKE ?');
@@ -979,7 +994,7 @@ route('GET', '/api/materials', async ({ url }) => {
   }
 
   const materials = db.prepare(`
-    SELECT code, name, unit, category, price
+    SELECT code, name, unit, category, price, paint_code
       FROM materials
      WHERE ${where.join(' AND ')}
      ORDER BY name
@@ -1057,6 +1072,80 @@ route('PATCH', '/api/works/:id', async ({ user, params, body }) => {
       body.active !== undefined ? (body.active ? 1 : 0) : work.active,
       work.id);
 
+  return { ok: true };
+});
+
+/* ---- Перевод кодов красок ------------------------------------------------ */
+
+/** Код приводим к простому виду: без пробелов и лишних знаков. */
+function normalizeCode(raw) {
+  return String(raw ?? '').toUpperCase().replace(/[^0-9A-ZА-Я]/g, '').slice(0, 10);
+}
+
+route('GET', '/api/codes', async ({ url }) => {
+  const q = normalizeCode(url.searchParams.get('q'));
+
+  const pairs = q
+    ? db.prepare('SELECT * FROM code_pairs WHERE code_a LIKE ? OR code_b LIKE ? ORDER BY code_a LIMIT 500').all(`%${q}%`, `%${q}%`)
+    : db.prepare('SELECT * FROM code_pairs ORDER BY id DESC LIMIT 500').all();
+
+  return { pairs };
+});
+
+route('POST', '/api/codes', async ({ user, body }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Коды правит приёмщик или админ');
+
+  const a = normalizeCode(body.code_a);
+  const b = normalizeCode(body.code_b);
+
+  if (!a || !b) throw new ApiError(400, 'Нужны два кода');
+  if (a === b) throw new ApiError(400, 'Коды совпадают');
+
+  const info = db.prepare('INSERT OR IGNORE INTO code_pairs (code_a, code_b, created_at) VALUES (?, ?, ?)')
+    .run(a, b, nowISO());
+
+  return { ok: true, added: info.changes > 0 };
+});
+
+route('POST', '/api/codes/import', async ({ user, body }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Коды правит приёмщик или админ');
+
+  const text = String(body.text || '').slice(0, 20000);
+  const insert = db.prepare('INSERT OR IGNORE INTO code_pairs (code_a, code_b, created_at) VALUES (?, ?, ?)');
+
+  let added = 0;
+  let skipped = 0;
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+
+    const parts = line.split(/[\s;,\t]+/).filter(Boolean);
+
+    if (parts.length < 2) {
+      skipped++;
+      continue;
+    }
+
+    const a = normalizeCode(parts[0]);
+    const b = normalizeCode(parts[1]);
+
+    if (!a || !b || a === b) {
+      skipped++;
+      continue;
+    }
+
+    const info = insert.run(a, b, nowISO());
+    if (info.changes > 0) added++;
+    else skipped++;
+  }
+
+  return { added, skipped };
+});
+
+route('DELETE', '/api/codes/:id', async ({ user, params }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Коды правит приёмщик или админ');
+
+  db.prepare('DELETE FROM code_pairs WHERE id = ?').run(Number(params.id));
   return { ok: true };
 });
 

@@ -217,7 +217,8 @@
     idleMinutes: 10,
     roleLabels: null,
     unreadOrders: {},
-    orderTab: 'order'
+    orderTab: 'order',
+    codes: []
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -1806,6 +1807,87 @@
     renderWorksRef();
     renderRecipesRef();
     renderMaterialsRef();
+    loadCodes();
+  }
+
+  /* ---- Перевод кодов красок ------------------------------------------------ */
+
+  async function loadCodes(search) {
+    const host = $('#codesList');
+    if (!host) return;
+
+    host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      const query = search !== undefined ? search : ($('#codesSearch') ? $('#codesSearch').value.trim() : '');
+      const data = await api('/api/codes' + (query ? '?q=' + encodeURIComponent(query) : ''));
+
+      state.codes = data.pairs;
+      renderCodes();
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function renderCodes() {
+    const host = $('#codesList');
+    if (!host) return;
+
+    if (!state.codes.length) {
+      host.innerHTML = '<div class="empty-line">Соответствий пока нет — вставьте пары выше</div>';
+      return;
+    }
+
+    host.innerHTML = `
+      <table class="grid">
+        <thead><tr><th>Brulex</th><th>Standox</th><th></th></tr></thead>
+        <tbody>
+          ${state.codes.map((pair) => `
+            <tr>
+              <td class="mono">${esc(pair.code_a)}</td>
+              <td class="mono">${esc(pair.code_b)}</td>
+              <td class="num">${isManager() ? `<button class="row-del" data-del-code="${pair.id}" title="Убрать">×</button>` : ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    host.querySelectorAll('[data-del-code]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          await api('/api/codes/' + button.dataset.delCode, { method: 'DELETE' });
+          await loadCodes();
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+    });
+  }
+
+  async function importCodes() {
+    const field = $('#codesBulk');
+    const status = $('#codesStatus');
+    const text = field.value.trim();
+
+    if (!text) {
+      toast('Вставьте пары кодов');
+      return;
+    }
+
+    try {
+      const data = await api('/api/codes/import', { method: 'POST', body: { text } });
+      field.value = '';
+
+      if (status) {
+        status.textContent = `Добавлено: ${data.added}${data.skipped ? `, пропущено: ${data.skipped}` : ''}`;
+      }
+
+      toast(`Добавлено пар: ${data.added}`);
+      await loadCodes('');
+      if ($('#codesSearch')) $('#codesSearch').value = '';
+    } catch (error) {
+      toast(error.message);
+    }
   }
 
   function renderWorksRef() {
@@ -2650,6 +2732,20 @@
     $('#newOrderForm').addEventListener('submit', submitNewOrder);
 
     $('#btnReport').addEventListener('click', loadReport);
+
+    const codesBulkButton = $('#btnImportCodes');
+    if (codesBulkButton) codesBulkButton.addEventListener('click', importCodes);
+
+    const codesSearch = $('#codesSearch');
+    if (codesSearch) {
+      let codesTimer = null;
+
+      codesSearch.addEventListener('input', () => {
+        clearTimeout(codesTimer);
+        const value = codesSearch.value.trim();
+        codesTimer = setTimeout(() => loadCodes(value), 220);
+      });
+    }
 
     $('#refMaterialSearch').addEventListener('input', (event) => {
       clearTimeout(searchTimer);
