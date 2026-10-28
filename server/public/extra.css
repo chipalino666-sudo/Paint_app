@@ -1317,7 +1317,54 @@ tr.unread:hover td { background: #e3efff; }
   .msg { max-width: 88%; }
 
   .actions-row .btn { flex: 1 1 auto; }
-}
+
+  /* Таблицы справочников и сотрудников — карточками с подписями */
+  table.grid thead { display: none; }
+  table.grid tbody, table.grid tr, table.grid td { display: block; width: auto; }
+
+  table.grid tr {
+    border-bottom: 1px solid var(--border-soft);
+    padding: 12px 2px;
+  }
+
+  table.grid tr:last-child { border-bottom: none; }
+
+  table.grid td {
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+    text-align: right;
+  }
+
+  table.grid td::before {
+    content: attr(data-label);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--grey);
+    text-align: left;
+    flex: none;
+  }
+
+  table.grid td[data-label=""]::before { content: none; }
+  table.grid td[data-label=""] { justify-content: flex-end; }
+
+  table.grid td:first-child {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    padding-bottom: 6px;
+  }
+
+  table.grid td:first-child::before { content: none; }
+
+  table.grid td.empty-line { display: block; text-align: center; }
+  table.grid td.empty-line::before { content: none; }
+
+  table.grid input[type="number"] { width: 110px !important; }}
 
 /* Шапки таблиц берут цвет из палитры, а не из старого стиля */
 table.grid th,

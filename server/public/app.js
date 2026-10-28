@@ -1844,9 +1844,9 @@
         <tbody>
           ${state.codes.map((pair) => `
             <tr>
-              <td class="mono">${esc(pair.code_a)}</td>
-              <td class="mono">${esc(pair.code_b)}</td>
-              <td class="num">${isManager() ? `<button class="row-del" data-del-code="${pair.id}" title="Убрать">×</button>` : ''}</td>
+              <td class="mono" data-label="Brulex">${esc(pair.code_a)}</td>
+              <td class="mono" data-label="Standox">${esc(pair.code_b)}</td>
+              <td class="num" data-label="">${isManager() ? `<button class="row-del" data-del-code="${pair.id}" title="Убрать">×</button>` : ''}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -1904,9 +1904,9 @@
         <tbody>
           ${state.works.map((work) => `
             <tr>
-              <td>${esc(work.name)}</td>
-              <td class="muted">${esc(work.category || '—')}</td>
-              <td class="num">
+              <td data-label="Работа">${esc(work.name)}</td>
+              <td class="muted" data-label="Категория">${esc(work.category || '—')}</td>
+              <td class="num" data-label="Детали">
                 ${!work.parts
                   ? '<span class="muted">—</span>'
                   : isManager()
@@ -1914,7 +1914,7 @@
                               style="width:90px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
                     : `<span class="mono">${qty(work.parts)}</span>`}
               </td>
-              <td class="num">
+              <td class="num" data-label="Цена">
                 ${isManager()
                   ? `<input type="number" value="${work.price}" min="0" step="0.01" data-work-price="${work.id}"
                             style="width:120px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
@@ -2007,15 +2007,15 @@
           <tbody>
             ${data.materials.map((item) => `
               <tr>
-                <td class="code-cell">${esc(item.code)}</td>
-                <td>${esc(item.name)}${item.aliases ? `<span class="muted"> · ${esc(item.aliases)}</span>` : ''}</td>
+                <td class="code-cell" data-label="Код">${esc(item.code)}</td>
+                <td data-label="Наименование">${esc(item.name)}${item.aliases ? `<span class="muted"> · ${esc(item.aliases)}</span>` : ''}</td>
                 <td class="num">
                   ${isManager()
                     ? `<input type="number" value="${item.price}" min="0" step="0.01" data-mat-price="${esc(item.code)}"
                               style="width:110px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
                     : `<span class="mono">${money(item.price)}</span>`}
                 </td>
-                <td class="muted">${esc(item.unit)}</td>
+                <td class="muted" data-label="Ед.">${esc(item.unit)}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -2274,15 +2274,15 @@
           <tbody>
             ${data.users.map((user) => `
               <tr>
-                <td>${esc(user.full_name)}</td>
-                <td class="muted">${esc(user.login)}</td>
-                <td>${esc(roleLabel(user))}${user.is_workstation ? ' <span class="muted">(общий вход)</span>' : ''}</td>
-                <td>${user.role === 'master' && !user.is_workstation && user.specialty !== 'bodyworker'
+                <td data-label="ФИО">${esc(user.full_name)}</td>
+                <td class="muted" data-label="Логин">${esc(user.login)}</td>
+                <td data-label="Роль">${esc(roleLabel(user))}${user.is_workstation ? ' <span class="muted">(общий вход)</span>' : ''}</td>
+                <td data-label="ПИН-код">${user.role === 'master' && !user.is_workstation && user.specialty !== 'bodyworker'
                   ? `<button class="btn btn-outline btn-sm" data-pin-user="${user.id}"
                              data-pin-name="${esc(user.full_name)}">${user.pin_set ? 'Сменить ПИН' : 'Задать ПИН'}</button>`
                   : '<span class="muted">—</span>'}</td>
-                <td>${user.active ? 'работает' : '<span class="muted">отключён</span>'}</td>
-                <td class="num"><button class="btn btn-outline btn-sm" data-edit-user="${user.id}">Изменить</button></td>
+                <td data-label="Статус">${user.active ? 'работает' : '<span class="muted">отключён</span>'}</td>
+                <td class="num" data-label=""><button class="btn btn-outline btn-sm" data-edit-user="${user.id}">Изменить</button></td>
               </tr>`).join('')}
           </tbody>
         </table>
