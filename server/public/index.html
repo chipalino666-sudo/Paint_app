@@ -28,6 +28,12 @@
 </head>
 <body>
 
+<!-- Приманка для менеджеров паролей: пусть заполняют это, а не наши поля -->
+<form class="autofill-trap" autocomplete="on" aria-hidden="true">
+  <input type="text" name="username" autocomplete="username" tabindex="-1">
+  <input type="password" name="password" autocomplete="current-password" tabindex="-1">
+</form>
+
 <div class="toast" id="toast"></div>
 
 <!-- ======================= ВХОД ПО ПИН-КОДУ ======================= -->
