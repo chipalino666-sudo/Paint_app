@@ -1333,14 +1333,14 @@
     state.works.forEach((work) => {
       const option = document.createElement('option');
       option.value = work.id;
-      option.textContent = `${work.name} — ${money(work.price)} · ${qty(work.parts ?? 1)} дет.`;
+      option.textContent = `${work.name} — ${money(work.price)}${work.parts ? ` · ${qty(work.parts)} дет.` : ''}`;
       select.appendChild(option);
     });
 
     // Сколько деталей у работы — столько и подставляем в количество
     const applyParts = () => {
       const work = state.works.find((w) => String(w.id) === select.value);
-      if (work) qtyInput.value = String(work.parts ?? 1);
+      qtyInput.value = String(work && work.parts ? work.parts : 1);
     };
 
     select.addEventListener('change', applyParts);
@@ -1907,10 +1907,12 @@
               <td>${esc(work.name)}</td>
               <td class="muted">${esc(work.category || '—')}</td>
               <td class="num">
-                ${isManager()
-                  ? `<input type="number" value="${work.parts ?? 1}" min="0.1" step="0.05" data-work-parts="${work.id}"
-                            style="width:90px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
-                  : `<span class="mono">${qty(work.parts ?? 1)}</span>`}
+                ${!work.parts
+                  ? '<span class="muted">—</span>'
+                  : isManager()
+                    ? `<input type="number" value="${work.parts}" min="0.1" step="0.05" data-work-parts="${work.id}"
+                              style="width:90px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
+                    : `<span class="mono">${qty(work.parts)}</span>`}
               </td>
               <td class="num">
                 ${isManager()

@@ -510,8 +510,16 @@ function init() {
     if (match) setPaintCode.run(match[1], paint.code);
   }
 
-  // Работы измеряются в деталях: капот — 1, большой капот — 1,5
-  db.prepare('UPDATE works SET parts = 1 WHERE parts IS NULL OR parts <= 0').run();
+  // Работы измеряются в деталях: капот — 1, большой капот — 1,5.
+  // Детали имеют смысл только у покраски — остальным работам их не ставим.
+  const paintWorks = db.prepare('SELECT id, name, category FROM works').all();
+  const clearParts = db.prepare('UPDATE works SET parts = NULL WHERE id = ?');
+
+  for (const work of paintWorks) {
+    const isPaint = /покраск/i.test(work.category || '') || /^\s*покраск/i.test(work.name || '');
+    if (!isPaint) clearParts.run(work.id);
+    else if (!work.parts) db.prepare('UPDATE works SET parts = 1 WHERE id = ?').run(work.id);
+  }
 
   const works = seedWorks();
   const materials = seedMaterials();

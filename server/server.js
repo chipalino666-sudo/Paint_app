@@ -761,6 +761,11 @@ function fallbackText(action, payload) {
   }
 }
 
+/** Детали считаются только у покраски: остальные работы — за штуку. */
+function isPaintWork(name, category) {
+  return /покраск/i.test(String(category || '')) || /^\s*покраск/i.test(String(name || ''));
+}
+
 /* ---- Работы в заказе --------------------------------------------------- */
 
 route('POST', '/api/orders/:id/works', async ({ user, params, body }) => {
@@ -1050,10 +1055,11 @@ route('POST', '/api/works', async ({ user, body }) => {
   const name = str(body.name, 200);
   if (!name) throw new ApiError(400, 'Укажите название работы');
 
-  const parts = round2(toNum(body.parts, 1)) || 1;
+  const category = str(body.category, 60) || 'Прочее';
+  const parts = isPaintWork(name, category) ? (round2(toNum(body.parts, 1)) || 1) : null;
 
   const info = db.prepare('INSERT INTO works (name, category, price, unit, parts, active) VALUES (?, ?, ?, ?, ?, 1)')
-    .run(name, str(body.category, 60) || 'Прочее', round2(toNum(body.price, 0)), str(body.unit, 10) || 'шт', parts);
+    .run(name, category, round2(toNum(body.price, 0)), str(body.unit, 10) || 'шт', parts);
 
   return { id: Number(info.lastInsertRowid) };
 });
@@ -1068,7 +1074,9 @@ route('PATCH', '/api/works/:id', async ({ user, params, body }) => {
     .run(body.name !== undefined ? str(body.name, 200) : work.name,
       body.category !== undefined ? str(body.category, 60) : work.category,
       body.price !== undefined ? round2(toNum(body.price, work.price)) : work.price,
-      body.parts !== undefined ? (round2(toNum(body.parts, work.parts || 1)) || 1) : (work.parts || 1),
+      isPaintWork(body.name !== undefined ? str(body.name, 200) : work.name, body.category !== undefined ? str(body.category, 60) : work.category)
+        ? (round2(toNum(body.parts, work.parts || 1)) || 1)
+        : null,
       body.active !== undefined ? (body.active ? 1 : 0) : work.active,
       work.id);
 
