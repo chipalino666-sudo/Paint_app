@@ -1364,7 +1364,25 @@ tr.unread:hover td { background: #e3efff; }
   table.grid td.empty-line { display: block; text-align: center; }
   table.grid td.empty-line::before { content: none; }
 
-  table.grid input[type="number"] { width: 110px !important; }}
+  table.grid input[type="number"] { width: 110px !important; }
+
+  /* Период отчёта: подписи над полями, поля на всю ширину */
+  .report-period { flex-direction: column; align-items: stretch; gap: 10px; }
+
+  .report-period label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .report-period input { width: 100%; }
+  .report-period .btn { width: 100%; }
+}
+
+
 
 /* Шапки таблиц берут цвет из палитры, а не из старого стиля */
 table.grid th,
@@ -1485,3 +1503,36 @@ td.empty-line,
 [data-sound="off"] .sound-btn .icon-sound-on { display: none; }
 [data-sound="off"] .sound-btn .icon-sound-off { display: block; }
 [data-sound="off"] .sound-btn { color: var(--grey); }
+
+/* Полосы прокрутки в тёмной теме — чтобы не светились белым */
+[data-theme="dark"] { scrollbar-color: #3a4557 transparent; }
+
+[data-theme="dark"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: transparent; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #3a4557; border-radius: 6px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #4a5669; }
+
+/* Меню на телефоне прокручивается, но полоса не мешает */
+@media (max-width: 780px) {
+  .nav { scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+}
+
+/* Выбор работы на телефоне: список отдельной строкой, ниже количество и кнопка */
+@media (max-width: 780px) {
+  .toolbar { flex-wrap: wrap; }
+
+  #workSelect, #orderWorkSelect {
+    flex: 1 1 100% !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #workQty, #orderWorkQty { flex: 1 1 80px; width: auto; }
+
+  #btnAddWork, #btnDoAddWork { flex: 1 1 auto; }
+}
+
+/* Список работ занимает свободное место в строке */
+#workSelect { flex: 1 1 220px; min-width: 0; }

@@ -1565,12 +1565,22 @@
 
     const workSelect = $('#workSelect');
     workSelect.innerHTML = '';
+
     state.works.forEach((work) => {
       const option = document.createElement('option');
       option.value = work.id;
-      option.textContent = `${work.name} — ${money(work.price)}`;
+      option.textContent = `${work.name} — ${money(work.price)}${work.parts ? ` · ${qty(work.parts)} дет.` : ''}`;
       workSelect.appendChild(option);
     });
+
+    // Покраска измеряется в деталях — количество подставляем сразу
+    const applyWorkParts = () => {
+      const work = state.works.find((w) => String(w.id) === workSelect.value);
+      if ($('#workQty')) $('#workQty').value = String(work && work.parts ? work.parts : 1);
+    };
+
+    workSelect.addEventListener('change', applyWorkParts);
+    applyWorkParts();
 
     $('#carPlate').focus();
   }
@@ -1740,23 +1750,23 @@
       const mastersRows = data.masters.length
         ? data.masters.map((row) => `
             <tr>
-              <td>${esc(row.master_name)}</td>
-              <td class="num">${row.orders}</td>
-              <td class="num">${row.closed}</td>
-              <td class="num">${row.in_work}</td>
-              <td class="num mono">${money(row.works_sum)}</td>
-              <td class="num mono">${money(row.materials_sum)}</td>
-              <td class="num mono"><b>${money(row.total)}</b></td>
+              <td data-label="Мастер">${esc(row.master_name)}</td>
+              <td class="num" data-label="Заказов">${row.orders}</td>
+              <td class="num" data-label="Закрыто">${row.closed}</td>
+              <td class="num" data-label="В работе">${row.in_work}</td>
+              <td class="num mono" data-label="Работы">${money(row.works_sum)}</td>
+              <td class="num mono" data-label="Материалы">${money(row.materials_sum)}</td>
+              <td class="num mono" data-label="Итого"><b>${money(row.total)}</b></td>
             </tr>`).join('')
         : '<tr><td colspan="7" class="empty-line">За этот период заказов нет</td></tr>';
 
       const materialsRows = data.materials.length
         ? data.materials.map((row) => `
             <tr>
-              <td class="code-cell">${esc(row.code)}</td>
-              <td>${esc(row.name)}</td>
-              <td class="num">${qty(row.qty)} ${esc(row.unit)}</td>
-              <td class="num mono">${money(row.cost)}</td>
+              <td class="code-cell" data-label="Код">${esc(row.code)}</td>
+              <td data-label="Наименование">${esc(row.name)}</td>
+              <td class="num" data-label="Кол-во">${qty(row.qty)} ${esc(row.unit)}</td>
+              <td class="num mono" data-label="Стоимость">${money(row.cost)}</td>
             </tr>`).join('')
         : '<tr><td colspan="4" class="empty-line">Материалы не списывались</td></tr>';
 

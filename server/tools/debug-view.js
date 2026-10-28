@@ -106,6 +106,11 @@ async function main() {
     })()`);
     await sleep(1600);
 
+    if (process.env.PAINT_CLICK) {
+      await evaluate(`(() => { const el = document.querySelector("' + process.env.PAINT_CLICK + '"); if (el) el.click(); return true; })()`);
+      await sleep(1200);
+    }
+
     if (process.env.PAINT_SCROLL) {
       await evaluate(`window.scrollTo(0, ${Number(process.env.PAINT_SCROLL)})`);
       await sleep(500);
