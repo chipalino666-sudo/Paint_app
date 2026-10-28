@@ -122,7 +122,9 @@ async function evaluate(cdp, expression) {
 }
 
 async function main() {
-  const token = await login();
+  // PAINT_ANON=1 — снять только страницу входа, без авторизации
+  const anon = process.env.PAINT_ANON === '1';
+  const token = anon ? null : await login();
   const browser = findBrowser();
 
   fs.mkdirSync(OUT, { recursive: true });
@@ -151,12 +153,19 @@ async function main() {
       width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false
     });
 
-    await cdp.send('Network.setCookie', {
-      name: 'psid', value: token, domain: '127.0.0.1', path: '/'
-    });
+    if (!anon) {
+      await cdp.send('Network.setCookie', {
+        name: 'psid', value: token, domain: '127.0.0.1', path: '/'
+      });
+    }
 
-    await cdp.send('Page.navigate', { url: BASE + '/' });
+    await cdp.send('Page.navigate', { url: BASE + (anon ? '/login.html' : '/') });
     await sleep(2500);
+
+    if (anon) {
+      await screenshot(cdp, '00-login.png');
+      return;
+    }
 
     // Рабочее место мастеров: сначала экран ПИН-кода
     const locked = await evaluate(cdp, `

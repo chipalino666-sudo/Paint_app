@@ -21,7 +21,7 @@ try {
         $text = "Сервер и так не работал."
     }
 
-    [System.Windows.Forms.MessageBox]::Show($text, 'Малярный цех', 'OK', 'Information') | Out-Null
+    [System.Windows.Forms.MessageBox]::Show($text, 'Лонжерон', 'OK', 'Information') | Out-Null
 } catch {
     # без окон — просто выходим
 }

@@ -1590,7 +1590,7 @@ function localAddresses() {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n  Малярный цех — сервер запущен`);
+  console.log(`\n  Лонжерон — CRM малярного цеха, сервер запущен`);
   console.log(`  На этом компьютере: http://localhost:${PORT}`);
 
   const addresses = localAddresses();

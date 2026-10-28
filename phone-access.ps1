@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$ruleName = 'Малярный цех (порт 3000)'
+$ruleName = 'Лонжерон (порт 3000)'
 
 function Test-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -18,7 +18,7 @@ if (-not (Test-Admin)) {
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
         )
     } catch {
-        [System.Windows.Forms.MessageBox]::Show('Нужно разрешить запуск от имени администратора', 'Малярный цех')
+        [System.Windows.Forms.MessageBox]::Show('Нужно разрешить запуск от имени администратора', 'Лонжерон')
     }
     exit
 }
@@ -61,7 +61,7 @@ Add-Type -AssemblyName System.Windows.Forms
 if (-not $addresses) {
     [System.Windows.Forms.MessageBox]::Show(
         "Не вижу сетевых адресов. Проверьте, что ноутбук подключён к Wi-Fi или точке доступа.",
-        'Малярный цех', 'OK', 'Warning') | Out-Null
+        'Лонжерон', 'OK', 'Warning') | Out-Null
     exit
 }
 
@@ -76,4 +76,4 @@ $list
 например, ноутбук подключён к точке доступа этого телефона.
 "@
 
-[System.Windows.Forms.MessageBox]::Show($message, 'Малярный цех', 'OK', 'Information') | Out-Null
+[System.Windows.Forms.MessageBox]::Show($message, 'Лонжерон', 'OK', 'Information') | Out-Null

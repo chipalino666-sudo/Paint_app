@@ -26,7 +26,7 @@ function Test-Server {
 function Show-Error($text) {
     try {
         Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show($text, 'Малярный цех', 'OK', 'Error') | Out-Null
+        [System.Windows.Forms.MessageBox]::Show($text, 'Лонжерон', 'OK', 'Error') | Out-Null
     } catch {
         # Если окон не завезли — молча выходим, ошибка уже в логе
     }
