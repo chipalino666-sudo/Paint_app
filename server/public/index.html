@@ -363,18 +363,54 @@
 
     <div class="field" style="margin-bottom:12px">
       <label for="passCurrent">Текущий пароль</label>
-      <input type="password" id="passCurrent" autocomplete="current-password">
+      <div class="password-wrap">
+        <input type="password" id="passCurrent" autocomplete="current-password">
+        <button type="button" class="password-toggle" data-toggle-password="passCurrent" aria-label="Показать пароль" title="Показать пароль">
+          <svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+            <path d="M3 3l18 18"/>
+          </svg>
+        </button>      </div>
     </div>
 
     <div class="field" style="margin-bottom:12px">
       <label for="passNext">Новый пароль</label>
-      <input type="password" id="passNext" autocomplete="new-password">
+      <div class="password-wrap">
+        <input type="password" id="passNext" autocomplete="new-password">
+        <button type="button" class="password-toggle" data-toggle-password="passNext" aria-label="Показать пароль" title="Показать пароль">
+          <svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+            <path d="M3 3l18 18"/>
+          </svg>
+        </button>      </div>
       <span class="hintline">Не короче 6 символов</span>
     </div>
 
     <div class="field">
       <label for="passRepeat">Повторите новый</label>
-      <input type="password" id="passRepeat" autocomplete="new-password">
+      <div class="password-wrap">
+        <input type="password" id="passRepeat" autocomplete="new-password">
+        <button type="button" class="password-toggle" data-toggle-password="passRepeat" aria-label="Показать пароль" title="Показать пароль">
+          <svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+            <path d="M3 3l18 18"/>
+          </svg>
+        </button>      </div>
     </div>
 
     <div class="actions-row" style="margin-top:16px">

@@ -29,7 +29,20 @@
 
     <div class="field">
       <label for="password">Пароль</label>
-      <input type="password" id="password" autocomplete="current-password" required>
+      <div class="password-wrap">
+        <input type="password" id="password" autocomplete="current-password" required>
+        <button type="button" class="password-toggle" data-toggle-password="password" aria-label="Показать пароль" title="Показать пароль">
+          <svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.6 12S5.2 5.6 12 5.6 22.4 12 22.4 12 18.8 18.4 12 18.4 1.6 12 1.6 12z"/>
+            <circle cx="12" cy="12" r="3.2"/>
+            <path d="M3 3l18 18"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary" style="width:100%" id="submitBtn">Войти</button>
@@ -43,6 +56,21 @@
   const form = document.getElementById('loginForm');
   const errorBox = document.getElementById('loginError');
   const submitBtn = document.getElementById('submitBtn');
+
+  // Показать/скрыть введённый пароль
+  const passwordInput = document.getElementById('password');
+  const toggle = document.querySelector('[data-toggle-password]');
+
+  if (toggle && passwordInput) {
+    toggle.addEventListener('click', () => {
+      const show = passwordInput.type === 'password';
+      passwordInput.type = show ? 'text' : 'password';
+      toggle.classList.toggle('is-on', show);
+      toggle.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+      toggle.title = show ? 'Скрыть пароль' : 'Показать пароль';
+      passwordInput.focus();
+    });
+  }
 
   function showError(message) {
     errorBox.textContent = message;

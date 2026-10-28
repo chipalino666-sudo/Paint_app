@@ -2023,6 +2023,20 @@
     $('#btnCancelPassword').addEventListener('click', closePasswordModal);
     $('#btnSavePassword').addEventListener('click', savePassword);
 
+    // «Глаз» в полях пароля: посмотреть, что набрали
+    document.querySelectorAll('[data-toggle-password]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.togglePassword);
+        if (!input) return;
+
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        button.classList.toggle('is-on', show);
+        button.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+        button.title = show ? 'Скрыть пароль' : 'Показать пароль';
+      });
+    });
+
     $('#btnNewOrder').addEventListener('click', () => showView('new'));
     $('#btnCancelNew').addEventListener('click', () => showView('orders'));
 
