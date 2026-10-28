@@ -768,6 +768,10 @@
         <rect class="car-panel" x="60" y="134" width="60" height="76" rx="7"></rect>
         <path class="car-window" d="M60 210 L120 210 L124 232 L56 232 Z"></path>
         <path class="car-line" d="M52 70 C74 64 106 64 128 70"></path>
+        <path class="car-door" d="M38 188 L58 188"></path>
+        <path class="car-door" d="M122 188 L142 188"></path>
+        <path class="car-door" d="M38 256 L58 256"></path>
+        <path class="car-door" d="M122 256 L142 256"></path>
         <path class="car-line" d="M52 272 C74 278 106 278 128 272"></path>
         <rect class="car-lamp" x="12" y="116" width="20" height="9" rx="4"></rect>
         <rect class="car-lamp" x="148" y="116" width="20" height="9" rx="4"></rect>
@@ -780,9 +784,8 @@
         <path class="car-body" d="M16 112 L16 96 C16 88 20 84 30 82 L88 72 C104 54 120 46 140 45 L232 45 C254 46 270 54 284 72 L336 82 C346 84 350 88 350 96 L350 112 Z"></path>
         <path class="car-window" d="M104 70 L136 50 L176 50 L176 70 Z"></path>
         <path class="car-window" d="M186 50 L230 50 C246 51 258 58 268 70 L186 70 Z"></path>
-        <path class="car-line" d="M181 45 L181 112"></path>
-        <path class="car-line" d="M104 70 L104 112"></path>
-        <path class="car-line" d="M268 70 L268 112"></path>
+        <path class="car-door" d="M104 70 L104 108 Q104 112 110 112 L181 112 L181 70"></path>
+        <path class="car-door" d="M181 70 L181 112 L262 112 Q268 112 268 108 L268 70"></path>
         <rect class="car-line" x="150" y="78" width="16" height="4" rx="2"></rect>
         <rect class="car-line" x="214" y="78" width="16" height="4" rx="2"></rect>
         <circle class="car-wheel" cx="96" cy="112" r="24"></circle>
