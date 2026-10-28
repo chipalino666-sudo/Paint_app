@@ -1,0 +1,23 @@
+[Unit]
+Description=Paint shop (Малярный цех)
+After=network.target
+
+[Service]
+Type=simple
+User=paint
+Group=paint
+WorkingDirectory=/opt/paint/server
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PAINT_PORT=3000
+Environment=PAINT_HOST=127.0.0.1
+Environment=TZ=Europe/Moscow
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/paint/server/data
+
+[Install]
+WantedBy=multi-user.target

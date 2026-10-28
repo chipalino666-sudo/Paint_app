@@ -1,0 +1,13 @@
+# Данные и служебные файлы — не в репозиторий
+server/data/
+server/shots/
+*.db
+*.db-wal
+*.db-shm
+node_modules/
+.idea/
+.vscode/
+*.log
+
+# Временная папка для выкладки на сервер
+.deploy-tmp/

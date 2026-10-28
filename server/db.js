@@ -1,0 +1,457 @@
+'use strict';
+
+/* ==========================================================================
+   База данных: схема, миграции, первичное наполнение.
+   SQLite из стандартной библиотеки Node (node:sqlite) — внешних зависимостей нет.
+   ========================================================================== */
+
+const path = require('node:path');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const crypto = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
+
+const DATA_DIR = process.env.PAINT_DATA_DIR || path.join(__dirname, 'data');
+fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const DB_PATH = process.env.PAINT_DB || path.join(DATA_DIR, 'paint.db');
+
+const db = new DatabaseSync(DB_PATH);
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
+
+/* --------------------------------------------------------------------------
+   Схема
+   -------------------------------------------------------------------------- */
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id          INTEGER PRIMARY KEY,
+  login       TEXT NOT NULL UNIQUE,
+  pass_hash   TEXT NOT NULL,
+  full_name   TEXT NOT NULL,
+  role        TEXT NOT NULL CHECK (role IN ('admin','manager','master','store')),
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token       TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL,
+  expires_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cars (
+  id           INTEGER PRIMARY KEY,
+  plate        TEXT NOT NULL,
+  vin          TEXT,
+  make         TEXT,
+  model        TEXT,
+  color        TEXT,
+  color_code   TEXT,
+  owner_name   TEXT,
+  owner_phone  TEXT,
+  notes        TEXT,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cars_plate_idx ON cars(plate);
+
+CREATE TABLE IF NOT EXISTS works (
+  id        INTEGER PRIMARY KEY,
+  name      TEXT NOT NULL,
+  category  TEXT,
+  price     REAL NOT NULL DEFAULT 0,
+  unit      TEXT NOT NULL DEFAULT 'шт',
+  active    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS materials (
+  code       TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  unit       TEXT NOT NULL DEFAULT 'шт',
+  category   TEXT,
+  price      REAL NOT NULL DEFAULT 0,
+  active     INTEGER NOT NULL DEFAULT 1,
+  synced_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS materials_name_idx ON materials(name);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id            INTEGER PRIMARY KEY,
+  number        TEXT NOT NULL UNIQUE,
+  car_id        INTEGER NOT NULL REFERENCES cars(id),
+  master_id     INTEGER REFERENCES users(id),
+  created_by    INTEGER REFERENCES users(id),
+  status        TEXT NOT NULL DEFAULT 'accepted'
+                CHECK (status IN ('draft','accepted','in_work','ready','closed','cancelled')),
+  planned_date  TEXT,
+  comment       TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  ready_at      TEXT,
+  closed_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS orders_status_idx ON orders(status);
+CREATE INDEX IF NOT EXISTS orders_master_idx ON orders(master_id);
+
+CREATE TABLE IF NOT EXISTS order_works (
+  id        INTEGER PRIMARY KEY,
+  order_id  INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  work_id   INTEGER REFERENCES works(id),
+  name      TEXT NOT NULL,
+  qty       REAL NOT NULL DEFAULT 1,
+  price     REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS order_works_order_idx ON order_works(order_id);
+
+CREATE TABLE IF NOT EXISTS order_materials (
+  id          INTEGER PRIMARY KEY,
+  order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  unit        TEXT NOT NULL DEFAULT 'г',
+  kind        TEXT NOT NULL DEFAULT 'material' CHECK (kind IN ('paint','material')),
+  qty         REAL NOT NULL,
+  price       REAL NOT NULL DEFAULT 0,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS order_materials_order_idx ON order_materials(order_id);
+
+CREATE TABLE IF NOT EXISTS recipes (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  base        REAL NOT NULL,
+  unit        TEXT NOT NULL DEFAULT 'г',
+  mixes       TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS norms (
+  id      INTEGER PRIMARY KEY,
+  work_id INTEGER NOT NULL REFERENCES works(id) ON DELETE CASCADE,
+  code    TEXT NOT NULL,
+  qty     REAL NOT NULL,
+  unit    TEXT NOT NULL DEFAULT 'г'
+);
+
+CREATE TABLE IF NOT EXISTS audit (
+  id         INTEGER PRIMARY KEY,
+  at         TEXT NOT NULL,
+  user_id    INTEGER,
+  action     TEXT NOT NULL,
+  entity     TEXT NOT NULL,
+  entity_id  TEXT,
+  payload    TEXT
+);
+CREATE INDEX IF NOT EXISTS audit_entity_idx ON audit(entity, entity_id);
+
+CREATE TABLE IF NOT EXISTS counters (
+  name  TEXT PRIMARY KEY,
+  value INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key    TEXT PRIMARY KEY,
+  value  TEXT NOT NULL
+);
+
+-- Внутренний чат: общий канал и обсуждение конкретного заказа.
+-- Сообщения не удаляются — вся переписка остаётся историей.
+CREATE TABLE IF NOT EXISTS messages (
+  id         INTEGER PRIMARY KEY,
+  channel    TEXT NOT NULL DEFAULT 'general',
+  user_id    INTEGER REFERENCES users(id),
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS messages_channel_idx ON messages(channel, id);
+
+CREATE TABLE IF NOT EXISTS chat_reads (
+  user_id  INTEGER NOT NULL,
+  channel  TEXT NOT NULL,
+  last_id  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, channel)
+);
+`);
+
+/* --------------------------------------------------------------------------
+   Миграции
+   -------------------------------------------------------------------------- */
+
+function addColumn(table, column, type) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (columns.some((c) => c.name === column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  return true;
+}
+
+/*
+ * SQLite сравнивает регистр только для латиницы: «Краска» и «краска» для LIKE —
+ * разные строки. Поэтому храним отдельное поле в нижнем регистре и ищем по нему.
+ * Заодно приравниваем ё к е — люди пишут и так, и так.
+ */
+function normalizeSearch(...parts) {
+  return parts
+    .filter((part) => part !== null && part !== undefined && part !== '')
+    .join(' ')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+addColumn('materials', 'search', 'TEXT');
+addColumn('users', 'search', 'TEXT');
+addColumn('cars', 'search', 'TEXT');
+
+// Рабочее место мастеров: общий вход на компьютере + личный ПИН-код у каждого
+addColumn('users', 'is_workstation', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'pin_hash', 'TEXT');
+addColumn('users', 'pin_updated_at', 'TEXT');
+
+// Мастера бывают двух специальностей: маляр (работает с материалом)
+// и кузовщик (пока только назначается на заказ).
+addColumn('users', 'specialty', 'TEXT');
+
+// В заказе два исполнителя: маляр и кузовщик
+addColumn('orders', 'bodyworker_id', 'INTEGER');
+
+// В сессии рабочего места хранится, чей кабинет сейчас открыт
+addColumn('sessions', 'active_user_id', 'INTEGER');
+addColumn('sessions', 'last_seen', 'TEXT');
+
+db.exec('CREATE INDEX IF NOT EXISTS materials_search_idx ON materials(search)');
+db.exec('CREATE INDEX IF NOT EXISTS cars_search_idx ON cars(search)');
+
+/* --------------------------------------------------------------------------
+   Утилиты
+   -------------------------------------------------------------------------- */
+
+const nowISO = () => new Date().toISOString();
+
+function randomToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+/** scrypt-хеш пароля в формате "salt:hash" (обе части hex). */
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored || !stored.includes(':')) return false;
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const expected = Buffer.from(hash, 'hex');
+  const actual = crypto.scryptSync(String(password), salt, expected.length, { N: 16384, r: 8, p: 1 });
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+/** Чтение переменной из старого файла-скрипта (database.js и подобных). */
+function loadScriptVar(file, varName) {
+  const full = path.join(__dirname, '..', file);
+  if (!fs.existsSync(full)) return undefined;
+
+  const src = fs.readFileSync(full, 'utf8') + `\n;__result = typeof ${varName} !== 'undefined' ? ${varName} : undefined;`;
+  const ctx = { console };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx, { timeout: 5000 });
+  return ctx.__result;
+}
+
+/* --------------------------------------------------------------------------
+   Первичное наполнение
+   -------------------------------------------------------------------------- */
+
+const DEFAULT_WORKS = [
+  ['Покраска бампера', 'Покраска'],
+  ['Покраска крыла переднего', 'Покраска'],
+  ['Покраска крыла заднего', 'Покраска'],
+  ['Покраска двери', 'Покраска'],
+  ['Покраска капота', 'Покраска'],
+  ['Покраска крышки багажника', 'Покраска'],
+  ['Покраска крыши', 'Покраска'],
+  ['Покраска порога', 'Покраска'],
+  ['Покраска стойки', 'Покраска'],
+  ['Покраска зеркала', 'Покраска'],
+  ['Покраска молдинга', 'Покраска'],
+  ['Покраска проёма', 'Покраска'],
+  ['Покраска кузова полностью', 'Покраска'],
+  ['Ремонт бампера (пластик)', 'Ремонт'],
+  ['Ремонт вмятины', 'Ремонт'],
+  ['Шпатлёвка и подготовка детали', 'Подготовка'],
+  ['Грунтование детали', 'Подготовка'],
+  ['Полировка детали', 'Полировка'],
+  ['Полировка кузова', 'Полировка'],
+  ['Снятие / установка детали', 'Разборка']
+];
+
+function seedWorks() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM works').get().n;
+  if (count > 0) return 0;
+
+  const insert = db.prepare('INSERT INTO works (name, category, price, unit, active) VALUES (?, ?, 0, ?, 1)');
+  for (const [name, category] of DEFAULT_WORKS) insert.run(name, category, 'шт');
+  return DEFAULT_WORKS.length;
+}
+
+function seedMaterials() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM materials').get().n;
+  if (count > 0) return 0;
+
+  const list = loadScriptVar('database.js', 'database');
+  const categories = loadScriptVar('categories.js', 'ITEM_CATEGORY') || {};
+  if (!Array.isArray(list) || !list.length) return 0;
+
+  const insert = db.prepare(
+    'INSERT INTO materials (code, name, unit, category, price, active, synced_at, search) VALUES (?, ?, ?, ?, 0, 1, ?, ?)'
+  );
+
+  let added = 0;
+  db.exec('BEGIN');
+  try {
+    for (const item of list) {
+      if (!item || !item.code || !item.name) continue;
+      insert.run(String(item.code), String(item.name), 'шт', categories[item.code] || 'other', nowISO(),
+        normalizeSearch(item.code, item.name));
+      added++;
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return added;
+}
+
+function seedRecipes() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
+  if (count > 0) return 0;
+
+  const seed = loadScriptVar('recipes.js', 'RECIPES_SEED');
+  if (!Array.isArray(seed) || !seed.length) return 0;
+
+  const insert = db.prepare('INSERT INTO recipes (id, name, base, unit, mixes, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+  let added = 0;
+  for (const r of seed) {
+    if (!r || !r.name || !Array.isArray(r.mixes)) continue;
+    insert.run(String(r.id || crypto.randomUUID()), String(r.name), Number(r.base) || 100, r.unit || 'г',
+      JSON.stringify(r.mixes), nowISO());
+    added++;
+  }
+  return added;
+}
+
+/** Первый администратор. Пароль можно задать переменной окружения. */
+function seedAdmin() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  if (count > 0) return null;
+
+  const login = process.env.PAINT_ADMIN_LOGIN || 'admin';
+  const password = process.env.PAINT_ADMIN_PASSWORD || 'admin12345';
+
+  db.prepare(
+    'INSERT INTO users (login, pass_hash, full_name, role, active, created_at, search) VALUES (?, ?, ?, ?, 1, ?, ?)'
+  ).run(login, hashPassword(password), 'Администратор', 'admin', nowISO(), normalizeSearch('Администратор'));
+
+  return { login, password };
+}
+
+/* --------------------------------------------------------------------------
+   Дозаполнение поисковых полей для баз, созданных до их появления
+   -------------------------------------------------------------------------- */
+
+function backfillSearch() {
+  let touched = 0;
+
+  const updMaterial = db.prepare('UPDATE materials SET search = ? WHERE code = ?');
+  for (const row of db.prepare("SELECT code, name FROM materials WHERE search IS NULL OR search = ''").all()) {
+    updMaterial.run(normalizeSearch(row.code, row.name), row.code);
+    touched++;
+  }
+
+  const updUser = db.prepare('UPDATE users SET search = ? WHERE id = ?');
+  for (const row of db.prepare("SELECT id, full_name FROM users WHERE search IS NULL OR search = ''").all()) {
+    updUser.run(normalizeSearch(row.full_name), row.id);
+    touched++;
+  }
+
+  const updCar = db.prepare('UPDATE cars SET search = ? WHERE id = ?');
+  for (const row of db.prepare("SELECT id, plate, vin, make, model FROM cars WHERE search IS NULL OR search = ''").all()) {
+    updCar.run(normalizeSearch(row.plate, row.vin, row.make, row.model), row.id);
+    touched++;
+  }
+
+  return touched;
+}
+
+/* --------------------------------------------------------------------------
+   Нумерация заказов: 2026-0001, счётчик отдельный на каждый год
+   -------------------------------------------------------------------------- */
+
+function nextOrderNumber() {
+  const year = new Date().getFullYear();
+  const name = `orders_${year}`;
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const row = db.prepare('SELECT value FROM counters WHERE name = ?').get(name);
+    const next = (row ? row.value : 0) + 1;
+    db.prepare('INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value')
+      .run(name, next);
+    db.exec('COMMIT');
+    return `${year}-${String(next).padStart(4, '0')}`;
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Журнал изменений
+   -------------------------------------------------------------------------- */
+
+function audit(userId, action, entity, entityId, payload) {
+  db.prepare('INSERT INTO audit (at, user_id, action, entity, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(nowISO(), userId ?? null, action, entity, entityId == null ? null : String(entityId),
+      payload == null ? null : JSON.stringify(payload));
+}
+
+/* --------------------------------------------------------------------------
+   Инициализация
+   -------------------------------------------------------------------------- */
+
+function init() {
+  backfillSearch();
+
+  // До появления кузовщиков все мастера были малярами
+  db.prepare(`
+    UPDATE users SET specialty = 'painter'
+     WHERE role = 'master' AND is_workstation = 0 AND (specialty IS NULL OR specialty = '')
+  `).run();
+
+  const works = seedWorks();
+  const materials = seedMaterials();
+  const recipes = seedRecipes();
+  const admin = seedAdmin();
+
+  return { works, materials, recipes, admin };
+}
+
+module.exports = {
+  db,
+  DB_PATH,
+  DATA_DIR,
+  init,
+  nowISO,
+  normalizeSearch,
+  randomToken,
+  hashPassword,
+  verifyPassword,
+  nextOrderNumber,
+  audit
+};

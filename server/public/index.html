@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Малярный цех</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/extra.css">
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- ======================= ВХОД ПО ПИН-КОДУ ======================= -->
+<div class="pin-screen hidden" id="pinScreen">
+  <div class="pin-box">
+    <div class="pin-brand">🎨 Малярный цех</div>
+    <div class="pin-title">Кто за компьютером?</div>
+    <div class="pin-sub">Введите свой ПИН-код</div>
+
+    <div class="pin-dots" id="pinDots">
+      <span></span><span></span><span></span><span></span>
+    </div>
+
+    <div class="pin-error hidden" id="pinError"></div>
+
+    <div class="pin-pad" id="pinPad">
+      <button type="button" data-key="1">1</button>
+      <button type="button" data-key="2">2</button>
+      <button type="button" data-key="3">3</button>
+      <button type="button" data-key="4">4</button>
+      <button type="button" data-key="5">5</button>
+      <button type="button" data-key="6">6</button>
+      <button type="button" data-key="7">7</button>
+      <button type="button" data-key="8">8</button>
+      <button type="button" data-key="9">9</button>
+      <button type="button" data-key="clear" class="pin-fn">C</button>
+      <button type="button" data-key="0">0</button>
+      <button type="button" data-key="back" class="pin-fn" title="Стереть">←</button>
+    </div>
+
+    <button type="button" class="pin-exit" id="btnPinExit">Выйти из рабочего места</button>
+    <div class="pin-hint" id="pinHint"></div>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">Малярный цех</div>
+
+  <nav class="nav" id="nav">
+    <button class="nav-btn active" data-view="orders">Заказы</button>
+    <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
+    <button class="nav-btn" data-view="report">Отчёт</button>
+    <button class="nav-btn" data-view="refs">Справочники</button>
+    <button class="nav-btn hidden" data-view="users" id="navUsers">Сотрудники</button>
+  </nav>
+
+  <div class="userbox">
+    <span id="userName"></span>
+    <span class="role-badge" id="userRole"></span>
+    <button class="btn btn-outline hidden" id="btnLock" style="padding:5px 10px;font-size:13px">Сменить мастера</button>
+    <button class="btn btn-outline" id="btnPassword" style="padding:5px 10px;font-size:13px">Пароль</button>
+    <button class="btn btn-outline" id="btnLogout" style="padding:5px 10px;font-size:13px">Выйти</button>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- ======================= СПИСОК ЗАКАЗОВ ======================= -->
+  <section class="view" id="view-orders">
+    <div class="toolbar">
+      <div class="chips" id="statusChips"></div>
+      <input type="search" id="orderSearch" placeholder="Номер, госномер, VIN, модель, мастер…" autocomplete="off">
+      <button class="btn btn-primary hidden" id="btnNewOrder">+ Новый заказ</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Заказ</th>
+            <th>Машина</th>
+            <th>Мастер</th>
+            <th>Статус</th>
+            <th>Принят</th>
+            <th class="num">Сумма</th>
+          </tr>
+        </thead>
+        <tbody id="ordersBody"></tbody>
+      </table>
+    </div>
+
+    <div id="ordersEmpty"></div>
+  </section>
+
+  <!-- ======================= КАРТОЧКА ЗАКАЗА ======================= -->
+  <section class="view hidden" id="view-order">
+    <div id="orderBody"></div>
+  </section>
+
+  <!-- ======================= НОВЫЙ ЗАКАЗ ======================= -->
+  <section class="view hidden" id="view-new">
+    <h1 class="page-title">Новый заказ</h1>
+
+    <form class="card" id="newOrderForm">
+      <div class="form-grid">
+        <div class="field">
+          <label for="carPlate">Госномер *</label>
+          <input type="text" id="carPlate" placeholder="А123ВС 01" required autocomplete="off">
+          <span class="hintline">Если машина уже была — подставится история.</span>
+        </div>
+        <div class="field">
+          <label for="carVin">VIN</label>
+          <input type="text" id="carVin" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="carMake">Марка</label>
+          <input type="text" id="carMake" placeholder="Lada" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="carModel">Модель</label>
+          <input type="text" id="carModel" placeholder="Vesta" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="carColor">Цвет</label>
+          <input type="text" id="carColor" list="colorList" placeholder="Белый" autocomplete="off">
+          <span class="hintline">Код краски укажет мастер в заказе.</span>
+        </div>
+        <div class="field">
+          <label for="ownerName">Владелец</label>
+          <input type="text" id="ownerName" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ownerPhone">Телефон</label>
+          <input type="text" id="ownerPhone" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="masterSelect">Маляр</label>
+          <select id="masterSelect"></select>
+        </div>
+        <div class="field">
+          <label for="bodyworkerSelect">Кузовщик</label>
+          <select id="bodyworkerSelect"></select>
+          <span class="hintline">Если машину делает ещё и кузовщик</span>
+        </div>
+        <div class="field">
+          <label for="plannedDate">Плановая дата</label>
+          <input type="date" id="plannedDate">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:12px">
+        <label for="orderComment">Комментарий</label>
+        <textarea id="orderComment" rows="2" placeholder="Что делаем, пожелания клиента…"></textarea>
+      </div>
+
+      <div class="section-head">
+        <h3>Работы</h3>
+      </div>
+
+      <div class="toolbar" style="margin-bottom:8px">
+        <select id="workSelect" style="flex:1;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:14px"></select>
+        <input type="number" id="workQty" value="1" min="0.1" step="0.1" style="width:90px;padding:9px 11px;border:1px solid var(--border);border-radius:6px">
+        <button type="button" class="btn btn-success" id="btnAddWork">Добавить</button>
+      </div>
+
+      <div id="newWorksList"></div>
+
+      <div class="totals">
+        <div>
+          <div class="t-k">Работы</div>
+          <div class="t-v" id="newWorksSum">0 ₽</div>
+        </div>
+        <div>
+          <div class="t-k">Итого к оплате</div>
+          <div class="t-v grand" id="newTotal">0 ₽</div>
+        </div>
+      </div>
+
+      <div class="actions-row" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary" id="btnCreateOrder">Создать заказ</button>
+        <button type="button" class="btn btn-outline" id="btnCancelNew">Отмена</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ======================= ОБСУЖДЕНИЯ ======================= -->
+  <section class="view hidden" id="view-chat">
+    <h1 class="page-title">Обсуждения</h1>
+
+    <div class="card chat-card">
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <form class="chat-form" id="chatForm">
+        <input type="text" id="chatInput" placeholder="Написать сообщение…" autocomplete="off" maxlength="2000">
+        <button type="submit" class="btn btn-primary">Отправить</button>
+      </form>
+
+      <p class="help-line">Переписка хранится в базе и не удаляется — всегда можно вернуться и посмотреть, о чём договорились.</p>
+    </div>
+  </section>
+
+  <!-- ======================= ОТЧЁТ ======================= -->
+  <section class="view hidden" id="view-report">
+    <h1 class="page-title">Отчёт</h1>
+
+    <div class="report-period">
+      <label>С <input type="date" id="reportFrom"></label>
+      <label>По <input type="date" id="reportTo"></label>
+      <button class="btn btn-primary" id="btnReport">Показать</button>
+    </div>
+
+    <div id="reportBody"></div>
+  </section>
+
+  <!-- ======================= СПРАВОЧНИКИ ======================= -->
+  <section class="view hidden" id="view-refs">
+    <h1 class="page-title">Справочники</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Работы и цены</h2>
+        <span class="muted">Цены можно править прямо в строке</span>
+      </div>
+
+      <div id="worksTable"></div>
+
+      <div class="toolbar" style="margin-top:12px">
+        <input type="text" id="newWorkName" placeholder="Новая работа: название" style="flex:2">
+        <input type="text" id="newWorkCategory" placeholder="Категория" style="flex:1">
+        <input type="number" id="newWorkPrice" placeholder="Цена" min="0" step="0.01" style="width:120px">
+        <button class="btn btn-success" id="btnAddWorkRef">Добавить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Готовые краски</h2>
+        <button class="btn btn-primary" id="btnNewRecipe">+ Новая краска</button>
+      </div>
+      <div id="recipesList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Материалы и цены</h2>
+        <span class="muted">Цена за единицу — для расчёта стоимости списания</span>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="refMaterialSearch" placeholder="Код или название…" autocomplete="off">
+      </div>
+
+      <div id="refMaterials"></div>
+    </div>
+  </section>
+
+  <!-- ======================= СОТРУДНИКИ ======================= -->
+  <section class="view hidden" id="view-users">
+    <h1 class="page-title">Сотрудники</h1>
+
+    <div class="card">
+      <div id="usersTable"></div>
+
+      <div class="section-head"><h3>Добавить</h3></div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="newUserLogin">Логин</label>
+          <input type="text" id="newUserLogin" autocomplete="off" autocapitalize="none">
+        </div>
+        <div class="field">
+          <label for="newUserName">ФИО</label>
+          <input type="text" id="newUserName" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="newUserRole">Роль</label>
+          <select id="newUserRole">
+            <option value="master">Мастер</option>
+            <option value="manager">Приёмщик / начальник</option>
+            <option value="store">Склад</option>
+            <option value="bodyworker">Кузовщик</option>
+            <option value="admin">Администратор</option>
+            <option value="workstation">Рабочее место мастеров (общий вход)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="newUserPassword">Пароль</label>
+          <input type="text" id="newUserPassword" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="newUserPin">ПИН-код (для мастера)</label>
+          <input type="text" id="newUserPin" inputmode="numeric" maxlength="4" placeholder="4 цифры" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="actions-row" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnAddUser">Добавить сотрудника</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ======================= СМЕНА ПАРОЛЯ ======================= -->
+<div class="modal" id="passwordModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-head">
+      <h2>Смена пароля</h2>
+      <button class="modal-close" id="btnClosePassword">×</button>
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label for="passCurrent">Текущий пароль</label>
+      <input type="password" id="passCurrent" autocomplete="current-password">
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label for="passNext">Новый пароль</label>
+      <input type="password" id="passNext" autocomplete="new-password">
+      <span class="hintline">Не короче 6 символов</span>
+    </div>
+
+    <div class="field">
+      <label for="passRepeat">Повторите новый</label>
+      <input type="password" id="passRepeat" autocomplete="new-password">
+    </div>
+
+    <div class="actions-row" style="margin-top:16px">
+      <span class="spacer"></span>
+      <button class="btn btn-outline" id="btnCancelPassword">Отмена</button>
+      <button class="btn btn-primary" id="btnSavePassword">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= РЕДАКТИРОВАНИЕ ЗАКАЗА ======================= -->
+<div class="modal" id="editOrderModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Изменить заказ</h2>
+      <button class="modal-close" id="btnCloseEditOrder">×</button>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="editPlate">Госномер</label>
+        <input type="text" id="editPlate" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editVin">VIN</label>
+        <input type="text" id="editVin" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editMake">Марка</label>
+        <input type="text" id="editMake" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editModel">Модель</label>
+        <input type="text" id="editModel" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editColor">Цвет</label>
+        <input type="text" id="editColor" list="colorList" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editOwnerName">Владелец</label>
+        <input type="text" id="editOwnerName" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editOwnerPhone">Телефон</label>
+        <input type="text" id="editOwnerPhone" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editMaster">Маляр</label>
+        <select id="editMaster"></select>
+      </div>
+      <div class="field">
+        <label for="editBodyworker">Кузовщик</label>
+        <select id="editBodyworker"></select>
+      </div>
+      <div class="field">
+        <label for="editPlannedDate">Плановая дата</label>
+        <input type="date" id="editPlannedDate">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:12px">
+      <label for="editComment">Комментарий</label>
+      <textarea id="editComment" rows="2"></textarea>
+    </div>
+
+    <p class="help-line">Все правки попадут в историю заказа: кто, когда и что изменил.</p>
+
+    <div class="actions-row" style="margin-top:14px">
+      <span class="spacer"></span>
+      <button class="btn btn-outline" id="btnCancelEditOrder">Отмена</button>
+      <button class="btn btn-primary" id="btnSaveEditOrder">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= РЕДАКТИРОВАНИЕ СОТРУДНИКА ======================= -->
+<div class="modal" id="editUserModal">
+  <div class="modal-box" style="max-width:460px">
+    <div class="modal-head">
+      <h2 id="editUserTitle">Сотрудник</h2>
+      <button class="modal-close" id="btnCloseEditUser">×</button>
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label for="editUserName">ФИО</label>
+      <input type="text" id="editUserName" autocomplete="off">
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="editUserRole">Роль</label>
+        <select id="editUserRole">
+          <option value="master">Мастер</option>
+          <option value="manager">Приёмщик / начальник</option>
+          <option value="store">Склад</option>
+            <option value="bodyworker">Кузовщик</option>
+          <option value="admin">Администратор</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="editUserPassword">Новый пароль</label>
+        <input type="text" id="editUserPassword" autocomplete="off" placeholder="оставьте пустым — не менять">
+      </div>
+    </div>
+
+    <div class="field" id="editUserPinField" style="margin-top:12px">
+      <label for="editUserPin">ПИН-код мастера</label>
+      <input type="text" id="editUserPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="оставьте пустым — не менять">
+      <span class="hintline">По нему мастер заходит на общем компьютере</span>
+    </div>
+
+    <label class="check-row" style="margin-top:14px">
+      <input type="checkbox" id="editUserActive">
+      <span>Сотрудник работает (снять галочку — отключить вход)</span>
+    </label>
+
+    <div class="actions-row" style="margin-top:16px">
+      <span class="spacer"></span>
+      <button class="btn btn-outline" id="btnCancelEditUser">Отмена</button>
+      <button class="btn btn-primary" id="btnSaveEditUser">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= РЕДАКТОР КРАСКИ ======================= -->
+<div class="modal" id="recipeModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="recipeModalTitle">Готовая краска</h2>
+      <button class="modal-close" id="btnCloseRecipe">×</button>
+    </div>
+
+    <div class="field-row" style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="field" style="flex:2;min-width:180px">
+        <label for="recipeName">Название цвета</label>
+        <input type="text" id="recipeName" placeholder="Lada 221">
+      </div>
+      <div class="field" style="width:110px">
+        <label for="recipeBase">База</label>
+        <input type="number" id="recipeBase" value="100" min="0.01" step="0.01">
+      </div>
+      <div class="field" style="width:90px">
+        <label for="recipeUnit">Ед.</label>
+        <select id="recipeUnit">
+          <option value="г">г</option>
+          <option value="мл">мл</option>
+          <option value="кг">кг</option>
+          <option value="л">л</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title">Миксы на эту базу</div>
+    <div id="recipeMixRows"></div>
+
+    <div class="picker" style="margin-top:10px">
+      <input type="text" id="recipeMixPicker" placeholder="Добавить микс: код или название…" autocomplete="off"
+             style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:14px">
+      <div class="picker-list" id="recipeMixList"></div>
+    </div>
+
+    <div class="mix-sum" id="recipeMixSum"></div>
+
+    <div class="actions-row" style="margin-top:14px">
+      <button class="btn btn-danger-outline hidden" id="btnDeleteRecipe">Удалить</button>
+      <span class="spacer"></span>
+      <button class="btn btn-outline" id="btnCancelRecipe">Отмена</button>
+      <button class="btn btn-primary" id="btnSaveRecipe">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="colorList">
+  <option value="Белый"></option>
+  <option value="Чёрный"></option>
+  <option value="Серый"></option>
+  <option value="Серебристый"></option>
+  <option value="Красный"></option>
+  <option value="Бордовый"></option>
+  <option value="Синий"></option>
+  <option value="Голубой"></option>
+  <option value="Зелёный"></option>
+  <option value="Жёлтый"></option>
+  <option value="Оранжевый"></option>
+  <option value="Бежевый"></option>
+  <option value="Коричневый"></option>
+  <option value="Хаки"></option>
+  <option value="Фиолетовый"></option>
+</datalist>
+
+<script src="/app.js"></script>
+</body>
+</html>

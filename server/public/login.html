@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход — Малярный цех</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/extra.css">
+</head>
+<body>
+
+<div class="login-page">
+  <form class="login-box" id="loginForm">
+    <h1>Малярный цех</h1>
+    <p class="sub">Вход в систему</p>
+
+    <div class="login-error hidden" id="loginError"></div>
+
+    <div class="field">
+      <label for="login">Логин</label>
+      <input type="text" id="login" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    </div>
+
+    <div class="field">
+      <label for="password">Пароль</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%" id="submitBtn">Войти</button>
+
+    <p class="help-line">Логин выдаёт администратор цеха.</p>
+  </form>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('loginForm');
+  const errorBox = document.getElementById('loginError');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.classList.remove('hidden');
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Входим…';
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          login: document.getElementById('login').value.trim(),
+          password: document.getElementById('password').value
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        showError(data.error || 'Не удалось войти');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Войти';
+        return;
+      }
+
+      location.href = '/';
+    } catch (error) {
+      showError('Сервер не отвечает. Проверьте, что он запущен.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Войти';
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

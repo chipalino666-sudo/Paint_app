@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Бланк списания</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000;
+    background: #f4f4f9;
+    margin: 0;
+    padding: 20px;
+  }
+
+  .sheet {
+    background: #fff;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 8mm;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, .15);
+  }
+
+  .doc-head { text-align: center; margin-bottom: 10px; }
+  .doc-head h1 { font-size: 19px; margin: 0 0 6px; }
+  .doc-head p { font-size: 13px; margin: 3px 0; }
+
+  .layout { display: flex; gap: 10px; margin-top: 10px; }
+  .col { width: 50%; }
+  .col h2 { font-size: 15px; text-align: center; margin: 6px 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 10px;
+  }
+
+  th, td {
+    border: 1px solid #000;
+    padding: 2px 3px;
+    line-height: 1.2;
+    word-wrap: break-word;
+    vertical-align: top;
+  }
+
+  th { font-size: 10px; text-align: center; font-weight: bold; }
+
+  th.c1, td.c1 { width: 62px; }
+  th.c3, td.c3 { width: 46px; text-align: center; }
+
+  .totals {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 30px;
+    font-size: 13px;
+  }
+
+  .totals div span { display: block; font-size: 10px; color: #444; }
+
+  .works { margin-top: 12px; font-size: 11px; }
+  .works b { font-size: 10px; text-transform: uppercase; }
+
+  .signs {
+    margin-top: 26px;
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    font-size: 11px;
+  }
+
+  .signs div { flex: 1; border-top: 1px solid #000; padding-top: 4px; text-align: center; }
+
+  .toolbar {
+    max-width: 210mm;
+    margin: 0 auto 14px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  .toolbar button {
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #fff;
+    background: #007bff;
+  }
+
+  .toolbar button.grey { background: #6c757d; }
+
+  .status { max-width: 210mm; margin: 0 auto 10px; font-size: 13px; color: #a02020; }
+
+  @page { size: A4; margin: 5mm; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .sheet { width: auto; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+    .toolbar, .status { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">🖨 Печать / PDF</button>
+  <button class="grey" onclick="window.close()">Закрыть</button>
+</div>
+
+<div class="status" id="status"></div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+
+  const esc = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const num = (value) => {
+    const n = Number(value) || 0;
+    let text = String(Math.round(n * 100) / 100);
+    if (text.includes('.')) text = text.replace(/0+$/, '').replace(/\.$/, '');
+    return text;
+  };
+
+  const money = (value) => (Number(value) || 0)
+    .toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' \u20BD';
+
+  function rows(list, unitLabel) {
+    if (!list.length) return '<tr><td colspan="3" style="text-align:center;color:#666">—</td></tr>';
+
+    return list.map((row) => `
+      <tr>
+        <td class="c1">${esc(row.code)}</td>
+        <td>${esc(row.name)}</td>
+        <td class="c3">${num(row.qty)} ${esc(unitLabel ? row.unit : '')}</td>
+      </tr>`).join('');
+  }
+
+  async function render() {
+    if (!id) {
+      document.getElementById('status').textContent = 'Не указан номер заказа';
+      return;
+    }
+
+    let order;
+    try {
+      const response = await fetch('/api/orders/' + encodeURIComponent(id));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Заказ не найден');
+      order = data.order;
+    } catch (error) {
+      document.getElementById('status').textContent = error.message;
+      return;
+    }
+
+    const paints = order.materials.filter((m) => m.kind === 'paint');
+    const materials = order.materials.filter((m) => m.kind === 'material');
+
+    const date = new Date(order.created_at).toLocaleDateString('ru-RU');
+
+    document.title = 'Бланк ' + order.number;
+
+    document.getElementById('sheet').innerHTML = `
+      <div class="doc-head">
+        <h1>Малярный цех</h1>
+        <p><b>Заказ-наряд №</b> ${esc(order.number)}</p>
+        <p>
+          <b>Автомобиль:</b> ${esc([order.make, order.model].filter(Boolean).join(' ') || '—')}
+          ${order.plate ? ' | <b>Номер:</b> ' + esc(order.plate) : ''}
+          ${order.vin ? ' | <b>VIN:</b> ' + esc(order.vin) : ''}
+        </p>
+        <p>
+          <b>Маляр:</b> ${esc(order.master_name || '—')}
+          ${order.color_code ? ' | <b>Код краски:</b> ' + esc(order.color_code) : ''}
+        </p>
+        <p style="color:#555;font-size:11px">Дата: ${date}</p>
+      </div>
+
+      <div class="layout">
+        <div class="col">
+          <h2>Автоэмаль</h2>
+          <table>
+            <thead><tr><th class="c1">Код</th><th>Наименование</th><th class="c3">Кол-во</th></tr></thead>
+            <tbody>${rows(paints, true)}</tbody>
+          </table>
+        </div>
+
+        <div class="col">
+          <h2>Материалы</h2>
+          <table>
+            <thead><tr><th class="c1">Код</th><th>Наименование</th><th class="c3">Кол-во</th></tr></thead>
+            <tbody>${rows(materials, true)}</tbody>
+          </table>
+        </div>
+      </div>
+
+      ${order.works.length ? `
+        <div class="works">
+          <b>Работы:</b> ${order.works.map((w) => esc(w.name) + (w.qty > 1 ? ' × ' + num(w.qty) : '')).join('; ')}
+        </div>` : ''}
+
+      <div class="totals">
+        <div><span>Работы</span>${money(order.works_sum)}</div>
+        <div><span>Материалы</span>${money(order.materials_sum)}</div>
+        <div><span>Итого</span><b>${money(order.total)}</b></div>
+      </div>
+
+      <div class="signs">
+        <div>Выдал (склад)</div>
+        <div>Получил (мастер)</div>
+        <div>Дата</div>
+      </div>
+    `;
+  }
+
+  render();
+})();
+</script>
+
+</body>
+</html>
