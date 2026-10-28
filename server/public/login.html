@@ -48,6 +48,18 @@
     <button type="submit" class="btn btn-primary" style="width:100%" id="submitBtn">Войти</button>
 
     <p class="help-line">Логин выдаёт администратор цеха.</p>
+
+    <button type="button" class="link-btn" id="installHint">Установить приложение на телефон</button>
+
+    <div class="install-steps hidden" id="installInfo">
+      <div><b>Android (Chrome):</b> меню ⋮ справа вверху → «Установить приложение»</div>
+      <div><b>iPhone (Safari):</b> кнопка «Поделиться» → «На экран «Домой»»</div>
+      <div><b>Компьютер:</b> значок установки в адресной строке</div>
+      <p class="help-line" style="margin-bottom:0">
+        Важно: открывать нужно в обычном браузере, а не по ссылке внутри мессенджера —
+        встроенные браузеры приложения не устанавливают.
+      </p>
+    </div>
   </form>
 </div>
 
@@ -56,6 +68,23 @@
   const form = document.getElementById('loginForm');
   const errorBox = document.getElementById('loginError');
   const submitBtn = document.getElementById('submitBtn');
+
+  // Служебный скрипт нужен, чтобы браузер предложил установку
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => { /* не критично */ });
+    });
+  }
+
+  // Подсказка, как установить приложение
+  const installHint = document.getElementById('installHint');
+  const installInfo = document.getElementById('installInfo');
+
+  if (installHint && installInfo) {
+    installHint.addEventListener('click', () => {
+      installInfo.classList.toggle('hidden');
+    });
+  }
 
   // Показать/скрыть введённый пароль
   const passwordInput = document.getElementById('password');
