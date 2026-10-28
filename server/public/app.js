@@ -303,9 +303,25 @@
      Навигация
      ------------------------------------------------------------------------ */
 
+  /* ------------------------------------------------------------------------
+     Кнопка «Назад» на телефоне
+     Без этого браузер уводил на страницу входа. Теперь «назад» листает
+     экраны программы, а на главном остаётся внутри.
+     ------------------------------------------------------------------------ */
+
+  let historyRestoring = false;
+
+  function pushAppState() {
+    try {
+      history.pushState({ app: true }, '', location.href);
+    } catch (error) { /* не критично */ }
+  }
+
   function showView(name) {
     state.view = name;
     shieldInputs();
+
+    if (!historyRestoring) pushAppState();
 
     $$('.view').forEach((view) => view.classList.add('hidden'));
     const target = document.getElementById('view-' + name);
@@ -2943,6 +2959,20 @@
       });
       resetIdle();
     }
+
+    // «Назад» на телефоне: листаем экраны программы, а не выходим на вход
+    window.addEventListener('popstate', () => {
+      historyRestoring = true;
+
+      try {
+        if (state.view !== 'orders') showView('orders');
+        pushAppState();
+      } finally {
+        historyRestoring = false;
+      }
+    });
+
+    pushAppState();
 
     showView('orders');
   }

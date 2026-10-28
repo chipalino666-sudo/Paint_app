@@ -89,6 +89,12 @@
   const errorBox = document.getElementById('loginError');
   const submitBtn = document.getElementById('submitBtn');
 
+  // Если сессия ещё жива — возвращаем внутрь, чтобы кнопка «Назад»
+  // не показывала окно входа уже вошедшему человеку
+  fetch('/api/me', { credentials: 'same-origin' })
+    .then((response) => { if (response.ok) location.replace('/'); })
+    .catch(() => { /* не критично */ });
+
   // Служебный скрипт нужен, чтобы браузер предложил установку
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
