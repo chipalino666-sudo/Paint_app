@@ -1418,3 +1418,23 @@ td.empty-line,
 .material-workspace table.lines input[type="number"] { width: 68px; }
 
 .material-workspace table.lines th { white-space: nowrap; }
+/* Кнопка-иконка (тема, звук) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0 !important;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.icon-btn:hover { color: var(--ink); border-color: var(--blue); background: var(--surface-2); }
+
+.sound-btn .icon-sound-off { display: none; }
+[data-sound="off"] .sound-btn .icon-sound-on { display: none; }
+[data-sound="off"] .sound-btn .icon-sound-off { display: block; }
+[data-sound="off"] .sound-btn { color: var(--grey); }

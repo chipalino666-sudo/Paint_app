@@ -30,6 +30,84 @@
     const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     setTheme(dark ? 'dark' : 'light');
   }
+
+  /* ------------------------------------------------------------------------
+     Звук нового сообщения
+     ------------------------------------------------------------------------ */
+
+  let audioContext = null;
+  let lastUnreadTotal = null;
+
+  function ensureAudio() {
+    if (audioContext) return audioContext;
+
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+
+    try {
+      audioContext = new Ctx();
+    } catch (error) {
+      return null;
+    }
+
+    return audioContext;
+  }
+
+  /** Короткий двойной сигнал — слышно, но не назойливо. */
+  function playPing() {
+    if (document.documentElement.dataset.sound === 'off') return;
+
+    const ctx = ensureAudio();
+    if (!ctx) return;
+
+    // Браузер разрешает звук только после действия пользователя
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => { /* пока нельзя */ });
+      return;
+    }
+
+    const now = ctx.currentTime;
+
+    [880, 1320].forEach((frequency, index) => {
+      const start = now + index * 0.12;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start(start);
+      oscillator.stop(start + 0.32);
+    });
+  }
+
+  function setSound(on) {
+    document.documentElement.dataset.sound = on ? 'on' : 'off';
+
+    try {
+      localStorage.setItem('sound', on ? 'on' : 'off');
+    } catch (error) { /* приватный режим */ }
+
+    const button = document.getElementById('btnSound');
+
+    if (button) {
+      const label = on ? 'Выключить звук' : 'Включить звук';
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    }
+  }
+
+  function applyStoredSound() {
+    setSound(document.documentElement.dataset.sound !== 'off');
+  }
+
   /** Телефон или узкое окно — тот же порог, что в стилях. */
   const isMobile = () => window.innerWidth <= 780;
 
@@ -1113,6 +1191,12 @@
 
       setBadge(generalBadge, channels.general || 0);
       setBadge(ordersBadge, ordersTotal);
+
+      // Непрочитанных стало больше — подаём сигнал
+      const total = (Number(channels.general) || 0) + ordersTotal;
+
+      if (lastUnreadTotal !== null && total > lastUnreadTotal) playPing();
+      lastUnreadTotal = total;
     } catch (error) {
       /* на запертом рабочем месте просто не показываем */
     }
@@ -2380,6 +2464,7 @@
     const userbox = $('.userbox');
     const install = $('#navInstall');
     const password = $('#btnPassword');
+    const sound = $('#btnSound');
     const logout = $('#btnLogout');
 
     if (!nav || !userbox || !install || !password || !logout) return;
@@ -2388,10 +2473,12 @@
       if (install.parentElement !== nav) {
         nav.appendChild(install);
         nav.appendChild(password);
+        if (sound) nav.appendChild(sound);
       }
     } else if (install.parentElement === nav) {
       userbox.insertBefore(install, logout);
       userbox.insertBefore(password, logout);
+      if (sound) userbox.insertBefore(sound, install);
     }
   }
 
@@ -2578,6 +2665,30 @@
     }
 
     applyStoredTheme();
+
+    const soundButton = document.getElementById('btnSound');
+
+    if (soundButton) {
+      soundButton.addEventListener('click', () => {
+        const nowOn = document.documentElement.dataset.sound !== 'off';
+        setSound(!nowOn);
+        if (!nowOn) playPing();
+      });
+    }
+
+    applyStoredSound();
+
+    // Браузер включает звук только после первого действия пользователя
+    const unlockAudio = () => {
+      const ctx = ensureAudio();
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => { /* не вышло */ });
+
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
 
     setupInstall();
     $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
