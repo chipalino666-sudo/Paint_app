@@ -512,34 +512,40 @@
           <span class="muted">что израсходовано на этот заказ</span>
         </div>
 
-        ${canEdit
-          ? '<div class="add-box add-box--wide" id="addMaterialBox"></div>'
-          : '<p class="help-line">Заказ сдан — списание закрыто. Верните его в работу, чтобы изменить.</p>'}
-
-        <div class="section-title">Автоэмаль</div>
-        <table class="lines">
-          <thead><tr><th>Код</th><th>Наименование</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
-          <tbody>${materialRows(order.materials.filter((m) => m.kind === 'paint'), canEdit)}</tbody>
-        </table>
-
-        <div class="section-title" style="margin-top:14px">Материалы</div>
-        <table class="lines">
-          <thead><tr><th>Код</th><th>Наименование</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
-          <tbody>${materialRows(order.materials.filter((m) => m.kind === 'material'), canEdit)}</tbody>
-        </table>
-
-        <div class="totals">
-          <div>
-            <div class="t-k">Работы</div>
-            <div class="t-v">${money(order.works_sum)}</div>
+        <div class="material-layout">
+          <div class="material-entry">
+            ${canEdit
+              ? '<div class="add-box add-box--wide" id="addMaterialBox"></div>'
+              : '<p class="help-line" style="margin:0">Заказ сдан — списание закрыто. Верните его в работу, чтобы изменить.</p>'}
           </div>
-          <div>
-            <div class="t-k">Материалы</div>
-            <div class="t-v">${money(order.materials_sum)}</div>
-          </div>
-          <div>
-            <div class="t-k">Итого</div>
-            <div class="t-v grand">${money(order.total)}</div>
+
+          <div class="material-list">
+            <div class="section-title">Автоэмаль</div>
+            <table class="lines">
+              <thead><tr><th>Код</th><th>Наименование</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
+              <tbody>${materialRows(order.materials.filter((m) => m.kind === 'paint'), canEdit)}</tbody>
+            </table>
+
+            <div class="section-title" style="margin-top:14px">Материалы</div>
+            <table class="lines">
+              <thead><tr><th>Код</th><th>Наименование</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
+              <tbody>${materialRows(order.materials.filter((m) => m.kind === 'material'), canEdit)}</tbody>
+            </table>
+
+            <div class="totals">
+              <div>
+                <div class="t-k">Работы</div>
+                <div class="t-v">${money(order.works_sum)}</div>
+              </div>
+              <div>
+                <div class="t-k">Материалы</div>
+                <div class="t-v">${money(order.materials_sum)}</div>
+              </div>
+              <div>
+                <div class="t-k">Итого</div>
+                <div class="t-v grand">${money(order.total)}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
