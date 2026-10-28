@@ -10,7 +10,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { db, init, nowISO, normalizeSearch, hashPassword, verifyPassword, nextOrderNumber, audit } = require('./db');
+const { db, init, rebuildPaintAliases, nowISO, normalizeSearch, hashPassword, verifyPassword, nextOrderNumber, audit } = require('./db');
 const auth = require('./auth');
 
 const PORT = Number(process.env.PAINT_PORT || 3000);
@@ -994,7 +994,7 @@ route('GET', '/api/materials', async ({ url }) => {
   }
 
   const materials = db.prepare(`
-    SELECT code, name, unit, category, price, paint_code
+    SELECT code, name, unit, category, price, paint_code, aliases
       FROM materials
      WHERE ${where.join(' AND ')}
      ORDER BY name
@@ -1104,6 +1104,8 @@ route('POST', '/api/codes', async ({ user, body }) => {
   const info = db.prepare('INSERT OR IGNORE INTO code_pairs (code_a, code_b, created_at) VALUES (?, ?, ?)')
     .run(a, b, nowISO());
 
+  rebuildPaintAliases();
+
   return { ok: true, added: info.changes > 0 };
 });
 
@@ -1139,6 +1141,8 @@ route('POST', '/api/codes/import', async ({ user, body }) => {
     else skipped++;
   }
 
+  rebuildPaintAliases();
+
   return { added, skipped };
 });
 
@@ -1146,6 +1150,8 @@ route('DELETE', '/api/codes/:id', async ({ user, params }) => {
   if (!canManage(user)) throw new ApiError(403, 'Коды правит приёмщик или админ');
 
   db.prepare('DELETE FROM code_pairs WHERE id = ?').run(Number(params.id));
+  rebuildPaintAliases();
+
   return { ok: true };
 });
 
@@ -1919,6 +1925,9 @@ const server = http.createServer(async (req, res) => {
 
 const seeded = init();
 auth.cleanupSessions();
+
+// Двойные названия красок (Brulex ↔ Standox) собираем из таблицы соответствий
+rebuildPaintAliases();
 
 /** Адреса, по которым сервер виден из локальной сети — для входа с телефона. */
 function localAddresses() {

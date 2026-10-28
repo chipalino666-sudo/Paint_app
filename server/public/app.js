@@ -731,7 +731,7 @@
     return rows.map((row) => `
       <tr data-mid="${row.id}">
         <td class="code-cell" data-label="Код">${esc(row.code)}</td>
-        <td data-label="Наименование">${esc(row.name)}</td>
+        <td data-label="Наименование">${esc(row.name)}${row.aliases ? `<span class="muted"> · ${esc(row.aliases)}</span>` : ''}</td>
         <td class="num" data-label="Кол-во">
           ${canEdit
             ? `<input type="number" min="0.01" step="0.01" value="${qty(row.qty)}" data-qty="${row.id}"> ${esc(row.unit)}`
@@ -1435,7 +1435,7 @@
         row.className = 'row';
         row.innerHTML = `
           <span class="code">${esc(item.code)}</span>
-          <span class="name">${esc(item.name)}</span>
+          <span class="name">${esc(item.name)}${item.aliases ? `<br><span class="muted">${esc(item.aliases)}</span>` : ''}</span>
           <button class="btn btn-left btn-sm" data-kind="paint">◀ Эмаль</button>
           <button class="btn btn-right btn-sm" data-kind="material">Материал ▶</button>
         `;
@@ -2006,7 +2006,7 @@
             ${data.materials.map((item) => `
               <tr>
                 <td class="code-cell">${esc(item.code)}</td>
-                <td>${esc(item.name)}</td>
+                <td>${esc(item.name)}${item.aliases ? `<span class="muted"> · ${esc(item.aliases)}</span>` : ''}</td>
                 <td class="num">
                   ${isManager()
                     ? `<input type="number" value="${item.price}" min="0" step="0.01" data-mat-price="${esc(item.code)}"

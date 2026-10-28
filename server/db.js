@@ -248,6 +248,9 @@ addColumn('messages', 'photo_id', 'INTEGER');
 addColumn('works', 'parts', 'REAL DEFAULT 1');
 addColumn('order_works', 'parts', 'REAL');
 addColumn('materials', 'paint_code', 'TEXT');
+addColumn('materials', 'aliases', 'TEXT');
+addColumn('code_pairs', 'brand_a', "TEXT DEFAULT 'Brulex'");
+addColumn('code_pairs', 'brand_b', "TEXT DEFAULT 'Standox'");
 
 // В заказе два исполнителя: маляр и кузовщик
 addColumn('orders', 'bodyworker_id', 'INTEGER');
@@ -518,8 +521,41 @@ function init() {
   return { works, materials, recipes, admin };
 }
 
+
+/**
+ * Переносит соответствия кодов в карточки красок: у материала появляется
+ * второе название («Brulex 132»), и поиск находит его обычным способом.
+ */
+function rebuildPaintAliases() {
+  const pairs = db.prepare('SELECT code_a, code_b, brand_a, brand_b FROM code_pairs').all();
+  const aliases = new Map();
+
+  for (const pair of pairs) {
+    const brandA = pair.brand_a || 'Brulex';
+    const brandB = pair.brand_b || 'Standox';
+
+    if (!aliases.has(pair.code_a)) aliases.set(pair.code_a, new Set());
+    if (!aliases.has(pair.code_b)) aliases.set(pair.code_b, new Set());
+
+    aliases.get(pair.code_a).add(brandB + ' ' + pair.code_b);
+    aliases.get(pair.code_b).add(brandA + ' ' + pair.code_a);
+  }
+
+  const paints = db.prepare("SELECT code, name, paint_code FROM materials WHERE category = 'paint'").all();
+  const update = db.prepare('UPDATE materials SET aliases = ?, search = ? WHERE code = ?');
+
+  for (const paint of paints) {
+    const list = paint.paint_code && aliases.has(paint.paint_code)
+      ? [...aliases.get(paint.paint_code)].join(', ')
+      : '';
+
+    update.run(list || null, normalizeSearch(paint.code, paint.name, list), paint.code);
+  }
+}
+
 module.exports = {
   db,
+  rebuildPaintAliases,
   DB_PATH,
   DATA_DIR,
   init,
