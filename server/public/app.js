@@ -8,6 +8,9 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+  /** Телефон или узкое окно — тот же порог, что в стилях. */
+  const isMobile = () => window.innerWidth <= 780;
+
   const STATUS = {
     accepted: 'Принят',
     in_work: 'В работе',
@@ -220,6 +223,40 @@
       return;
     }
 
+    // На телефоне таблица из шести колонок не читается — показываем карточки
+    if (isMobile()) {
+      body.innerHTML = '';
+
+      const list = document.createElement('div');
+      list.className = 'order-cards';
+
+      state.orders.forEach((order) => {
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.dataset.id = order.id;
+
+        card.innerHTML = `
+          <div class="oc-top">
+            <span class="order-number">${esc(order.number)}</span>
+            <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
+          </div>
+          <div class="oc-car">${esc(order.plate)}<span class="muted"> ${esc([order.make, order.model].filter(Boolean).join(' '))}</span></div>
+          <div class="oc-master">${esc(order.master_name || 'маляр не назначен')}${order.bodyworker_name
+            ? `<span class="muted"> · кузовщик: ${esc(order.bodyworker_name)}</span>` : ''}</div>
+          <div class="oc-bottom">
+            <span class="muted">${dateText(order.created_at)}</span>
+            <span class="mono">${money(order.total)}</span>
+          </div>
+        `;
+
+        card.addEventListener('click', () => openOrder(order.id));
+        list.appendChild(card);
+      });
+
+      empty.appendChild(list);
+      return;
+    }
+
     body.innerHTML = state.orders.map((order) => `
       <tr data-id="${order.id}">
         <td><span class="order-number">${esc(order.number)}</span></td>
@@ -300,15 +337,15 @@
     const worksRows = order.works.length
       ? order.works.map((row) => `
           <tr data-wid="${row.id}">
-            <td>${esc(row.name)}</td>
-            <td class="num">${canEditPrices
+            <td data-label="Работа">${esc(row.name)}</td>
+            <td class="num" data-label="Кол-во">${canEditPrices
               ? `<input type="number" min="0" step="0.1" value="${qty(row.qty)}" data-work-qty="${row.id}" style="width:70px">`
               : qty(row.qty)}</td>
-            <td class="num">${canEditPrices
+            <td class="num" data-label="Цена">${canEditPrices
               ? `<input type="number" min="0" step="0.01" value="${row.price}" data-work-price-edit="${row.id}" style="width:100px">`
               : `<span class="mono">${money(row.price)}</span>`}</td>
-            <td class="num mono">${money(row.sum)}</td>
-            <td class="num">${canEditPrices ? `<button class="row-del" data-del-work="${row.id}" title="Убрать">×</button>` : ''}</td>
+            <td class="num mono" data-label="Сумма">${money(row.sum)}</td>
+            <td class="num" data-label="">${canEditPrices ? `<button class="row-del" data-del-work="${row.id}" title="Убрать">×</button>` : ''}</td>
           </tr>`).join('')
       : '<tr><td colspan="5" class="empty-line">Работы не добавлены</td></tr>';
 
@@ -438,15 +475,15 @@
 
     return rows.map((row) => `
       <tr data-mid="${row.id}">
-        <td class="code-cell">${esc(row.code)}</td>
-        <td>${esc(row.name)}</td>
-        <td class="num">
+        <td class="code-cell" data-label="Код">${esc(row.code)}</td>
+        <td data-label="Наименование">${esc(row.name)}</td>
+        <td class="num" data-label="Кол-во">
           ${canEdit
             ? `<input type="number" min="0.01" step="0.01" value="${qty(row.qty)}" data-qty="${row.id}"> ${esc(row.unit)}`
             : `${qty(row.qty)} ${esc(row.unit)}`}
         </td>
-        <td class="num mono">${money(row.sum)}</td>
-        <td class="num">${canEdit ? `<button class="row-del" data-del-material="${row.id}" title="Убрать">×</button>` : ''}</td>
+        <td class="num mono" data-label="Сумма">${money(row.sum)}</td>
+        <td class="num" data-label="">${canEdit ? `<button class="row-del" data-del-material="${row.id}" title="Убрать">×</button>` : ''}</td>
       </tr>
     `).join('');
   }
@@ -1889,6 +1926,57 @@
   }
 
   /* ------------------------------------------------------------------------
+     Установка как приложение (PWA)
+     ------------------------------------------------------------------------ */
+
+  let installPrompt = null;
+
+  function openInstallHelp() {
+    $('#installModal').classList.add('open');
+  }
+
+  function closeInstallHelp() {
+    $('#installModal').classList.remove('open');
+  }
+
+  function setupInstall() {
+    const button = $('#navInstall');
+    if (!button) return;
+
+    // Уже открыто как приложение — кнопка не нужна
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+
+    if (standalone) button.classList.add('hidden');
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      installPrompt = event;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installPrompt = null;
+      button.classList.add('hidden');
+      toast('Приложение установлено');
+    });
+
+    button.addEventListener('click', async () => {
+      if (installPrompt) {
+        installPrompt.prompt();
+        const choice = await installPrompt.userChoice.catch(() => null);
+        installPrompt = null;
+        if (choice && choice.outcome === 'accepted') toast('Устанавливаем приложение…');
+        return;
+      }
+
+      openInstallHelp();
+    });
+
+    $('#btnCloseInstall').addEventListener('click', closeInstallHelp);
+    $('#btnCloseInstall2').addEventListener('click', closeInstallHelp);
+  }
+
+  /* ------------------------------------------------------------------------
      Запуск
      ------------------------------------------------------------------------ */
 
@@ -2008,6 +2096,7 @@
     $('#recipeMixPicker').addEventListener('input', renderMixPicker);
 
     $('#btnAddUser').addEventListener('click', addUser);
+    setupInstall();
     $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
     $('#btnResetRoleLabels').addEventListener('click', () => saveRoleLabels(true));
 
@@ -2043,6 +2132,7 @@
       if ($('#editOrderModal').classList.contains('open')) closeEditOrder();
       if ($('#passwordModal').classList.contains('open')) closePasswordModal();
       if ($('#editUserModal').classList.contains('open')) closeUserEditor();
+      if ($('#installModal').classList.contains('open')) closeInstallHelp();
     });
   }
 
@@ -2197,6 +2287,12 @@
     $('#btnPinExit').addEventListener('click', async () => {
       try { await api('/api/logout', { method: 'POST' }); } catch (error) { /* всё равно уходим */ }
       location.href = '/login.html';
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => { /* не критично */ });
     });
   }
 

@@ -110,10 +110,13 @@ async function waitForTargets() {
   throw new Error('Браузер не открыл отладочный порт');
 }
 
+let NAME_SUFFIX = '';
+
 async function screenshot(cdp, name) {
   const result = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
-  fs.writeFileSync(path.join(OUT, name), Buffer.from(result.data, 'base64'));
-  console.log('  сохранено: shots/' + name);
+  const file = name.replace(/\.png$/, NAME_SUFFIX + '.png');
+  fs.writeFileSync(path.join(OUT, file), Buffer.from(result.data, 'base64'));
+  console.log('  сохранено: shots/' + file);
 }
 
 async function evaluate(cdp, expression) {
@@ -149,8 +152,16 @@ async function main() {
 
     await cdp.send('Page.enable');
     await cdp.send('Network.enable');
+
+    // PAINT_MOBILE=1 — снимаем как на телефоне
+    const mobile = process.env.PAINT_MOBILE === '1';
+    NAME_SUFFIX = mobile ? '-mobile' : '';
+
     await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false
+      width: mobile ? 390 : 1440,
+      height: mobile ? 844 : 1000,
+      deviceScaleFactor: mobile ? 2 : 1,
+      mobile
     });
 
     if (!anon) {
@@ -191,9 +202,9 @@ async function main() {
     // Карточка первого заказа
     const opened = await evaluate(cdp, `
       (() => {
-        const row = document.querySelector('#ordersBody tr');
-        if (!row) return 'empty';
-        row.click();
+        const target = document.querySelector('#ordersBody tr') || document.querySelector('.order-card');
+        if (!target) return 'empty';
+        target.click();
         return 'ok';
       })()
     `);

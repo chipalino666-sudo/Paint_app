@@ -6,6 +6,12 @@
 <title>Лонжерон — CRM малярного цеха</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Лонжерон">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/extra.css">
 </head>
@@ -54,6 +60,7 @@
     <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
     <button class="nav-btn" data-view="report">Отчёт</button>
     <button class="nav-btn" data-view="refs">Справочники</button>
+    <button class="nav-btn" id="navInstall">Установить</button>
     <button class="nav-btn hidden" data-view="users" id="navUsers">Сотрудники</button>
   </nav>
 
@@ -319,6 +326,32 @@
   </section>
 
 </main>
+
+<!-- ======================= УСТАНОВКА ПРИЛОЖЕНИЯ ======================= -->
+<div class="modal" id="installModal">
+  <div class="modal-box" style="max-width:470px">
+    <div class="modal-head">
+      <h2>Установить приложение</h2>
+      <button class="modal-close" id="btnCloseInstall">×</button>
+    </div>
+
+    <p class="help-line" style="margin-top:0">
+      Программа откроется в своём окне — без адресной строки и вкладок, как обычное приложение.
+      Вход и данные остаются прежними.
+    </p>
+
+    <div class="install-steps">
+      <div><b>Телефон Android (Chrome):</b> меню ⋮ → «Установить приложение»</div>
+      <div><b>Телефон iPhone (Safari):</b> кнопка «Поделиться» → «На экран «Домой»»</div>
+      <div><b>Компьютер (Chrome, Edge):</b> значок установки справа в адресной строке</div>
+    </div>
+
+    <div class="actions-row" style="margin-top:16px">
+      <span class="spacer"></span>
+      <button class="btn btn-primary" id="btnCloseInstall2">Понятно</button>
+    </div>
+  </div>
+</div>
 
 <!-- ======================= СМЕНА ПАРОЛЯ ======================= -->
 <div class="modal" id="passwordModal">
