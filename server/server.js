@@ -970,6 +970,9 @@ route('GET', '/api/materials', async ({ url }) => {
   const where = ['active = 1'];
   const params = [];
 
+  let order = 'ORDER BY name';
+  const orderParams = [];
+
   // Если ищут код краски — находим и по соответствиям другой системы
   const isCode = /^\d{2,4}$/.test(q);
 
@@ -983,8 +986,14 @@ route('GET', '/api/materials', async ({ url }) => {
 
     const list = [...codes].filter(Boolean);
 
-    where.push(`(paint_code IN (${list.map(() => '?').join(',')}) OR search LIKE ?)`);
-    params.push(...list, `%${q}%`);
+    const prefix = list.map(() => 'paint_code LIKE ?');
+
+    where.push(`(${prefix.join(' OR ')} OR search LIKE ?)`);
+    params.push(...list.map((code) => `${code}%`), `%${q}%`);
+
+    // Материал с точно таким кодом показываем первым
+    order = `ORDER BY CASE WHEN paint_code IN (${list.map(() => '?').join(',')}) THEN 0 ELSE 1 END, name`;
+    orderParams.push(...list);
   } else if (q) {
     // Ищем по каждому слову отдельно: «краска 563» найдёт «Краска MIX 563 Schwarz»
     for (const word of q.split(/\s+/).filter(Boolean)) {
@@ -1002,9 +1011,9 @@ route('GET', '/api/materials', async ({ url }) => {
     SELECT code, name, unit, category, price, paint_code, aliases
       FROM materials
      WHERE ${where.join(' AND ')}
-     ORDER BY name
+     ${order}
      LIMIT 60
-  `).all(...params);
+  `).all(...params, ...orderParams);
 
   return { materials };
 });

@@ -498,6 +498,44 @@ function init() {
   for (const user of freshUsers) markSeen.run(user.id, now);
 
   // Код цвета берём из названия краски: «563 Schwarz B 3.5 ltr» → 563
+  // Код берём из названия: «563 Schwarz B 3.5 ltr» и «Краска Brulex MIX 110B» — оба про 3 цифры
+
+  // Таблица соответствий Brutex ↔ Standox (солидные компоненты)
+  const pairsReady = db.prepare("SELECT value FROM settings WHERE key = 'code_pairs_ready'").get();
+
+  if (!pairsReady) {
+    const solidPairs = [
+      ['101', '562'], ['102', '561'], ['103', '563'], ['104', '566'], ['105', '567'],
+      ['106', '814'], ['107', '886'], ['109', '569'], ['110', '570'], ['111', '571'],
+      ['112', '573'], ['114', '574'], ['115', '576'], ['116', '575'], ['119', '577'],
+      ['121', '588'], ['123', '589'], ['124', '579'], ['127', '583'], ['128', '816'],
+      ['129', '586'], ['142', '587'], ['144', '849'], ['148', '585'], ['151', '810'],
+      ['153', '859'], ['154', '851'], ['155', '854'], ['157', '856'], ['160', '855'],
+      ['162', '857'], ['164', '861'], ['168', '870'], ['170', '882'], ['172', '884'],
+      ['173', '885'], ['177', '008'], ['178', '883'], ['181', '581'], ['182', '580'],
+      ['183', '582'], ['184', '564'], ['189', '815'], ['196', '896'], ['197', '897'],
+      ['199', '599'],
+      // металлики
+      ['130', '593'], ['131', '811'], ['132', '812'], ['133', '590'], ['135', '595'],
+      ['136', '813'], ['137', '594'], ['138', '598'], ['149', '806'], ['180', '818'],
+      ['185', '895'], ['186', '892'], ['187', '891'], ['190', '819'], ['143', '887'],
+      ['193', '893'],
+      // перламутры
+      ['201', '801'], ['202', '802'], ['203', '803'], ['205', '805'], ['206', '804'],
+      ['207', '829'], ['208', '825'], ['209', '821'], ['210', '827'], ['211', '839'],
+      ['212', '846'], ['213', '843'], ['214', '845'], ['215', '823'], ['216', '826'],
+      ['217', '824'], ['218', '836'], ['220', '844'], ['221', '828'], ['222', '894'],
+      ['223', '820'], ['224', '831'], ['225', '841'], ['228', '888'], ['235', 'PP304']
+    ];
+
+    const insertPair = db.prepare('INSERT OR IGNORE INTO code_pairs (code_a, code_b, created_at) VALUES (?, ?, ?)');
+    const moment = new Date().toISOString();
+
+    for (const [brutex, standox] of solidPairs) insertPair.run(brutex, standox, moment);
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('code_pairs_ready', '1')").run();
+  }
+
   const paintsWithoutCode = db.prepare(`
     SELECT code, name FROM materials
      WHERE category = 'paint' AND (paint_code IS NULL OR paint_code = '')
@@ -506,7 +544,7 @@ function init() {
   const setPaintCode = db.prepare('UPDATE materials SET paint_code = ? WHERE code = ?');
 
   for (const paint of paintsWithoutCode) {
-    const match = /\b(\d{3})\b/.exec(paint.name);
+    const match = /(?:^|\s)(\d{3})(?=[A-Za-zА-Яа-я]|\s|$)/.exec(paint.name);
     if (match) setPaintCode.run(match[1], paint.code);
   }
 
