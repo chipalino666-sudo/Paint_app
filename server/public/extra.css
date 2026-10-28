@@ -968,7 +968,7 @@ ul.history .muted { font-size: 11.5px; margin-bottom: 2px; }
 
 .material-layout {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -1379,3 +1379,42 @@ td.empty-line,
 [data-theme="dark"] td { background-color: transparent; }
 
 [data-theme="dark"] td.empty-line { background: rgba(255, 255, 255, .03); }
+
+/* Строка результата поиска: код, наименование, две кнопки — по своим местам */
+.search-results .row {
+  display: grid;
+  grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-results .row .code {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-results .row .name {
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-height: 1.3;
+}
+
+.search-results .row .btn { white-space: nowrap; }
+
+/* Таблицы списания: колонки с оговорённой шириной, чтобы ничего не сминалось */
+.material-workspace table.lines th:nth-child(1),
+.material-workspace table.lines td:nth-child(1) { width: 96px; }
+
+.material-workspace table.lines th:nth-child(3),
+.material-workspace table.lines td:nth-child(3) { width: 118px; white-space: nowrap; }
+
+.material-workspace table.lines th:nth-child(4),
+.material-workspace table.lines td:nth-child(4) { width: 110px; }
+
+.material-workspace table.lines th:nth-child(5),
+.material-workspace table.lines td:nth-child(5) { width: 58px; text-align: center; padding-right: 10px; }
+
+.material-workspace table.lines input[type="number"] { width: 68px; }
+
+.material-workspace table.lines th { white-space: nowrap; }
