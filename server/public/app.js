@@ -467,6 +467,20 @@
 
       <div class="card">
         <div class="card-head">
+          <h2>Фотографии</h2>
+          <span class="muted">машина, повреждения, результат</span>
+        </div>
+
+        <div class="photo-grid" id="orderPhotos"><div class="spinner">Загрузка…</div></div>
+
+        <div class="actions-row" style="margin-top:12px">
+          <button class="btn btn-outline" id="btnOrderPhoto">Добавить фото</button>
+          <input type="file" id="orderPhotoInput" accept="image/*" multiple hidden>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
           <h2>История изменений</h2>
           <span class="muted">кто, когда и что менял</span>
         </div>
@@ -483,12 +497,19 @@
 
         <form class="chat-form" id="orderChatForm" style="border:none;padding:10px 0 0">
           <input type="text" id="orderChatInput" placeholder="Написать по этому заказу…" autocomplete="off" maxlength="2000">
+          <button type="button" class="btn btn-outline attach-btn" id="btnOrderChatPhoto" title="Прикрепить фото" aria-label="Прикрепить фото">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/>
+            </svg>
+          </button>
           <button type="submit" class="btn btn-primary">Отправить</button>
+          <input type="file" id="orderChatPhotoInput" accept="image/*" multiple hidden>
         </form>
       </div>
     `;
 
     bindOrderEvents(order, canEdit, canEditPrices);
+    loadOrderPhotos(order.id);
     loadHistory(order.id);
     openOrderChat(order);
   }
@@ -516,6 +537,12 @@
   function bindOrderEvents(order, canEdit, canEditPrices) {
     $('#btnBack').addEventListener('click', () => showView('orders'));
     $('#btnPrint').addEventListener('click', () => window.open('/print.html?id=' + order.id, '_blank'));
+
+    bindOrderPhotos(order);
+
+    bindPhotoButton($('#btnOrderChatPhoto'), $('#orderChatPhotoInput'),
+      () => 'order:' + order.id,
+      () => openOrderChat(order));
 
     $$('[data-status]').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -682,6 +709,126 @@
     }
   }
 
+  /* ---- Фотографии --------------------------------------------------------- */
+
+  const PHOTO_MAX_SIDE = 1600;
+  const PHOTO_QUALITY = 0.82;
+
+  /** Перед отправкой сжимаем снимок: с телефона он иначе весит 5–10 МБ. */
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+
+      reader.onload = () => {
+        const image = new Image();
+
+        image.onerror = () => reject(new Error('Это не похоже на изображение'));
+
+        image.onload = () => {
+          let { width, height } = image;
+          const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(width, height));
+
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const context = canvas.getContext('2d');
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, width, height);
+          context.drawImage(image, 0, 0, width, height);
+
+          resolve(canvas.toDataURL('image/jpeg', PHOTO_QUALITY));
+        };
+
+        image.src = reader.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadPhoto(file, target) {
+    const image = await compressImage(file);
+    const data = await api('/api/photos', { method: 'POST', body: { image, ...target } });
+    return data.photo;
+  }
+
+  function openLightbox(src) {
+    const box = document.createElement('div');
+    box.className = 'lightbox';
+    box.innerHTML = `<img src="${esc(src)}" alt="фотография">`;
+
+    box.addEventListener('click', () => box.remove());
+    document.body.appendChild(box);
+  }
+
+  /* ---- Фотографии заказа -------------------------------------------------- */
+
+  async function loadOrderPhotos(orderId) {
+    const host = $('#orderPhotos');
+    if (!host) return;
+
+    try {
+      const data = await api('/api/orders/' + orderId + '/photos');
+      renderOrderPhotos(data.photos);
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function renderOrderPhotos(photos) {
+    const host = $('#orderPhotos');
+    if (!host) return;
+
+    if (!photos.length) {
+      host.innerHTML = '<div class="empty-line">Фотографий пока нет</div>';
+      return;
+    }
+
+    host.innerHTML = photos.map((photo) => `
+      <figure class="photo">
+        <img src="${esc(photo.url)}" alt="фотография заказа" loading="lazy">
+        <figcaption>${esc(photo.user_name || '')}${photo.user_name ? ' · ' : ''}${dateText(photo.created_at)}</figcaption>
+      </figure>`).join('');
+
+    host.querySelectorAll('img').forEach((image) => {
+      image.addEventListener('click', () => openLightbox(image.src));
+    });
+  }
+
+  /** Кнопка «Добавить фото» в карточке заказа. */
+  function bindOrderPhotos(order) {
+    const button = $('#btnOrderPhoto');
+    const input = $('#orderPhotoInput');
+    if (!button || !input) return;
+
+    button.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', async () => {
+      const files = [...input.files];
+      input.value = '';
+      if (!files.length) return;
+
+      toast('Загружаем фотографии…');
+
+      for (const file of files) {
+        try {
+          await uploadPhoto(file, { orderId: order.id });
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+
+      await loadOrderPhotos(order.id);
+      loadHistory(order.id);
+    });
+  }
+
   /* ---- Внутренний чат ----------------------------------------------------- */
 
   function chatContainer(key) {
@@ -707,7 +854,8 @@
           <span class="msg-author">${esc(message.user_name)}</span>
           <span class="msg-time">${formatDateTime(message.created_at)}</span>
         </div>
-        <div class="msg-body">${esc(message.body)}</div>
+        ${message.photo_url ? `<img class="msg-photo" src="${esc(message.photo_url)}" alt="фотография">` : ''}
+        ${message.body ? `<div class="msg-body">${esc(message.body)}</div>` : ''}
       </div>`;
     }).join('');
 
@@ -740,6 +888,48 @@
 
     renderChat(key);
     markRead(box.channel, box.lastId);
+  }
+
+  async function sendChatPhoto(key, file) {
+    const box = chat[key];
+    if (!box.channel) return;
+
+    const photo = await uploadPhoto(file, { channel: box.channel });
+    const data = await api('/api/chat', { method: 'POST', body: { channel: box.channel, photo_id: photo.id } });
+
+    box.messages.push(data.message);
+    box.lastId = data.message.id;
+
+    renderChat(key);
+    markRead(box.channel, box.lastId);
+  }
+
+  /** Кнопка «скрепка»: выбираем файл и отправляем его в нужный чат. */
+  function bindPhotoButton(button, input, channel, onDone) {
+    if (!button || !input) return;
+
+    button.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', async () => {
+      const files = [...input.files];
+      input.value = '';
+      if (!files.length) return;
+
+      for (const file of files) {
+        try {
+          await sendChatPhotoTo(channel(), file);
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+
+      if (onDone) await onDone();
+    });
+  }
+
+  async function sendChatPhotoTo(channel, file) {
+    const photo = await uploadPhoto(file, { channel });
+    await api('/api/chat', { method: 'POST', body: { channel, photo_id: photo.id } });
   }
 
   function markRead(channel, lastId) {
@@ -2089,13 +2279,57 @@
     $('#btnCancelNew').addEventListener('click', () => showView('orders'));
 
     let searchTimer = null;
-    $('#orderSearch').addEventListener('input', (event) => {
+    let searchTouched = false;
+    let userTyped = false;
+
+    const searchField = $('#orderSearch');
+
+    // Поле поиска держим «закрытым», пока в него не ткнули: иначе браузер
+    // подставляет туда сохранённый логин и список заказов пустеет
+    const unlockSearch = () => {
+      searchField.removeAttribute('readonly');
+      searchField.removeEventListener('focus', unlockSearch);
+      searchField.removeEventListener('pointerdown', unlockSearch);
+    };
+
+    searchField.addEventListener('focus', unlockSearch);
+    searchField.addEventListener('pointerdown', unlockSearch);
+
+    // Настоящий ввод всегда начинается с клавиши или вставки
+    searchField.addEventListener('keydown', () => { userTyped = true; });
+    searchField.addEventListener('paste', () => { userTyped = true; });
+
+    searchField.addEventListener('input', (event) => {
+      // Значение появилось без нажатия клавиш — это автозаполнение, а не поиск
+      if (!userTyped) {
+        if (event.target.value) {
+          event.target.value = '';
+          state.orderFilter.q = '';
+          loadOrders(true);
+        }
+        return;
+      }
+
+      searchTouched = true;
       clearTimeout(searchTimer);
+
       const value = event.target.value.trim();
       searchTimer = setTimeout(() => {
         state.orderFilter.q = value;
         loadOrders();
       }, 220);
+    });
+
+    // Страховка на первые секунды после входа: браузер нередко пишет логин
+    // в первое текстовое поле страницы
+    [900, 1800, 3000].forEach((delay) => {
+      setTimeout(() => {
+        if (!searchTouched && searchField.value) {
+          searchField.value = '';
+          state.orderFilter.q = '';
+          loadOrders(true);
+        }
+      }, delay);
     });
 
     $('#btnAddWork').addEventListener('click', () => {
@@ -2162,6 +2396,8 @@
     $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
     $('#btnResetRoleLabels').addEventListener('click', () => saveRoleLabels(true));
 
+    bindPhotoButton($('#btnChatPhoto'), $('#chatPhotoInput'), () => 'general', () => fetchChat('general'));
+
     $('#chatForm').addEventListener('submit', async (event) => {
       event.preventDefault();
 
@@ -2195,6 +2431,9 @@
       if ($('#passwordModal').classList.contains('open')) closePasswordModal();
       if ($('#editUserModal').classList.contains('open')) closeUserEditor();
       if ($('#installModal').classList.contains('open')) closeInstallHelp();
+
+      const photo = event.target.closest && event.target.closest('.msg-photo');
+      if (photo) openLightbox(photo.src);
     });
   }
 

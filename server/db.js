@@ -168,6 +168,19 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_channel_idx ON messages(channel, id);
 
+CREATE TABLE IF NOT EXISTS photos (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL,
+  order_id   INTEGER,
+  channel    TEXT,
+  file       TEXT NOT NULL,
+  mime       TEXT NOT NULL,
+  bytes      INTEGER,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS photos_order_idx ON photos(order_id);
+CREATE INDEX IF NOT EXISTS photos_channel_idx ON photos(channel);
+
 CREATE TABLE IF NOT EXISTS order_reads (
   user_id  INTEGER NOT NULL,
   order_id INTEGER NOT NULL,
@@ -221,6 +234,7 @@ addColumn('users', 'pin_updated_at', 'TEXT');
 // Мастера бывают двух специальностей: маляр (работает с материалом)
 // и кузовщик (пока только назначается на заказ).
 addColumn('users', 'specialty', 'TEXT');
+addColumn('messages', 'photo_id', 'INTEGER');
 
 // В заказе два исполнителя: маляр и кузовщик
 addColumn('orders', 'bodyworker_id', 'INTEGER');

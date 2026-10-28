@@ -16,7 +16,8 @@ const auth = require('./auth');
 const PORT = Number(process.env.PAINT_PORT || 3000);
 const HOST = process.env.PAINT_HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const MAX_BODY = 2 * 1024 * 1024;
+const MAX_BODY = 8 * 1024 * 1024;
+const UPLOAD_DIR = process.env.PAINT_UPLOADS || path.join(__dirname, 'data', 'uploads');
 
 // Через сколько минут бездействия кабинет мастера закрывается сам
 const IDLE_MINUTES = Number(process.env.PAINT_IDLE_MINUTES || 10);
@@ -193,7 +194,7 @@ function orderList(user, query) {
            (SELECT COUNT(*) FROM audit a
              WHERE a.entity = 'order' AND a.entity_id = CAST(o.id AS TEXT)
                AND a.user_id <> ?
-               AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove')
+               AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove', 'photo_add')
                AND a.at > COALESCE((SELECT r.seen_at FROM order_reads r
                                      WHERE r.user_id = ? AND r.order_id = o.id), '')
            ) AS unread_changes
@@ -755,6 +756,7 @@ function fallbackText(action, payload) {
     case 'work_add': return `Добавлена работа: ${payload.work || ''}`;
     case 'work_remove': return 'Удалена работа';
     case 'work_edit': return 'Изменена работа';
+    case 'photo_add': return 'Добавлена фотография';
     default: return action;
   }
 }
@@ -1383,6 +1385,145 @@ route('GET', '/api/reports/summary', async ({ user, url }) => {
 });
 
 /* --------------------------------------------------------------------------
+   Фотографии
+
+   Файлы лежат на диске, в базе — только описание. Смотреть может лишь тот,
+   кому виден заказ: чужие снимки по прямой ссылке не откроются.
+   -------------------------------------------------------------------------- */
+
+const PHOTO_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
+
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+function photoView(row) {
+  return {
+    id: row.id,
+    order_id: row.order_id,
+    channel: row.channel,
+    user_id: row.user_id,
+    created_at: row.created_at,
+    url: '/api/photos/' + row.id
+  };
+}
+
+/** Доступ к снимку: только через заказ, к которому он прикреплён. */
+function photoFor(user, rawId) {
+  const row = db.prepare('SELECT * FROM photos WHERE id = ?').get(Number(rawId));
+  if (!row) throw new ApiError(404, 'Фотография не найдена');
+
+  let orderId = row.order_id;
+
+  if (!orderId && row.channel && row.channel.startsWith('order:')) {
+    orderId = Number(row.channel.split(':')[1]);
+  }
+
+  if (orderId) {
+    const order = orderView(orderId);
+    if (!order || !canSeeOrder(user, order)) throw new ApiError(403, 'Нет доступа к этой фотографии');
+  }
+
+  return row;
+}
+
+route('POST', '/api/photos', async ({ user, body }) => {
+  const raw = String(body.image || '');
+  const match = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(raw);
+  if (!match) throw new ApiError(400, 'Не удалось прочитать изображение');
+
+  const mime = match[1].toLowerCase();
+  if (!PHOTO_EXT[mime]) throw new ApiError(400, 'Подойдёт JPEG, PNG или WebP');
+
+  const data = Buffer.from(match[2], 'base64');
+  if (!data.length) throw new ApiError(400, 'Пустой файл');
+  if (data.length > MAX_PHOTO_BYTES) throw new ApiError(413, 'Фотография больше 6 МБ');
+
+  let orderId = null;
+  let channel = null;
+
+  if (body.orderId) {
+    const order = orderView(body.orderId);
+    if (!order) throw new ApiError(404, 'Заказ не найден');
+    if (!canSeeOrder(user, order)) throw new ApiError(403, 'Это не ваш заказ');
+    orderId = order.id;
+  } else if (body.channel) {
+    const resolved = resolveChannel(user, body.channel);
+    channel = resolved.channel;
+    orderId = resolved.order ? resolved.order.id : null;
+  } else {
+    throw new ApiError(400, 'Не указано, к чему прикрепить фотографию');
+  }
+
+  const file = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${PHOTO_EXT[mime]}`;
+  fs.writeFileSync(path.join(UPLOAD_DIR, file), data);
+
+  const info = db.prepare(`INSERT INTO photos (user_id, order_id, channel, file, mime, bytes, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(user.id, orderId, channel, file, mime, data.length, nowISO());
+
+  const row = db.prepare('SELECT * FROM photos WHERE id = ?').get(Number(info.lastInsertRowid));
+
+  if (orderId) audit(user.id, 'photo_add', 'order', orderId, { photo: row.id, text: 'Добавлена фотография' });
+  else audit(user.id, 'photo_add', 'chat', row.id, { channel });
+
+  return { photo: photoView(row) };
+});
+
+route('GET', '/api/photos/:id', async ({ user, params, res }) => {
+  const row = photoFor(user, params.id);
+  const file = path.join(UPLOAD_DIR, row.file);
+
+  if (!fs.existsSync(file)) throw new ApiError(404, 'Файл не найден');
+
+  const data = fs.readFileSync(file);
+
+  res.writeHead(200, {
+    'Content-Type': row.mime,
+    'Content-Length': data.length,
+    'Cache-Control': 'private, max-age=86400'
+  });
+  res.end(data);
+
+  return { __raw: true };
+});
+
+route('DELETE', '/api/photos/:id', async ({ user, params }) => {
+  const row = photoFor(user, params.id);
+
+  if (row.user_id !== user.id && user.role !== 'admin') {
+    throw new ApiError(403, 'Удалять может только тот, кто загрузил');
+  }
+
+  try {
+    fs.unlinkSync(path.join(UPLOAD_DIR, row.file));
+  } catch (error) {
+    /* файла уже нет — не беда */
+  }
+
+  db.prepare('DELETE FROM photos WHERE id = ?').run(row.id);
+
+  return { ok: true };
+});
+
+route('GET', '/api/orders/:id/photos', async ({ user, params }) => {
+  const order = orderView(params.id);
+  if (!order) throw new ApiError(404, 'Заказ не найден');
+  if (!canSeeOrder(user, order)) throw new ApiError(403, 'Это не ваш заказ');
+
+  const rows = db.prepare(`
+    SELECT p.*, u.full_name AS user_name
+      FROM photos p
+      LEFT JOIN users u ON u.id = p.user_id
+     WHERE p.order_id = ? AND (p.channel IS NULL OR p.channel = '')
+     ORDER BY p.id DESC
+  `).all(order.id);
+
+  return {
+    photos: rows.map((row) => ({ ...photoView(row), user_name: row.user_name }))
+  };
+});
+
+/* --------------------------------------------------------------------------
    Внутренний чат
 
    Канал 'general' — общий, 'order:12' — обсуждение конкретного заказа.
@@ -1412,7 +1553,9 @@ function messageView(row) {
     user_id: row.user_id,
     user_name: row.user_name || 'система',
     role: row.role || '',
-    created_at: row.created_at
+    created_at: row.created_at,
+    photo_id: row.photo_id || null,
+    photo_url: row.photo_id ? '/api/photos/' + row.photo_id : null
   };
 }
 
@@ -1435,11 +1578,21 @@ route('GET', '/api/chat', async ({ user, url }) => {
 route('POST', '/api/chat', async ({ user, body }) => {
   const { channel } = resolveChannel(user, body.channel);
   const text = str(body.body, 2000);
+  const photoId = body.photo_id ? Number(body.photo_id) : null;
 
-  if (!text) throw new ApiError(400, 'Сообщение пустое');
+  if (!text && !photoId) throw new ApiError(400, 'Сообщение пустое');
 
-  const info = db.prepare('INSERT INTO messages (channel, user_id, body, created_at) VALUES (?, ?, ?, ?)')
-    .run(channel, user.id, text, nowISO());
+  let photo = null;
+  if (photoId) {
+    photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(photoId);
+
+    if (!photo) throw new ApiError(404, 'Фотография не найдена');
+    if (photo.user_id !== user.id) throw new ApiError(403, 'Это чужая фотография');
+    if (photo.channel !== channel) throw new ApiError(400, 'Фотография из другого чата');
+  }
+
+  const info = db.prepare('INSERT INTO messages (channel, user_id, body, photo_id, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(channel, user.id, text, photo ? photo.id : null, nowISO());
 
   const row = db.prepare(`
     SELECT m.*, u.full_name AS user_name, u.role
@@ -1502,7 +1655,7 @@ route('GET', '/api/chat/unread', async ({ user }) => {
       JOIN orders o ON CAST(o.id AS TEXT) = a.entity_id
      WHERE a.entity = 'order'
        AND a.user_id <> ?
-       AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove')
+       AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove', 'photo_add')
        AND a.at > COALESCE((SELECT r.seen_at FROM order_reads r WHERE r.user_id = ? AND r.order_id = o.id), '')
        ${masterScope}
   `).get(user.id, user.id, ...masterParams).n;
@@ -1640,6 +1793,8 @@ const server = http.createServer(async (req, res) => {
       const result = await found.handler({
         req, res, url, params: found.params, body, user, sessionData, token, locked
       });
+
+      if (result && result.__raw) return;
 
       json(res, 200, result ?? { ok: true });
       return;
