@@ -1096,6 +1096,60 @@ route('DELETE', '/api/recipes/:id', async ({ user, params }) => {
    Пользователи (админ)
    -------------------------------------------------------------------------- */
 
+/* ---- Названия ролей: как их видит цех ------------------------------------ */
+
+const DEFAULT_ROLE_LABELS = {
+  admin: 'администратор',
+  manager: 'приёмщик',
+  painter: 'маляр',
+  bodyworker: 'кузовщик',
+  store: 'склад',
+  workstation: 'рабочее место'
+};
+
+function roleLabels() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'role_labels'").get();
+
+  let custom = {};
+  try {
+    if (row && row.value) custom = JSON.parse(row.value) || {};
+  } catch (error) {
+    custom = {};
+  }
+
+  const result = { ...DEFAULT_ROLE_LABELS };
+  for (const key of Object.keys(DEFAULT_ROLE_LABELS)) {
+    if (typeof custom[key] === 'string' && custom[key].trim()) result[key] = custom[key].trim();
+  }
+
+  return result;
+}
+
+route('GET', '/api/settings/roles', async ({ user }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Нет прав');
+  return { labels: roleLabels(), defaults: DEFAULT_ROLE_LABELS };
+});
+
+route('PUT', '/api/settings/roles', async ({ user, body }) => {
+  if (user.role !== 'admin') throw new ApiError(403, 'Названия ролей меняет администратор');
+
+  const incoming = body.labels || {};
+  const next = {};
+
+  for (const key of Object.keys(DEFAULT_ROLE_LABELS)) {
+    const value = str(incoming[key], 40);
+    if (value) next[key] = value;
+  }
+
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('role_labels', ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(JSON.stringify(next));
+
+  audit(user.id, 'update', 'settings', 'role_labels', next);
+
+  return { labels: roleLabels() };
+});
+
 route('GET', '/api/users', async ({ user }) => {
   if (!canManage(user)) throw new ApiError(403, 'Нет прав');
 

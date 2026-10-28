@@ -278,12 +278,12 @@
         <div class="field">
           <label for="newUserRole">Роль</label>
           <select id="newUserRole">
-            <option value="master">Мастер</option>
-            <option value="manager">Приёмщик / начальник</option>
-            <option value="store">Склад</option>
-            <option value="bodyworker">Кузовщик</option>
-            <option value="admin">Администратор</option>
-            <option value="workstation">Рабочее место мастеров (общий вход)</option>
+            <option value="master" data-role="painter">Маляр</option>
+            <option value="bodyworker" data-role="bodyworker">Кузовщик</option>
+            <option value="manager" data-role="manager">Приёмщик / начальник</option>
+            <option value="store" data-role="store">Склад</option>
+            <option value="admin" data-role="admin">Администратор</option>
+            <option value="workstation" data-role="workstation">Рабочее место мастеров (общий вход)</option>
           </select>
         </div>
         <div class="field">
@@ -298,6 +298,22 @@
 
       <div class="actions-row" style="margin-top:12px">
         <button class="btn btn-primary" id="btnAddUser">Добавить сотрудника</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Названия ролей</h2>
+        <span class="muted">как роли называются в цеху</span>
+      </div>
+
+      <div class="form-grid" id="roleLabelsGrid"></div>
+
+      <p class="help-line">Права у ролей не меняются — меняется только название на экранах и в списках.</p>
+
+      <div class="actions-row" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnSaveRoleLabels">Сохранить названия</button>
+        <button class="btn btn-outline" id="btnResetRoleLabels">Вернуть стандартные</button>
       </div>
     </div>
   </section>
@@ -419,11 +435,11 @@
       <div class="field">
         <label for="editUserRole">Роль</label>
         <select id="editUserRole">
-          <option value="master">Мастер</option>
-          <option value="manager">Приёмщик / начальник</option>
-          <option value="store">Склад</option>
-            <option value="bodyworker">Кузовщик</option>
-          <option value="admin">Администратор</option>
+          <option value="master" data-role="painter">Маляр</option>
+          <option value="bodyworker" data-role="bodyworker">Кузовщик</option>
+          <option value="manager" data-role="manager">Приёмщик / начальник</option>
+          <option value="store" data-role="store">Склад</option>
+          <option value="admin" data-role="admin">Администратор</option>
         </select>
       </div>
 

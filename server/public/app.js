@@ -17,18 +17,25 @@
     draft: 'Черновик'
   };
 
-  const ROLE = {
+  const ROLE_DEFAULTS = {
     admin: 'администратор',
     manager: 'приёмщик',
-    master: 'мастер',
+    painter: 'маляр',
+    bodyworker: 'кузовщик',
     store: 'склад',
     workstation: 'рабочее место'
   };
 
   /** Маляр и кузовщик — оба «master», различаются специальностью. */
   function roleLabel(user) {
-    if (user.role === 'master' && !user.is_workstation && user.specialty === 'bodyworker') return 'кузовщик';
-    return ROLE[user.role] || user.role;
+    const labels = state.roleLabels || ROLE_DEFAULTS;
+
+    if (user.is_workstation) return labels.workstation;
+    if (user.role === 'master') {
+      return user.specialty === 'bodyworker' ? labels.bodyworker : labels.painter;
+    }
+
+    return labels[user.role] || user.role;
   }
 
   const state = {
@@ -44,7 +51,8 @@
     draftMixes: [],
     newWorks: [],
     workstation: false,
-    idleMinutes: 10
+    idleMinutes: 10,
+    roleLabels: null
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -1663,6 +1671,8 @@
         button.addEventListener('click', () => setPinFor(button.dataset.pinUser, button.dataset.pinName));
       });
 
+      renderRoleLabelsForm();
+
       host.querySelectorAll('[data-edit-user]').forEach((button) => {
         button.addEventListener('click', () => {
           const target = state.users.find((user) => String(user.id) === button.dataset.editUser);
@@ -1683,6 +1693,86 @@
       await api(`/api/users/${userId}/pin`, { method: 'POST', body: { pin } });
       await loadUsers();
       toast('ПИН-код сохранён');
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  /* ---- Названия ролей ------------------------------------------------------ */
+
+  const ROLE_TITLES = {
+    admin: 'Администратор',
+    manager: 'Приёмщик / начальник',
+    painter: 'Маляр',
+    bodyworker: 'Кузовщик',
+    store: 'Склад',
+    workstation: 'Рабочее место мастеров'
+  };
+
+  async function loadRoleLabels() {
+    if (!isManager()) return;
+
+    try {
+      const data = await api('/api/settings/roles');
+      state.roleLabels = data.labels;
+    } catch (error) {
+      /* останутся стандартные */
+    }
+  }
+
+  function renderRoleLabelsForm() {
+    const host = $('#roleLabelsGrid');
+    if (!host) return;
+
+    const labels = state.roleLabels || ROLE_DEFAULTS;
+
+    host.innerHTML = Object.keys(ROLE_DEFAULTS).map((key) => `
+      <div class="field">
+        <label for="role-${key}">${ROLE_TITLES[key]}</label>
+        <input type="text" id="role-${key}" maxlength="40" value="${esc(labels[key])}" autocomplete="off">
+      </div>`).join('');
+  }
+
+  /** Одна и та же роль называется одинаково и в таблице, и в выпадающих списках. */
+  function updateRoleSelectLabels() {
+    const labels = state.roleLabels || ROLE_DEFAULTS;
+
+    document.querySelectorAll('option[data-role]').forEach((option) => {
+      const label = labels[option.dataset.role];
+      if (!label) return;
+
+      // В списке — с заглавной буквы, в таблице роль пишется строчными
+      const красиво = label.charAt(0).toUpperCase() + label.slice(1);
+
+      option.textContent = option.dataset.role === 'workstation'
+        ? `${красиво} (общий вход)`
+        : красиво;
+    });
+  }
+
+  /** reset = true — вернуть стандартные названия (пустые значения сервер заменит ими). */
+  async function saveRoleLabels(reset = false) {
+    const labels = {};
+
+    Object.keys(ROLE_DEFAULTS).forEach((key) => {
+      if (reset) {
+        labels[key] = '';
+        return;
+      }
+
+      const input = document.getElementById('role-' + key);
+      if (input) labels[key] = input.value.trim();
+    });
+
+    try {
+      const data = await api('/api/settings/roles', { method: 'PUT', body: { labels } });
+      state.roleLabels = data.labels;
+
+      applyRole();
+      updateRoleSelectLabels();
+      renderRoleLabelsForm();
+      await loadUsers();
+      toast(reset ? 'Вернули стандартные названия' : 'Названия ролей сохранены');
     } catch (error) {
       toast(error.message);
     }
@@ -1807,7 +1897,7 @@
 
     $('#userName').textContent = user.full_name;
     const badge = $('#userRole');
-    badge.textContent = ROLE[user.role] || user.role;
+    badge.textContent = roleLabel(user);
     badge.className = 'role-badge ' + user.role;
 
     $('#btnNewOrder').classList.toggle('hidden', !isManager());
@@ -1918,6 +2008,8 @@
     $('#recipeMixPicker').addEventListener('input', renderMixPicker);
 
     $('#btnAddUser').addEventListener('click', addUser);
+    $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
+    $('#btnResetRoleLabels').addEventListener('click', () => saveRoleLabels(true));
 
     $('#chatForm').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1983,7 +2075,9 @@
   }
 
   async function startApp() {
+    await loadRoleLabels();
     applyRole();
+    updateRoleSelectLabels();
     renderStatusChips();
 
     try {
