@@ -144,6 +144,18 @@ async function main() {
       console.log('печать в поиске:', typed);
     }
 
+    if (process.env.PAINT_WORK === '1') {
+      await evaluate(`document.getElementById('btnAddWorkToOrder') && document.getElementById('btnAddWorkToOrder').click()`);
+      await sleep(600);
+
+      const info = await evaluate(`JSON.stringify({
+        options: [...document.querySelectorAll('#orderWorkSelect option')].slice(0, 3).map(o => o.textContent),
+        qty: document.getElementById('orderWorkQty') ? document.getElementById('orderWorkQty').value : null
+      })`);
+
+      console.log('добавление работы:', info);
+    }
+
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(OUT, Buffer.from(shot.data, 'base64'));
     console.log('снимок:', OUT);

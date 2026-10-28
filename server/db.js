@@ -235,6 +235,8 @@ addColumn('users', 'pin_updated_at', 'TEXT');
 // и кузовщик (пока только назначается на заказ).
 addColumn('users', 'specialty', 'TEXT');
 addColumn('messages', 'photo_id', 'INTEGER');
+addColumn('works', 'parts', 'REAL DEFAULT 1');
+addColumn('order_works', 'parts', 'REAL');
 
 // В заказе два исполнителя: маляр и кузовщик
 addColumn('orders', 'bodyworker_id', 'INTEGER');
@@ -480,6 +482,9 @@ function init() {
   `).all();
 
   for (const user of freshUsers) markSeen.run(user.id, now);
+
+  // Работы измеряются в деталях: капот — 1, большой капот — 1,5
+  db.prepare('UPDATE works SET parts = 1 WHERE parts IS NULL OR parts <= 0').run();
 
   const works = seedWorks();
   const materials = seedMaterials();

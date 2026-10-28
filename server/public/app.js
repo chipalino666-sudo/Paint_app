@@ -524,7 +524,7 @@
     const worksRows = order.works.length
       ? order.works.map((row) => `
           <tr data-wid="${row.id}">
-            <td data-label="Работа">${esc(row.name)}</td>
+            <td data-label="Работа">${esc(row.name)}${row.parts ? `<span class="muted"> · ${qty(row.parts)} дет.</span>` : ''}</td>
             <td class="num" data-label="Кол-во">${canEditPrices
               ? `<input type="number" min="0" step="0.1" value="${qty(row.qty)}" data-work-qty="${row.id}" style="width:70px">`
               : qty(row.qty)}</td>
@@ -1327,12 +1327,23 @@
     `;
 
     const select = $('#orderWorkSelect');
+    const qtyInput = $('#orderWorkQty');
+
     state.works.forEach((work) => {
       const option = document.createElement('option');
       option.value = work.id;
-      option.textContent = `${work.name} — ${money(work.price)}`;
+      option.textContent = `${work.name} — ${money(work.price)} · ${qty(work.parts ?? 1)} дет.`;
       select.appendChild(option);
     });
+
+    // Сколько деталей у работы — столько и подставляем в количество
+    const applyParts = () => {
+      const work = state.works.find((w) => String(w.id) === select.value);
+      if (work) qtyInput.value = String(work.parts ?? 1);
+    };
+
+    select.addEventListener('change', applyParts);
+    applyParts();
 
     $('#btnDoAddWork').addEventListener('click', async () => {
       try {
@@ -1807,12 +1818,18 @@
 
     host.innerHTML = `
       <table class="grid">
-        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Цена</th></tr></thead>
+        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th></tr></thead>
         <tbody>
           ${state.works.map((work) => `
             <tr>
               <td>${esc(work.name)}</td>
               <td class="muted">${esc(work.category || '—')}</td>
+              <td class="num">
+                ${isManager()
+                  ? `<input type="number" value="${work.parts ?? 1}" min="0.1" step="0.05" data-work-parts="${work.id}"
+                            style="width:90px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
+                  : `<span class="mono">${qty(work.parts ?? 1)}</span>`}
+              </td>
               <td class="num">
                 ${isManager()
                   ? `<input type="number" value="${work.price}" min="0" step="0.01" data-work-price="${work.id}"
@@ -1823,6 +1840,25 @@
         </tbody>
       </table>
     `;
+
+    host.querySelectorAll('[data-work-parts]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const value = Number(input.value) || 1;
+
+        try {
+          await api('/api/works/' + input.dataset.workParts, {
+            method: 'PATCH',
+            body: { parts: value }
+          });
+
+          const work = state.works.find((w) => String(w.id) === input.dataset.workParts);
+          if (work) work.parts = value;
+          toast('Количество деталей обновлено');
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+    });
 
     host.querySelectorAll('[data-work-price]').forEach((input) => {
       input.addEventListener('change', async () => {

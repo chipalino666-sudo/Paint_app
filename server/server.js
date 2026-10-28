@@ -505,13 +505,13 @@ route('POST', '/api/orders', async ({ user, body }) => {
   const orderId = Number(info.lastInsertRowid);
 
   const works = Array.isArray(body.works) ? body.works : [];
-  const insertWork = db.prepare('INSERT INTO order_works (order_id, work_id, name, qty, price) VALUES (?, ?, ?, ?, ?)');
+  const insertWork = db.prepare('INSERT INTO order_works (order_id, work_id, name, qty, price, parts) VALUES (?, ?, ?, ?, ?, ?)');
 
   for (const row of works) {
     const work = db.prepare('SELECT * FROM works WHERE id = ?').get(Number(row.work_id));
     if (!work) continue;
     const qty = Math.max(0, toNum(row.qty, 1)) || 1;
-    insertWork.run(orderId, work.id, work.name, qty, round2(toNum(row.price, work.price)));
+    insertWork.run(orderId, work.id, work.name, qty, round2(toNum(row.price, work.price)), work.parts || 1);
   }
 
   const carPlate = db.prepare('SELECT plate FROM cars WHERE id = ?').get(carId).plate;
@@ -776,8 +776,8 @@ route('POST', '/api/orders/:id/works', async ({ user, params, body }) => {
   const qty = Math.max(0, toNum(body.qty, 1)) || 1;
   const price = body.price !== undefined ? round2(toNum(body.price, work.price)) : work.price;
 
-  db.prepare('INSERT INTO order_works (order_id, work_id, name, qty, price) VALUES (?, ?, ?, ?, ?)')
-    .run(order.id, work.id, work.name, qty, price);
+  db.prepare('INSERT INTO order_works (order_id, work_id, name, qty, price, parts) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(order.id, work.id, work.name, qty, price, work.parts || 1);
 
   audit(user.id, 'work_add', 'order', order.id, {
     work: work.name, qty, text: `Добавлена работа: ${work.name}`
@@ -1035,8 +1035,10 @@ route('POST', '/api/works', async ({ user, body }) => {
   const name = str(body.name, 200);
   if (!name) throw new ApiError(400, 'Укажите название работы');
 
-  const info = db.prepare('INSERT INTO works (name, category, price, unit, active) VALUES (?, ?, ?, ?, 1)')
-    .run(name, str(body.category, 60) || 'Прочее', round2(toNum(body.price, 0)), str(body.unit, 10) || 'шт');
+  const parts = round2(toNum(body.parts, 1)) || 1;
+
+  const info = db.prepare('INSERT INTO works (name, category, price, unit, parts, active) VALUES (?, ?, ?, ?, ?, 1)')
+    .run(name, str(body.category, 60) || 'Прочее', round2(toNum(body.price, 0)), str(body.unit, 10) || 'шт', parts);
 
   return { id: Number(info.lastInsertRowid) };
 });
@@ -1047,10 +1049,11 @@ route('PATCH', '/api/works/:id', async ({ user, params, body }) => {
   const work = db.prepare('SELECT * FROM works WHERE id = ?').get(Number(params.id));
   if (!work) throw new ApiError(404, 'Работа не найдена');
 
-  db.prepare('UPDATE works SET name = ?, category = ?, price = ?, active = ? WHERE id = ?')
+  db.prepare('UPDATE works SET name = ?, category = ?, price = ?, parts = ?, active = ? WHERE id = ?')
     .run(body.name !== undefined ? str(body.name, 200) : work.name,
       body.category !== undefined ? str(body.category, 60) : work.category,
       body.price !== undefined ? round2(toNum(body.price, work.price)) : work.price,
+      body.parts !== undefined ? (round2(toNum(body.parts, work.parts || 1)) || 1) : (work.parts || 1),
       body.active !== undefined ? (body.active ? 1 : 0) : work.active,
       work.id);
 
