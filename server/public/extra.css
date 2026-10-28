@@ -928,6 +928,7 @@ ul.history .muted { font-size: 11.5px; margin-bottom: 2px; }
   .brand { font-size: 14.5px; }
   .userbox { font-size: 12px; gap: 6px; margin-left: auto; }
   #userName { display: none; }
+  #navInstall, #btnPassword { padding: 5px 9px !important; font-size: 12px !important; }
 
   /* Меню уезжает во вторую строку и прокручивается вбок */
   .nav { flex-basis: 100%; order: 3; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
