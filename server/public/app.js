@@ -11,6 +11,43 @@
   /** Телефон или узкое окно — тот же порог, что в стилях. */
   const isMobile = () => window.innerWidth <= 780;
 
+  /**
+   * Браузер любит подставлять сохранённый логин в первое текстовое поле страницы.
+   * Держим поле «закрытым» до первого касания, а значение без ввода стираем.
+   */
+  function shieldInput(input) {
+    if (!input || input.dataset.shielded === '1') return;
+    if (input.getAttribute('autocomplete') === 'tel') return;
+
+    input.dataset.shielded = '1';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('data-form-type', 'other');
+    input.setAttribute('data-lpignore', 'true');
+    input.setAttribute('readonly', '');
+
+    let typed = false;
+
+    const unlock = () => {
+      input.removeAttribute('readonly');
+      input.removeEventListener('focus', unlock);
+      input.removeEventListener('pointerdown', unlock);
+    };
+
+    input.addEventListener('focus', unlock);
+    input.addEventListener('pointerdown', unlock);
+    input.addEventListener('keydown', () => { typed = true; });
+    input.addEventListener('paste', () => { typed = true; });
+
+    input.addEventListener('input', () => {
+      if (!typed && input.value) input.value = '';
+    });
+  }
+
+  function shieldInputs(root) {
+    const host = root || document;
+    host.querySelectorAll('input[type="text"], input[type="search"], input:not([type])').forEach(shieldInput);
+  }
+
   const STATUS = {
     accepted: 'Принят',
     in_work: 'В работе',
@@ -56,7 +93,8 @@
     workstation: false,
     idleMinutes: 10,
     roleLabels: null,
-    unreadOrders: {}
+    unreadOrders: {},
+    orderTab: 'order'
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -143,6 +181,7 @@
 
   function showView(name) {
     state.view = name;
+    shieldInputs();
 
     $$('.view').forEach((view) => view.classList.add('hidden'));
     const target = document.getElementById('view-' + name);
@@ -393,7 +432,18 @@
             <button class="btn btn-outline" id="btnBack">← К списку</button>
           </div>
         </div>
+      </div>
 
+      <div class="order-tabs" id="orderTabs">
+        <button class="order-tab" data-otab="order">Заказ</button>
+        <button class="order-tab" data-otab="materials">Списание материала<span class="tab-count">${order.materials.length}</span></button>
+        <button class="order-tab" data-otab="photos">Фото<span class="tab-count" id="tabPhotoCount"></span></button>
+        <button class="order-tab" data-otab="history">История</button>
+        <button class="order-tab" data-otab="chat">Обсуждение</button>
+      </div>
+
+      <section class="order-panel" data-panel="order">
+      <div class="card">
         <div class="kv">
           <div><div class="k">Маляр</div><div class="v">${esc(order.master_name || 'не назначен')}</div></div>
           <div><div class="k">Кузовщик</div><div class="v">${esc(order.bodyworker_name || '—')}</div></div>
@@ -431,9 +481,18 @@
 
         <div id="addWorkToOrderBox"></div>
       </div>
+      </section>
 
-      <div class="card">
-        <div class="section-head"><h3>Списание материала</h3></div>
+      <section class="order-panel hidden" data-panel="materials">
+      <div class="card material-workspace">
+        <div class="card-head">
+          <h2>Списание материала</h2>
+          <span class="muted">что израсходовано на этот заказ</span>
+        </div>
+
+        ${canEdit
+          ? '<div class="add-box add-box--wide" id="addMaterialBox"></div>'
+          : '<p class="help-line">Заказ сдан — списание закрыто. Верните его в работу, чтобы изменить.</p>'}
 
         <div class="section-title">Автоэмаль</div>
         <table class="lines">
@@ -446,8 +505,6 @@
           <thead><tr><th>Код</th><th>Наименование</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
           <tbody>${materialRows(order.materials.filter((m) => m.kind === 'material'), canEdit)}</tbody>
         </table>
-
-        ${canEdit ? '<div class="add-box" id="addMaterialBox"></div>' : ''}
 
         <div class="totals">
           <div>
@@ -464,7 +521,9 @@
           </div>
         </div>
       </div>
+      </section>
 
+      <section class="order-panel hidden" data-panel="photos">
       <div class="card">
         <div class="card-head">
           <h2>Фотографии</h2>
@@ -478,7 +537,9 @@
           <input type="file" id="orderPhotoInput" accept="image/*" multiple hidden>
         </div>
       </div>
+      </section>
 
+      <section class="order-panel hidden" data-panel="history">
       <div class="card">
         <div class="card-head">
           <h2>История изменений</h2>
@@ -486,7 +547,9 @@
         </div>
         <div id="orderHistory"><div class="spinner">Загрузка…</div></div>
       </div>
+      </section>
 
+      <section class="order-panel hidden" data-panel="chat">
       <div class="card">
         <div class="card-head">
           <h2>Обсуждение заказа</h2>
@@ -506,12 +569,28 @@
           <input type="file" id="orderChatPhotoInput" accept="image/*" multiple hidden>
         </form>
       </div>
+      </section>
     `;
 
     bindOrderEvents(order, canEdit, canEditPrices);
+    selectOrderTab(state.orderTab || 'order');
+    shieldInputs(host);
     loadOrderPhotos(order.id);
     loadHistory(order.id);
     openOrderChat(order);
+  }
+
+  /** Вкладки внутри карточки заказа. */
+  function selectOrderTab(name) {
+    state.orderTab = name;
+
+    $$('.order-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.otab === name);
+    });
+
+    $$('.order-panel').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.panel !== name);
+    });
   }
 
   function materialRows(rows, canEdit) {
@@ -537,6 +616,10 @@
   function bindOrderEvents(order, canEdit, canEditPrices) {
     $('#btnBack').addEventListener('click', () => showView('orders'));
     $('#btnPrint').addEventListener('click', () => window.open('/print.html?id=' + order.id, '_blank'));
+
+    $$('.order-tab').forEach((tab) => {
+      tab.addEventListener('click', () => selectOrderTab(tab.dataset.otab));
+    });
 
     bindOrderPhotos(order);
 
@@ -804,6 +887,9 @@
       const image = event.target.closest('img');
       if (image) openLightbox(image.src);
     };
+
+    const counter = document.getElementById('tabPhotoCount');
+    if (counter) counter.textContent = photos.length ? String(photos.length) : '';
   }
 
   /** Кнопка «Добавить фото» в карточке заказа. */

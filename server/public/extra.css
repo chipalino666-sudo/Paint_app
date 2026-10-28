@@ -892,6 +892,64 @@ ul.history .muted { font-size: 11.5px; margin-bottom: 2px; }
   font-size: 13px;
 }
 
+/* ---------- Вкладки внутри заказа ----------------------------------------- */
+
+.order-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+  scrollbar-width: none;
+}
+
+.order-tabs::-webkit-scrollbar { display: none; }
+
+.order-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+}
+
+.order-tab:hover { border-color: #b6c2d1; color: var(--ink); }
+
+.order-tab.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.order-tab .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .08);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.order-tab .tab-count:empty { display: none; }
+.order-tab.active .tab-count { background: rgba(255, 255, 255, .25); }
+
+/* Рабочее окно списания — просторнее обычной карточки */
+.material-workspace .add-box--wide { margin-bottom: 18px; }
+.material-workspace .add-box--wide input[type="text"] { font-size: 15px; padding: 12px 14px; }
+.material-workspace .lines td { padding: 11px 10px; }
+.material-workspace .totals { margin-top: 16px; }
+
 /* ---------- Фотографии ---------------------------------------------------- */
 
 .photo-grid {
