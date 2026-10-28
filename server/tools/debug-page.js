@@ -91,7 +91,7 @@ async function main() {
     const login = await fetch(BASE + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: 'admin', password: 'admin12345' })
+      body: JSON.stringify({ login: process.env.PAINT_LOGIN || 'admin', password: process.env.PAINT_PASSWORD || 'admin12345' })
     });
     const raw = login.headers.getSetCookie ? login.headers.getSetCookie().join(';') : login.headers.get('set-cookie');
     const token = /psid=([^;]+)/.exec(raw)[1];
@@ -102,7 +102,7 @@ async function main() {
 
     const result = await send('Runtime.evaluate', {
       expression: `JSON.stringify({
-        cards: document.querySelectorAll('.order-card').length,
+        name: document.getElementById('userName')?.textContent, navButtons: [...document.querySelectorAll('#nav .btn')].map(b => b.textContent.trim()), cards: document.querySelectorAll('.order-card').length,
         rows: document.querySelectorAll('#ordersBody tr').length,
         bodyText: (document.getElementById('ordersBody')?.innerText || '').slice(0, 200),
         empty: document.getElementById('ordersEmpty')?.children.length,

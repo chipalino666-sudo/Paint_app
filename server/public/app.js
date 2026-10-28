@@ -2218,10 +2218,45 @@
      Запуск
      ------------------------------------------------------------------------ */
 
+  /** На телефоне места мало: показываем «Фамилия И.» и уводим лишние кнопки в меню. */
+  function layoutHeader() {
+    const user = state.user;
+    if (!user) return;
+
+    const name = $('#userName');
+    const full = String(user.full_name || '');
+    const parts = full.split(/\s+/).filter(Boolean);
+    const mobile = isMobile();
+
+    if (name) {
+      name.textContent = mobile && parts.length > 1
+        ? parts[0] + ' ' + parts[1].charAt(0) + '.'
+        : full;
+    }
+
+    const nav = $('#nav');
+    const userbox = $('.userbox');
+    const install = $('#navInstall');
+    const password = $('#btnPassword');
+    const logout = $('#btnLogout');
+
+    if (!nav || !userbox || !install || !password || !logout) return;
+
+    if (mobile) {
+      if (install.parentElement !== nav) {
+        nav.appendChild(install);
+        nav.appendChild(password);
+      }
+    } else if (install.parentElement === nav) {
+      userbox.insertBefore(install, logout);
+      userbox.insertBefore(password, logout);
+    }
+  }
+
   function applyRole() {
     const user = state.user;
 
-    $('#userName').textContent = user.full_name;
+    layoutHeader();
     const badge = $('#userRole');
     badge.textContent = roleLabel(user);
     badge.className = 'role-badge ' + user.role;
@@ -2395,6 +2430,12 @@
     setupInstall();
     $('#btnSaveRoleLabels').addEventListener('click', () => saveRoleLabels(false));
     $('#btnResetRoleLabels').addEventListener('click', () => saveRoleLabels(true));
+
+    let layoutTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(layoutTimer);
+      layoutTimer = setTimeout(layoutHeader, 150);
+    });
 
     bindPhotoButton($('#btnChatPhoto'), $('#chatPhotoInput'), () => 'general', () => fetchChat('general'));
 
