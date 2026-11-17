@@ -2737,3 +2737,76 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   font-weight: 700;
   white-space: nowrap;
 }
+/* ---------- Склад: минимумы, приход, история ------------------------------ */
+
+.stock-low-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stock-low-toggle input { width: 16px; height: 16px; accent-color: var(--blue); }
+
+#stockLowCard {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #e0a800;
+  border-radius: var(--radius-sm);
+  background: rgba(224, 168, 0, .08);
+}
+
+.stock-low-head {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #b8860b;
+  margin-bottom: 8px;
+}
+
+.low-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+
+.low-row:last-child { border-bottom: none; }
+.low-name { flex: 1 1 auto; min-width: 0; }
+.low-qty { color: #b8860b; font-weight: 700; white-space: nowrap; }
+
+.stock-min-input { width: 80px; }
+.stock-actions { white-space: nowrap; text-align: right; }
+.stock-actions .btn { margin-left: 4px; }
+
+.stock-row-low td { background: rgba(224, 168, 0, .06); }
+
+.move-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.move-row:last-child { border-bottom: none; }
+.move-kind { flex: 0 0 120px; font-weight: 600; }
+.move-in { color: #2e9d5a; }
+.move-adjust { color: #b8860b; }
+.move-out { color: #b03a2e; }
+.move-qty { flex: 1 1 auto; }
+.move-meta { font-size: 12px; }
+
+@media (max-width: 780px) {
+  #stockLowCard { padding: 10px 12px; }
+  .stock-actions { display: flex; gap: 6px; }
+  .stock-actions .btn { margin-left: 0; }
+}

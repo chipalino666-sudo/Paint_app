@@ -156,6 +156,20 @@ CREATE TABLE IF NOT EXISTS material_docs (
 
 CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
 
+/* Движения склада: приход, ручная правка остатка, списание */
+CREATE TABLE IF NOT EXISTS stock_moves (
+  id         INTEGER PRIMARY KEY,
+  code       TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'in',
+  qty        REAL NOT NULL,
+  price      REAL NOT NULL DEFAULT 0,
+  note       TEXT,
+  user_id    INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS stock_moves_code_idx ON stock_moves(code);
+
 /* Нормы списания: на деталь и на машину. owner_id NULL — общая база. */
 CREATE TABLE IF NOT EXISTS norm_items (
   id       INTEGER PRIMARY KEY,
@@ -282,6 +296,7 @@ addColumn('order_works', 'parts', 'REAL');
 addColumn('materials', 'paint_code', 'TEXT');
 addColumn('materials', 'aliases', 'TEXT');
 addColumn('materials', 'stock', 'REAL');
+addColumn('materials', 'min_stock', 'REAL DEFAULT 0');
 addColumn('orders', 'inspection', 'TEXT');
 addColumn('code_pairs', 'brand_a', "TEXT DEFAULT 'Brulex'");
 addColumn('code_pairs', 'brand_b', "TEXT DEFAULT 'Standox'");

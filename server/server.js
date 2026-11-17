@@ -1410,7 +1410,7 @@ route('GET', '/api/stock', async ({ url }) => {
   const q = normalizeSearch(str(url.searchParams.get('q'), 100));
 
   const rows = db.prepare(`
-    SELECT m.code, m.name, m.unit, m.category, m.price, m.stock,
+    SELECT m.code, m.name, m.unit, m.category, m.price, m.stock, m.min_stock,
            COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
       FROM materials m
      WHERE m.active = 1
@@ -1426,6 +1426,8 @@ route('GET', '/api/stock', async ({ url }) => {
 
     const stock = round2(Number(row.stock) || 0);
     const used = round2(Number(row.used) || 0);
+    const left = round2(stock - used);
+    const minStock = round2(Number(row.min_stock) || 0);
 
     items.push({
       code: row.code,
@@ -1435,14 +1437,139 @@ route('GET', '/api/stock', async ({ url }) => {
       price: row.price,
       stock,
       used,
-      left: round2(stock - used)
+      min_stock: minStock,
+      low: minStock > 0 && left <= minStock,
+      left
     });
   }
 
   return { items };
 });
 
+/** Приход товара: остаток растёт, движение пишется в историю. */
+route('POST', '/api/stock/incoming', async ({ user, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Приход оформляет кладовщик или админ');
+
+  const code = str(body.code, 40);
+  if (!code) throw new ApiError(400, 'Не указан материал');
+
+  const material = db.prepare('SELECT code, name, unit, stock FROM materials WHERE code = ?').get(code);
+  if (!material) throw new ApiError(404, 'Материал не найден');
+
+  const qty = round2(toNum(body.qty, 0));
+  if (!(qty > 0)) throw new ApiError(400, 'Количество должно быть больше нуля');
+
+  const price = round2(toNum(body.price, 0));
+  const note = str(body.note, 300);
+
+  db.exec('BEGIN');
+
+  try {
+    db.prepare('UPDATE materials SET stock = COALESCE(stock, 0) + ? WHERE code = ?').run(qty, material.code);
+
+    // Приход с ценой обновляет закупочную цену материала
+    if (price > 0) {
+      db.prepare('UPDATE materials SET price = ? WHERE code = ?').run(price, material.code);
+    }
+
+    db.prepare(`INSERT INTO stock_moves (code, kind, qty, price, note, user_id, created_at)
+                VALUES (?, 'in', ?, ?, ?, ?, ?)`)
+      .run(material.code, qty, price, note || null, user.id, nowISO());
+
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+  audit(user.id, 'stock_in', 'material', null, {
+    code: material.code,
+    text: `Приход: ${material.name} +${qty} ${material.unit}${price ? ', по ' + price + ' ₽' : ''}`
+  });
+
+  return { ok: true, code: material.code };
+});
+
+/** История движений: по материалу или последние по складу. */
+route('GET', '/api/stock/moves', async ({ url }) => {
+  const code = str(url.searchParams.get('code'), 40);
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 40, 1), 200);
+
+  const rows = db.prepare(`
+    SELECT s.id, s.code, s.kind, s.qty, s.price, s.note, s.created_at,
+           COALESCE(m.name, s.code) AS name, m.unit AS unit,
+           COALESCE(u.full_name, '') AS user_name
+      FROM stock_moves s
+      LEFT JOIN materials m ON m.code = s.code
+      LEFT JOIN users u ON u.id = s.user_id
+     ${code ? 'WHERE s.code = ?' : ''}
+     ORDER BY s.id DESC
+     LIMIT ?
+  `).all(...(code ? [code, limit] : [limit]));
+
+  return {
+    moves: rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      unit: row.unit || 'шт',
+      kind: row.kind,
+      qty: round2(Number(row.qty) || 0),
+      price: round2(Number(row.price) || 0),
+      note: row.note,
+      user: row.user_name,
+      at: row.created_at
+    }))
+  };
+});
+
+/** Что заканчивается: остаток ниже минимума. */
+route('GET', '/api/stock/low', async () => {
+  const rows = db.prepare(`
+    SELECT m.code, m.name, m.unit, m.stock, m.min_stock,
+           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+      FROM materials m
+     WHERE m.active = 1 AND COALESCE(m.min_stock, 0) > 0
+     ORDER BY m.name
+  `).all();
+
+  const items = [];
+
+  for (const row of rows) {
+    const left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
+    const minStock = round2(Number(row.min_stock) || 0);
+
+    if (left > minStock) continue;
+
+    items.push({
+      code: row.code,
+      name: row.name,
+      unit: row.unit,
+      left,
+      min_stock: minStock,
+      need: round2(Math.max(0, minStock - left))
+    });
+  }
+
+  return { items };
+});
+
+/** Минимальный остаток задаёт кладовщик. */
+route('PATCH', '/api/stock/:code/min', async ({ user, params, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Минимум задаёт кладовщик или админ');
+
+  const material = db.prepare('SELECT code, name, min_stock FROM materials WHERE code = ?').get(params.code);
+  if (!material) throw new ApiError(404, 'Материал не найден');
+
+  const min = Math.max(0, round2(toNum(body.min, 0)));
+
+  db.prepare('UPDATE materials SET min_stock = ? WHERE code = ?').run(min, material.code);
+
+  return { ok: true, min_stock: min };
+});
+
 /** Остаток меняет кладовщик: вводит «сколько есть сейчас». */
+
 route('PATCH', '/api/stock/:code', async ({ user, params, body }) => {
   if (!isStaff(user)) throw new ApiError(403, 'Остатки меняет кладовщик или админ');
 
@@ -1456,7 +1583,15 @@ route('PATCH', '/api/stock/:code', async ({ user, params, body }) => {
   const left = Math.max(0, toNum(body.left, 0));
   const stock = round2(left + (Number(used) || 0));
 
+  const before = round2((Number(material.stock) || 0) - (Number(used) || 0));
+
   db.prepare('UPDATE materials SET stock = ? WHERE code = ?').run(stock, material.code);
+
+  if (round2(left - before) !== 0) {
+    db.prepare(`INSERT INTO stock_moves (code, kind, qty, price, note, user_id, created_at)
+                VALUES (?, 'adjust', ?, 0, ?, ?, ?)`)
+      .run(material.code, round2(left - before), `Остаток: ${before} → ${left}`, user.id, nowISO());
+  }
 
   audit(user.id, 'stock', 'material', null, {
     code: material.code,

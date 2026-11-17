@@ -27,6 +27,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
 19. Если инструмент вернул несколько подходящих заказов (ambiguity), покажи их списком — номер, госномер, статус — и спроси, какой именно. Никогда не выбирай за человека.
+24. На вопрос «что заканчивается на складе» вызывай low_stock и перечисли материалы с остатком и минимумом. Если список пуст — так и скажи.
 23. Ссылки на документы НЕ вставляй в текст ответа — программа сама покажет их кнопками «открыть». Просто скажи, что нашёл.
 22. ТДС ищи через find_tds — по коду материала, названию материала или названию документа. Если человек говорит «тдс на грунт 590», ищи по названию, а не только по коду.
 21. Понимаешь и русский, и латиницу: «Skoda Rapid» = «Шкода Рапид», «Lada» = «Лада», «Fetisov» = «Фетисов». Если инструмент не нашёл по одному написанию — попробуй другое, не сдавайся сразу.
@@ -87,6 +88,17 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'low_stock',
+      description: 'Показать материалы, которые заканчиваются: остаток дошёл до заданного минимума.',
+      parameters: {
+        type: 'object',
+        properties: {}
       }
     }
   },
@@ -633,6 +645,29 @@ function makeContext(env) {
       }));
 
       return { materials };
+    },
+
+    low_stock() {
+      const rows = db.prepare(`
+        SELECT m.code, m.name, m.unit, m.stock, m.min_stock,
+               COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+          FROM materials m
+         WHERE m.active = 1 AND COALESCE(m.min_stock, 0) > 0
+         ORDER BY m.name
+      `).all();
+
+      const items = [];
+
+      for (const row of rows) {
+        const left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
+        const minStock = round2(Number(row.min_stock) || 0);
+
+        if (left > minStock) continue;
+
+        items.push({ name: row.name, code: row.code, left, min: minStock, unit: row.unit });
+      }
+
+      return { count: items.length, items };
     },
 
     find_tds({ query }) {
