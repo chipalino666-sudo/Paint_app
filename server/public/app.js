@@ -3831,12 +3831,21 @@
         return;
       }
 
-      // Группируем по материалу
+      // Группируем по материалу; документы без материала — в «Общие»
       const groups = new Map();
 
       for (const doc of docs) {
-        const key = doc.code;
-        if (!groups.has(key)) groups.set(key, { code: doc.code, name: doc.name || doc.code, items: [] });
+        const isGeneral = !doc.code;
+        const key = isGeneral ? '__general__' : doc.code;
+
+        if (!groups.has(key)) {
+          groups.set(key, {
+            code: isGeneral ? '' : doc.code,
+            name: isGeneral ? 'Общие документы (без материала)' : (doc.name || doc.code),
+            items: []
+          });
+        }
+
         groups.get(key).items.push(doc);
       }
 
@@ -3944,16 +3953,12 @@
   async function addTdsLink() {
     const materialText = $('#tdsMatSearch') ? $('#tdsMatSearch').value.trim() : '';
 
-    // Материал могли ввести руками, не выбрав из подсказок
-    if (!tdsPicked) {
-      if (!materialText) {
-        tdsSay('Сначала выберите материал или введите его код');
-        return;
-      }
-
+    // Материал не обязателен: без него документ попадёт в «Общие»
+    if (!tdsPicked && materialText) {
       const found = await resolveTdsMaterial(materialText);
+
       if (!found) {
-        tdsSay('Материал не найден — начните вводить код или название и выберите из списка');
+        tdsSay('Материал не найден. Очистите поле «Материал», чтобы добавить документ в общие');
         return;
       }
 
@@ -3995,10 +4000,10 @@
 
         await api('/api/tds/file', {
           method: 'POST',
-          body: { code: tdsPicked.code, title, file: dataUrl }
+          body: { code: tdsPicked ? tdsPicked.code : '', title, file: dataUrl }
         });
       } else {
-        await api('/api/tds', { method: 'POST', body: { code: tdsPicked.code, title, url } });
+        await api('/api/tds', { method: 'POST', body: { code: tdsPicked ? tdsPicked.code : '', title, url } });
       }
 
       tdsPicked = null;

@@ -1688,7 +1688,6 @@ route('POST', '/api/tds', async ({ user, body }) => {
   const title = str(body.title, 200);
   const url = str(body.url, 500);
 
-  if (!code) throw new ApiError(400, 'Не указан материал');
   if (!title) throw new ApiError(400, 'Укажите название документа');
   if (!/^https?:\/\/\S+$/i.test(url)) throw new ApiError(400, 'Ссылка должна начинаться с http:// или https://');
 
@@ -1708,7 +1707,6 @@ route('POST', '/api/tds/file', async ({ user, body }) => {
   const title = str(body.title, 200);
   const raw = String(body.file || '');
 
-  if (!code) throw new ApiError(400, 'Не указан материал');
   if (!title) throw new ApiError(400, 'Укажите название документа');
 
   const match = /^data:([a-z0-9.+/-]+);base64,(.+)$/i.exec(raw);
