@@ -1978,3 +1978,60 @@ td.empty-line,
 }
 
 .material-hint.hidden { display: none; }
+/* ---------- Списание на весь экран ---------------------------------------- */
+
+.focus-btn { margin-left: auto; }
+
+.focus-exit {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .18);
+}
+
+.focus-exit:hover { border-color: var(--blue); color: var(--blue); }
+.focus-exit.hidden { display: none; }
+
+body.focus-mode .topbar,
+body.focus-mode .order-bar,
+body.focus-mode .order-tabs,
+body.focus-mode .page-title { display: none !important; }
+
+body.focus-mode .material-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  padding: 14px 18px 18px;
+  background: var(--bg);
+  overflow: auto;
+}
+
+body.focus-mode .material-workspace .card-head { display: none; }
+
+body.focus-mode .material-layout {
+  min-height: calc(100vh - 50px);
+  grid-template-columns: minmax(460px, 46%) minmax(0, 1fr);
+  gap: 24px;
+}
+
+body.focus-mode .material-entry .search-results { max-height: none; }
+
+@media (max-width: 1100px) {
+  body.focus-mode .material-layout { grid-template-columns: 1fr; }
+}

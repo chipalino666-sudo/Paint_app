@@ -636,11 +636,18 @@
         </div>
       </section>
       <section class="order-panel hidden" data-panel="materials">
-      <div class="card material-workspace">
+      <div class="card material-workspace" id="materialWorkspace">
         <div class="card-head">
           <h2>Списание материала</h2>
           <span class="muted">что израсходовано на этот заказ</span>
+          <button class="btn btn-outline btn-sm focus-btn" id="btnFocusMaterials" title="Развернуть на весь экран (F)">
+            ⛶ На весь экран
+          </button>
         </div>
+
+        <button class="focus-exit hidden" id="btnFocusExit" title="Свернуть (Esc)">
+          ✕ Свернуть
+        </button>
 
         <div class="material-layout">
           <div class="material-entry">
@@ -924,8 +931,23 @@
   }
 
   /** Вкладки внутри карточки заказа. */
+  /* ------------------------------------------------------------------------
+     Списание на весь экран: остаётся только рабочая область
+     ------------------------------------------------------------------------ */
+
+  function setFocusMode(on) {
+    document.body.classList.toggle('focus-mode', Boolean(on));
+    document.body.style.overflow = on ? 'hidden' : '';
+
+    const exitButton = $('#btnFocusExit');
+    if (exitButton) exitButton.classList.toggle('hidden', !on);
+  }
+
+  /** Вкладки внутри карточки заказа. */
   function selectOrderTab(name) {
     state.orderTab = name;
+
+    if (name !== 'materials') setFocusMode(false);
 
     $$('.order-tab').forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.otab === name);
@@ -958,6 +980,9 @@
 
   function bindOrderEvents(order, canEdit, canEditPrices) {
     $('#btnBack').addEventListener('click', () => showView('orders'));
+    if ($('#btnFocusMaterials')) $('#btnFocusMaterials').addEventListener('click', () => setFocusMode(true));
+    if ($('#btnFocusExit')) $('#btnFocusExit').addEventListener('click', () => setFocusMode(false));
+
     $('#btnPrint').addEventListener('click', () => window.open('/print.html?id=' + order.id, '_blank'));
 
     $$('.order-tab').forEach((tab) => {
@@ -3235,7 +3260,18 @@
     });
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeMenus();
+      if (event.key === 'Escape') {
+        closeMenus();
+        setFocusMode(false);
+      }
+
+      // F — развернуть списание, если открыта его вкладка
+      if ((event.key === 'f' || event.key === 'F' || event.key === 'а' || event.key === 'А')
+          && !event.ctrlKey && !event.metaKey && !event.altKey
+          && !/input|textarea|select/i.test(document.activeElement.tagName)
+          && state.orderTab === 'materials') {
+        setFocusMode(true);
+      }
     });
 
 
