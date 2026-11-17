@@ -558,23 +558,20 @@
       : '<tr><td colspan="5" class="empty-line">Работы не добавлены</td></tr>';
 
     host.innerHTML = `
-      <div class="card">
-        <div class="card-head">
-          <div>
-            <h2>Заказ № ${esc(order.number)}
-              <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
-            </h2>
-            <div class="card-title-sub">
-              ${esc(order.plate)} · ${esc([order.make, order.model].filter(Boolean).join(' ') || 'марка не указана')}
-              ${order.color ? ' · ' + esc(order.color) : ''}
-            </div>
-          </div>
-          <div class="actions-row">
-            ${isManager() ? '<button class="btn btn-outline" id="btnEditOrder">Изменить</button>' : ''}
-            ${actionButtons}
-            <button class="btn btn-outline" id="btnPrint">Печать</button>
-            <button class="btn btn-outline" id="btnBack">← К списку</button>
-          </div>
+      <div class="order-bar">
+        <div class="order-bar-main">
+          <span class="order-bar-num">Заказ № ${esc(order.number)}</span>
+          <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
+          <span class="order-bar-sub">
+            ${esc(order.plate)} · ${esc([order.make, order.model].filter(Boolean).join(' ') || 'марка не указана')}${order.color ? ' · ' + esc(order.color) : ''}
+          </span>
+        </div>
+
+        <div class="order-bar-actions">
+          ${isManager() ? '<button class="btn btn-outline btn-sm" id="btnEditOrder">Изменить</button>' : ''}
+          ${actionButtons.replaceAll('class="btn ', 'class="btn btn-sm ')}
+          <button class="btn btn-outline btn-sm" id="btnPrint">Печать</button>
+          <button class="btn btn-outline btn-sm" id="btnBack">← К списку</button>
         </div>
       </div>
 
@@ -1598,6 +1595,10 @@
 
       <div id="addSearchWrap">
         <input type="text" id="matSearch" placeholder="Код или название материала…" autocomplete="off">
+        <div class="material-hint" id="matHint">
+          Начните вводить код или название — например, <b>110</b>, <b>127</b> или <b>скотч</b>.
+          Коды Brulex и Standox работают в обе стороны.
+        </div>
         <div class="search-results hidden" id="matResults"></div>
       </div>
 
@@ -1645,6 +1646,9 @@
 
   async function searchMaterials(term) {
     const wrap = $('#matResults');
+
+    const hint = $('#matHint');
+    if (hint) hint.classList.toggle('hidden', Boolean(term));
 
     try {
       const data = await api('/api/materials?q=' + encodeURIComponent(term));
