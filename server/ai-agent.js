@@ -25,6 +25,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
 12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
+18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
 16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
 14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
@@ -125,7 +126,8 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          order_id: { type: 'integer', description: 'id заказа' },
+          order_id: { type: 'integer', description: 'id заказа, если он известен' },
+          order: { type: 'string', description: 'номер заказа, госномер или марка машины: 2026-0025, P654HP30, Skoda Rapid' },
           paint_code: { type: 'string', description: 'код краски (цвета), которую красят' },
           recipe: { type: 'string', description: 'название готовой краски, если красят ею (Lada 221)' },
           parts: { type: 'number', description: 'количество деталей; по умолчанию 1' }
@@ -169,7 +171,8 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          order_id: { type: 'integer', description: 'id заказа' },
+          order_id: { type: 'integer', description: 'id заказа, если он известен' },
+          order: { type: 'string', description: 'номер заказа, госномер или марка машины: 2026-0025, P654HP30, Skoda Rapid' },
           items: {
             type: 'array',
             description: 'что списать',
@@ -280,6 +283,51 @@ function makeContext(env) {
     return order;
   };
 
+  /** Заказ по номеру, госномеру, марке или мастеру — если id не подошёл. */
+  const visibleOrderByText = (value) => {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+
+    const rows = db.prepare(`
+      SELECT o.id, o.number, c.plate, c.make, c.model, u.full_name AS master
+        FROM orders o
+        JOIN cars c ON c.id = o.car_id
+        LEFT JOIN users u ON u.id = o.master_id
+       ORDER BY o.id DESC
+       LIMIT 500
+    `).all();
+
+    const visible = rows.filter((row) => visibleOrder(row.id));
+    const needle = normalize(text);
+
+    const found = visible.find((row) => normalize(row.number) === needle)
+      || visible.find((row) => normalize(row.plate) === needle)
+      || visible.find((row) => normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle));
+
+    return found ? visibleOrder(found.id) : null;
+  };
+
+  /** Разбор ссылки на заказ: «2026-0025», «Skoda Rapid», «P654HP30» или id. */
+  const orderRef = (args) => {
+    const candidates = [args.order, args.order_id];
+
+    for (const value of candidates) {
+      const text = String(value ?? '').trim();
+      if (!text) continue;
+
+      const asNumber = Number(text);
+      if (Number.isFinite(asNumber) && String(asNumber) === text) {
+        const byId = visibleOrder(asNumber);
+        if (byId) return byId;
+      }
+
+      const byText = visibleOrderByText(text);
+      if (byText) return byText;
+    }
+
+    return null;
+  };
+
   return {
     search_orders({ query }) {
       const q = String(query || '').trim().toLowerCase();
@@ -312,8 +360,8 @@ function makeContext(env) {
       return { orders };
     },
 
-    get_order({ order_id }) {
-      const order = visibleOrder(Number(order_id));
+    get_order({ order_id, order: orderText }) {
+      const order = orderRef({ order_id, order: orderText });
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       return {
@@ -459,8 +507,8 @@ function makeContext(env) {
       };
     },
 
-    apply_norms({ order_id, paint_code, recipe, parts }) {
-      const order = visibleOrder(Number(order_id));
+    apply_norms({ order_id, order: orderText, paint_code, recipe, parts }) {
+      const order = orderRef({ order_id, order: orderText });
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       const count = Number(parts) > 0 ? Number(parts) : 1;
@@ -630,8 +678,8 @@ function makeContext(env) {
       };
     },
 
-    propose_write_off({ order_id, items }) {
-      const order = visibleOrder(Number(order_id));
+    propose_write_off({ order_id, order: orderText, items }) {
+      const order = orderRef({ order_id, order: orderText });
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       const list = [];
