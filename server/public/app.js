@@ -3919,20 +3919,60 @@
 
     const title = $('#tdsTitle').value.trim();
     const url = $('#tdsUrl').value.trim();
+    const fileInput = $('#tdsFile');
+    const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    if (!title) {
+      toast('Укажите название документа');
+      return;
+    }
+
+    if (!file && !url) {
+      toast('Дайте ссылку или выберите файл');
+      return;
+    }
+
+    const button = $('#btnAddTds');
+    if (button) {
+      button.disabled = true;
+      button.textContent = file ? 'Загружаю…' : 'Добавляю…';
+    }
 
     try {
-      await api('/api/tds', { method: 'POST', body: { code: tdsPicked.code, title, url } });
+      if (file) {
+        // Файл читаем в браузере и отправляем как данные — сервер сохранит его у себя
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+          reader.readAsDataURL(file);
+        });
+
+        await api('/api/tds/file', {
+          method: 'POST',
+          body: { code: tdsPicked.code, title, file: dataUrl }
+        });
+      } else {
+        await api('/api/tds', { method: 'POST', body: { code: tdsPicked.code, title, url } });
+      }
 
       tdsPicked = null;
       $('#tdsMatSearch').value = '';
       $('#tdsTitle').value = '';
       $('#tdsUrl').value = '';
       $('#tdsPicked').textContent = '';
+      if (fileInput) fileInput.value = '';
+      if ($('#tdsFileName')) $('#tdsFileName').textContent = '';
 
       await loadTdsView();
-      toast('Документ добавлен');
+      toast(file ? 'Файл загружен и привязан к материалу' : 'Документ добавлен');
     } catch (error) {
       toast(error.message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Добавить';
+      }
     }
   }
 
@@ -4308,6 +4348,31 @@
 
     if ($('#btnNormSave')) $('#btnNormSave').addEventListener('click', saveNormsSet);
     if ($('#btnNormReset')) $('#btnNormReset').addEventListener('click', resetNormsSet);
+
+    /* ТДС: показываем имя выбранного файла */
+    const tdsFileInput = $('#tdsFile');
+
+    if (tdsFileInput) {
+      tdsFileInput.addEventListener('change', () => {
+        const file = tdsFileInput.files && tdsFileInput.files[0];
+        const label = $('#tdsFileName');
+
+        if (!label) return;
+
+        if (!file) { label.textContent = ''; return; }
+
+        const size = file.size > 1024 * 1024
+          ? (file.size / 1024 / 1024).toFixed(1) + ' МБ'
+          : Math.round(file.size / 1024) + ' КБ';
+
+        label.textContent = file.name + ' · ' + size;
+
+        const titleInput = $('#tdsTitle');
+        if (titleInput && !titleInput.value) {
+          titleInput.value = file.name.replace(/\.[^.]+$/, '');
+        }
+      });
+    }
 
     document.querySelectorAll('input[name="normScope"]').forEach((radio) => {
       radio.addEventListener('change', () => {

@@ -467,11 +467,21 @@
           <label for="tdsUrl">Ссылка</label>
           <input type="text" id="tdsUrl" placeholder="https://…">
         </div>
+
+        <div class="field">
+          <label for="tdsFile">…или файл (PDF, JPG, PNG — до 20 МБ)</label>
+          <input type="file" id="tdsFile" accept=".pdf,.jpg,.jpeg,.png,.webp">
+          <span class="muted" id="tdsFileName" style="margin-top:6px;display:block"></span>
+        </div>
       </div>
 
       <div class="actions-row">
         <button class="btn btn-primary" id="btnAddTds">Добавить</button>
       </div>
+
+      <p class="muted" style="margin:10px 0 0;font-size:12.5px">
+        Достаточно ссылки <b>или</b> файла. Файл сохраняется на сервере и открывается прямо в браузере.
+      </p>
     </div>
   </section>
 

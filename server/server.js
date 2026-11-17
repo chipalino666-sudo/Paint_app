@@ -33,7 +33,9 @@ const aiAgent = require('./ai-agent');
 const PORT = Number(process.env.PAINT_PORT || 3000);
 const HOST = process.env.PAINT_HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const MAX_BODY = 8 * 1024 * 1024;
+const MAX_BODY = 24 * 1024 * 1024;      // хватает на PDF-документы
+const MAX_DOC_BYTES = 20 * 1024 * 1024;
+const DOC_EXT = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const UPLOAD_DIR = process.env.PAINT_UPLOADS || path.join(__dirname, 'data', 'uploads');
 
 // Через сколько минут бездействия кабинет мастера закрывается сам
@@ -1693,6 +1695,73 @@ route('POST', '/api/tds', async ({ user, body }) => {
   audit(user.id, 'create', 'material_doc', Number(info.lastInsertRowid), { text: `ТДС: ${title}` });
 
   return { ok: true, id: Number(info.lastInsertRowid) };
+});
+
+/** Файл ТДС (PDF или картинка) — сохраняем на сервере и отдаём по ссылке. */
+route('POST', '/api/tds/file', async ({ user, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Документы добавляет кладовщик или приёмщик');
+
+  const code = str(body.code, 40);
+  const title = str(body.title, 200);
+  const raw = String(body.file || '');
+
+  if (!code) throw new ApiError(400, 'Не указан материал');
+  if (!title) throw new ApiError(400, 'Укажите название документа');
+
+  const match = /^data:([a-z0-9.+/-]+);base64,(.+)$/i.exec(raw);
+  if (!match) throw new ApiError(400, 'Не удалось прочитать файл');
+
+  const mime = match[1].toLowerCase();
+  const ext = DOC_EXT[mime];
+
+  if (!ext) throw new ApiError(400, 'Подойдёт PDF, JPEG, PNG или WebP');
+
+  const data = Buffer.from(match[2], 'base64');
+  if (!data.length) throw new ApiError(400, 'Пустой файл');
+  if (data.length > MAX_DOC_BYTES) {
+    throw new ApiError(413, `Файл больше ${Math.round(MAX_DOC_BYTES / 1024 / 1024)} МБ`);
+  }
+
+  const dir = path.join(UPLOAD_DIR, 'docs');
+  fs.mkdirSync(dir, { recursive: true });
+
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  fs.writeFileSync(path.join(dir, name), data);
+
+  const url = '/api/tds/file/' + name;
+
+  const info = db.prepare('INSERT INTO material_docs (code, title, url, created_at) VALUES (?, ?, ?, ?)')
+    .run(code, title, url, nowISO());
+
+  audit(user.id, 'create', 'material_doc', Number(info.lastInsertRowid), { text: `ТДС файлом: ${title}` });
+
+  return { ok: true, id: Number(info.lastInsertRowid), url };
+});
+
+/** Выдача файлов ТДС: открываются в браузере, PDF — во встроенном просмотрщике. */
+route('GET', '/api/tds/file/:name', async ({ params, res }) => {
+  const name = path.basename(String(params.name || ''));
+
+  if (!/^[\w.-]+\.(pdf|jpe?g|png|webp)$/i.test(name)) {
+    throw new ApiError(404, 'Файл не найден');
+  }
+
+  const file = path.join(UPLOAD_DIR, 'docs', name);
+  if (!fs.existsSync(file)) throw new ApiError(404, 'Файл не найден');
+
+  const ext = path.extname(name).toLowerCase();
+  const type = ext === '.pdf' ? 'application/pdf'
+    : ext === '.png' ? 'image/png'
+    : ext === '.webp' ? 'image/webp'
+    : 'image/jpeg';
+
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Disposition': `inline; filename="${name}"`,
+    'Cache-Control': 'private, max-age=604800'
+  });
+
+  fs.createReadStream(file).pipe(res);
 });
 
 route('DELETE', '/api/tds/:id', async ({ user, params }) => {
