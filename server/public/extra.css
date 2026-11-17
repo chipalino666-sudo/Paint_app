@@ -2457,3 +2457,30 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
 }
 
 .quick-line:last-child { border-bottom: none; }
+/* ---------- Нормы списания ------------------------------------------------ */
+
+.norms-scope {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.norms-scope label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.norms-scope input { width: 16px; height: 16px; accent-color: var(--blue); }
+
+#normsSetList table.grid input[type=number],
+#normsSetList table.grid select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+#view-norms .quick-row input[type=text] { flex: 1 1 auto; min-width: 0; }
+#view-norms .quick-row select { flex: 0 0 130px; }
+#view-norms .quick-row input[type=number] { flex: 0 0 90px; }

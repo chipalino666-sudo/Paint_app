@@ -340,6 +340,7 @@
     if (name === 'clients') loadClients();
     if (name === 'stock') loadWarehouse();
     if (name === 'tds') loadTdsView();
+    if (name === 'norms') loadNormsView();
     if (name === 'users') loadUsers();
     if (name === 'new') resetNewOrder();
   }
@@ -1645,10 +1646,11 @@
           <div class="quick-box" id="quickBox">
             <div class="quick-head">Быстрый набор по деталям</div>
             <div class="quick-row">
-              <select id="quickWork"></select>
+              <input type="text" id="quickPaint" placeholder="Краска: код или название" autocomplete="off">
               <input type="number" id="quickParts" value="1" min="0.1" step="0.05" title="Сколько деталей">
               <button class="btn btn-outline btn-sm" id="btnQuick">Подобрать</button>
             </div>
+            <div class="search-results hidden" id="quickPaintResults"></div>
             <div id="quickResult"></div>
           </div>
         </div>
@@ -1694,10 +1696,27 @@
     let mode = 'materials';
 
     renderMaterialChips();
-    quickFillWorks();
 
-    if ($('#btnQuick')) $('#btnQuick').addEventListener('click', quickPreview);
-    if ($('#quickWork')) $('#quickWork').addEventListener('change', () => { if ($('#quickResult').innerHTML) quickPreview(); });
+    let quickPaintItem = null;
+
+    if ($('#btnQuick')) {
+      $('#btnQuick').addEventListener('click', () => quickPreview(quickPaintItem));
+    }
+
+    const quickPaint = $('#quickPaint');
+
+    if (quickPaint) {
+      let quickTimer = null;
+
+      quickPaint.addEventListener('input', () => {
+        clearTimeout(quickTimer);
+        quickTimer = setTimeout(() => quickPickPaint(quickPaint.value.trim(), (item) => {
+          quickPaintItem = item;
+          quickPaint.value = item.name;
+          $('#quickPaintResults').classList.add('hidden');
+        }), 220);
+      });
+    }
 
     const clearToggle = $('#matClearToggle');
 
@@ -1846,46 +1865,72 @@
 
   /* ---- Быстрый набор материалов по количеству деталей --------------------- */
 
-  function quickFillWorks() {
-    const select = $('#quickWork');
-    if (!select) return;
+  /* ---- Быстрый набор материалов по количеству деталей --------------------- */
 
-    const current = select.value;
+  /** Выбор краски для наряда: по коду или названию. */
+  async function quickPickPaint(term, onPick) {
+    const wrap = $('#quickPaintResults');
+    if (!wrap) return;
 
-    select.innerHTML = state.works
-      .map((work) => `<option value="${work.id}">${esc(work.name)}</option>`)
-      .join('');
+    if (!term) {
+      wrap.classList.add('hidden');
+      return;
+    }
 
-    if (current) select.value = current;
+    try {
+      const data = await api('/api/materials?q=' + encodeURIComponent(term));
+      const paints = data.materials.filter((item) => item.category === 'paint').slice(0, 8);
+
+      wrap.innerHTML = paints.map((item) => `
+        <div class="row" data-quick-pick="${esc(item.code)}">
+          <span class="code">${esc(item.code)}</span>
+          <span class="name">${esc(item.name)}</span>
+        </div>
+      `).join('') || '<div class="row" style="cursor:default">Краска не найдена</div>';
+
+      wrap.classList.remove('hidden');
+
+      wrap.querySelectorAll('[data-quick-pick]').forEach((row) => {
+        row.addEventListener('click', () => {
+          const item = paints.find((p) => p.code === row.dataset.quickPick);
+          if (item && onPick) onPick(item);
+        });
+      });
+    } catch (error) {
+      wrap.classList.add('hidden');
+    }
   }
 
-  async function quickPreview() {
-    const select = $('#quickWork');
+  async function quickPreview(paintItem) {
     const partsInput = $('#quickParts');
     const result = $('#quickResult');
 
-    if (!select || !result || !state.order) return;
+    if (!result || !state.order) return;
 
     const parts = Number(partsInput.value) || 1;
+    const paint = paintItem ? paintItem.code : '';
 
     result.innerHTML = '<div class="muted" style="padding:8px 0">Считаю…</div>';
 
     try {
-      const data = await api(`/api/norms/quick?work_id=${select.value}&parts=${encodeURIComponent(parts)}`);
+      const data = await api(`/api/norms/quick?parts=${encodeURIComponent(parts)}${paint ? '&paint=' + encodeURIComponent(paint) : ''}`);
 
       if (!data.items.length) {
-        result.innerHTML = '<div class="muted" style="padding:8px 0">Для этой работы нормы не заданы. Их задаёт приёмщик в «Справочниках».</div>';
+        result.innerHTML = '<div class="muted" style="padding:8px 0">Нормы не заданы. Задайте их в разделе «Нормы списания».</div>';
         return;
       }
+
+      const hasPaintRow = data.items.some((item) => item.role === 'paint');
 
       result.innerHTML = `
         <div class="quick-list">
           ${data.items.map((item) => `
             <div class="quick-line">
               <span>${esc(item.name)}</span>
-              <span class="mono">${qty(item.qty)} ${esc(item.unit)}</span>
+              <span class="mono">${qty(item.qty)} ${esc(item.unit)}${item.per === 'order' ? ' <span class="muted">на машину</span>' : ''}</span>
             </div>`).join('')}
         </div>
+        ${hasPaintRow ? '' : '<div class="muted" style="margin-top:6px">Краска не выбрана — выберите её в поле выше.</div>'}
         <button class="btn btn-primary btn-sm" id="btnQuickAdd" style="width:100%;margin-top:8px">
           Добавить в списание (${data.items.length})
         </button>
@@ -1914,7 +1959,7 @@
           state.order = fresh.order;
           renderOrder();
 
-          toast(`Добавлено: ${data.work.name}, ${qty(parts)} дет.`);
+          toast(`Добавлено: ${qty(parts)} дет.`);
         } catch (error) {
           toast(error.message);
           button.disabled = false;
@@ -1926,62 +1971,142 @@
     }
   }
 
-  /* ---- Нормы расхода: редактор для приёмщика ------------------------------ */
+  /* ---- Нормы списания: свой набор у каждого маляра, общая база для всех --- */
 
-  let normsWork = null;
-  let normsDraft = [];
+  let normsCommon = [];
+  let normsMine = [];
+  let normsDraftSet = [];
+  let normsScope = 'mine';
+  let normPick = null;
 
-  async function openNorms(work) {
-    normsWork = work;
-    normsDraft = [];
+  const canEditCommon = () => state.user && (state.user.role === 'admin' || state.user.role === 'manager');
 
-    const modal = $('#normsModal');
-    if (!modal) return;
-
-    $('#normsTitle').textContent = 'Нормы: ' + work.name;
-    modal.classList.remove('hidden');
-
-    try {
-      const data = await api('/api/norms?work_id=' + work.id);
-      normsDraft = (data.norms || []).map((row) => ({
-        code: row.code,
-        name: row.name || row.code,
-        qty: row.qty,
-        unit: row.unit || 'г'
-      }));
-    } catch (error) {
-      normsDraft = [];
-    }
-
-    renderNormsDraft();
-  }
-
-  function renderNormsDraft() {
-    const host = $('#normsList');
+  async function loadNormsView() {
+    const host = $('#normsSetList');
     if (!host) return;
 
-    if (!normsDraft.length) {
-      host.innerHTML = '<div class="muted" style="padding:8px 0">Пока пусто — добавьте материалы, которые уходят на деталь</div>';
+    host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      const data = await api('/api/norm-set');
+
+      normsCommon = data.common || [];
+      normsMine = data.mine || [];
+
+      // У маляра со своими нормами открываем личные, иначе — общую базу
+      normsScope = normsMine.length ? 'mine' : (canEditCommon() ? 'common' : 'mine');
+
+      const mineRadio = document.querySelector('input[name="normScope"][value="mine"]');
+      const commonRadio = document.querySelector('input[name="normScope"][value="common"]');
+
+      if (mineRadio) mineRadio.checked = normsScope === 'mine';
+      if (commonRadio) commonRadio.checked = normsScope === 'common';
+
+      // Общую базу маляру показываем, но менять не даём
+      const commonLabel = $('#normCommonLabel');
+      if (commonLabel) commonLabel.classList.toggle('hidden', !canEditCommon() && !normsCommon.length);
+
+      renderNormsSet();
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function normsForScope() {
+    return normsScope === 'common' ? normsCommon : normsMine;
+  }
+
+  function renderNormsSet() {
+    const host = $('#normsSetList');
+    if (!host) return;
+
+    const editable = normsScope === 'mine' || canEditCommon();
+
+    // Своих норм ещё нет — показываем общую базу как заготовку для копии
+    const source = (normsScope === 'mine' && !normsMine.length) ? normsCommon : normsForScope();
+
+    normsDraftSet = source.map((row) => ({
+      code: row.code,
+      name: row.role === 'paint' ? 'Краска — по выбору в наряде' : (row.name || row.code),
+      role: row.role,
+      qty: row.qty,
+      unit: row.unit,
+      per: row.per
+    }));
+
+    const label = $('#normsScopeLabel');
+    if (label) {
+      label.textContent = normsScope === 'common'
+        ? (canEditCommon() ? 'общая база — для всех' : 'общая база — только просмотр')
+        : (normsMine.length ? 'ваши личные нормы' : 'пока не заданы — ниже общая база');
+    }
+
+    if (!normsDraftSet.length) {
+      host.innerHTML = '<div class="muted" style="padding:10px 0">Список пуст. Добавьте материалы ниже.</div>';
       return;
     }
 
-    host.innerHTML = normsDraft.map((item, index) => `
-      <div class="quick-line">
-        <span>${esc(item.name)}</span>
-        <span class="mono">${qty(item.qty)} ${esc(item.unit)}</span>
-        <button class="row-del" data-norm-remove="${index}" title="Убрать">×</button>
-      </div>`).join('');
+    host.innerHTML = `
+      <table class="grid">
+        <thead><tr><th>Материал</th><th class="num">Кол-во</th><th>Когда</th><th></th></tr></thead>
+        <tbody>
+          ${normsDraftSet.map((row, index) => `
+            <tr>
+              <td data-label="Материал">${esc(row.name)}</td>
+              <td class="num" data-label="Кол-во">
+                ${editable
+                  ? `<input type="number" value="${row.qty}" min="0.01" step="0.01" data-norm-qty="${index}" style="width:96px;text-align:right"> <span class="unit">${esc(row.unit)}</span>`
+                  : `<span class="mono">${qty(row.qty)} ${esc(row.unit)}</span>`}
+              </td>
+              <td data-label="Когда">
+                ${editable
+                  ? `<select data-norm-per="${index}">
+                       <option value="part"${row.per === 'part' ? ' selected' : ''}>на деталь</option>
+                       <option value="order"${row.per === 'order' ? ' selected' : ''}>на машину</option>
+                     </select>`
+                  : (row.per === 'part' ? 'на деталь' : 'на машину')}
+              </td>
+              <td>${editable ? `<button class="row-del" data-norm-del="${index}" title="Убрать">×</button>` : ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
 
-    host.querySelectorAll('[data-norm-remove]').forEach((button) => {
+    host.querySelectorAll('[data-norm-qty]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const row = normsDraftSet[Number(input.dataset.normQty)];
+        if (row) row.qty = Number(input.value) || 0;
+      });
+    });
+
+    host.querySelectorAll('[data-norm-per]').forEach((select) => {
+      select.addEventListener('change', () => {
+        const row = normsDraftSet[Number(select.dataset.normPer)];
+        if (row) row.per = select.value;
+      });
+    });
+
+    host.querySelectorAll('[data-norm-del]').forEach((button) => {
       button.addEventListener('click', () => {
-        normsDraft.splice(Number(button.dataset.normRemove), 1);
-        renderNormsDraft();
+        normsDraftSet.splice(Number(button.dataset.normDel), 1);
+        renderNormsDraftOnly();
       });
     });
   }
 
-  async function pickNormMaterial(term) {
-    const wrap = $('#normsResults');
+  /** Перерисовка без перезагрузки с сервера (после правок в таблице). */
+  function renderNormsDraftOnly() {
+    const keepMine = normsMine;
+    const keepCommon = normsCommon;
+
+    normsMine = normsScope === 'mine' ? normsDraftSet : keepMine;
+    normsCommon = normsScope === 'common' ? normsDraftSet : keepCommon;
+
+    renderNormsSet();
+  }
+
+  async function pickNormItem(term) {
+    const wrap = $('#normResults');
     if (!wrap) return;
 
     if (!term) {
@@ -1993,7 +2118,7 @@
       const data = await api('/api/materials?q=' + encodeURIComponent(term));
 
       wrap.innerHTML = data.materials.slice(0, 8).map((item) => `
-        <div class="row" data-norm-pick="${esc(item.code)}">
+        <div class="row" data-norm-item="${esc(item.code)}">
           <span class="code">${esc(item.code)}</span>
           <span class="name">${esc(item.name)}</span>
         </div>
@@ -2001,23 +2126,24 @@
 
       wrap.classList.remove('hidden');
 
-      wrap.querySelectorAll('[data-norm-pick]').forEach((row) => {
+      wrap.querySelectorAll('[data-norm-item]').forEach((row) => {
         row.addEventListener('click', () => {
-          const item = data.materials.find((m) => m.code === row.dataset.normPick);
-          const amount = Number($('#normsQty').value) || 100;
+          const item = data.materials.find((m) => m.code === row.dataset.normItem);
+          const amount = Number($('#normQty').value) || 100;
 
-          normsDraft = normsDraft.filter((n) => n.code !== item.code);
-          normsDraft.push({
+          normsDraftSet = normsDraftSet.filter((n) => n.code !== item.code);
+          normsDraftSet.push({
             code: item.code,
             name: item.name,
+            role: 'material',
             qty: amount,
-            unit: /\bг\b/.test(item.unit) || item.category === 'paint' ? 'г' : (item.unit || 'г')
+            unit: item.category === 'paint' ? 'г' : (item.unit || 'шт'),
+            per: $('#normPer').value
           });
 
-          renderNormsDraft();
+          renderNormsDraftOnly();
 
-          $('#normsSearch').value = '';
-          $('#normsQty').value = '100';
+          $('#normSearch').value = '';
           wrap.classList.add('hidden');
         });
       });
@@ -2026,17 +2152,25 @@
     }
   }
 
-  async function saveNorms() {
-    if (!normsWork) return;
-
+  async function saveNormsSet() {
     try {
-      await api('/api/norms', {
+      await api('/api/norm-set', {
         method: 'PUT',
-        body: { work_id: normsWork.id, items: normsDraft }
+        body: { scope: normsScope, items: normsDraftSet }
       });
 
-      $('#normsModal').classList.add('hidden');
       toast('Нормы сохранены');
+      await loadNormsView();
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  async function resetNormsSet() {
+    try {
+      await api('/api/norm-set', { method: 'DELETE' });
+      toast('Вернулись к общей базе');
+      await loadNormsView();
     } catch (error) {
       toast(error.message);
     }
@@ -2995,7 +3129,7 @@
 
     host.innerHTML = `
       <table class="grid">
-        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th><th>Нормы</th></tr></thead>
+        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th></tr></thead>
         <tbody>
           ${state.works.map((work) => `
             <tr>
@@ -3014,11 +3148,6 @@
                   ? `<input type="number" value="${work.price}" min="0" step="0.01" data-work-price="${work.id}"
                             style="width:120px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
                   : `<span class="mono">${money(work.price)}</span>`}
-              </td>
-              <td data-label="Нормы">
-                ${isManager()
-                  ? `<button class="btn btn-outline btn-sm" data-work-norms="${work.id}">Нормы</button>`
-                  : '<span class="muted">—</span>'}
               </td>
             </tr>`).join('')}
         </tbody>
@@ -4143,6 +4272,40 @@
     }
 
     if ($('#btnAddTds')) $('#btnAddTds').addEventListener('click', addTdsLink);
+
+    /* Нормы списания: выбор набора, добавление материалов, сохранение */
+    const normSearch = $('#normSearch');
+
+    if (normSearch) {
+      let normTimer = null;
+
+      normSearch.addEventListener('input', () => {
+        clearTimeout(normTimer);
+        const value = normSearch.value.trim();
+        normTimer = setTimeout(() => pickNormItem(value), 220);
+      });
+    }
+
+    if ($('#btnNormAdd')) $('#btnNormAdd').addEventListener('click', () => {
+      if (!normSearch.value.trim()) {
+        toast('Введите код или название материала');
+        normSearch.focus();
+        return;
+      }
+
+      pickNormItem(normSearch.value.trim());
+    });
+
+    if ($('#btnNormSave')) $('#btnNormSave').addEventListener('click', saveNormsSet);
+    if ($('#btnNormReset')) $('#btnNormReset').addEventListener('click', resetNormsSet);
+
+    document.querySelectorAll('input[name="normScope"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        normsScope = radio.value;
+        renderNormsSet();
+      });
+    });
 
     const codesBulkButton = $('#btnImportCodes');
     if (codesBulkButton) codesBulkButton.addEventListener('click', importCodes);

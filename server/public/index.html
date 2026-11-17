@@ -88,6 +88,7 @@
         <button class="nav-btn menu-item" data-view="report">Отчёт</button>
         <button class="nav-btn menu-item" data-view="stock" id="navStock">Склад</button>
         <button class="nav-btn menu-item" data-view="tds" id="navTds">ТДС и паспорта</button>
+        <button class="nav-btn menu-item" data-view="norms" id="navNorms">Нормы списания</button>
         <button class="nav-btn menu-item" data-view="clients" id="navClients">Клиенты</button>
         <button class="nav-btn menu-item" data-view="refs">Справочники</button>
         <button class="nav-btn menu-item hidden" data-view="users" id="navUsers">Сотрудники</button>
@@ -382,6 +383,47 @@
       <div class="actions-row">
         <button class="btn btn-primary" id="btnAddStock">Добавить на склад</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ======================= НОРМЫ СПИСАНИЯ ======================= -->
+  <section class="view hidden" id="view-norms">
+    <h1 class="page-title">Нормы списания</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Что списывается</h2>
+        <span class="muted" id="normsScopeLabel"></span>
+      </div>
+
+      <div class="norms-scope" id="normsScopeBox">
+        <label><input type="radio" name="normScope" value="mine" checked> Мои нормы</label>
+        <label id="normCommonLabel"><input type="radio" name="normScope" value="common"> Общая база</label>
+      </div>
+
+      <div id="normsSetList"></div>
+
+      <div class="quick-row" style="margin-top:12px">
+        <input type="text" id="normSearch" placeholder="Материал: код или название" autocomplete="off">
+        <input type="number" id="normQty" value="300" min="0.01" step="0.01" title="Количество">
+        <select id="normPer" title="Когда списывать">
+          <option value="part">на деталь</option>
+          <option value="order">на машину</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="btnNormAdd">Добавить</button>
+      </div>
+
+      <div class="search-results hidden" id="normResults"></div>
+
+      <div class="actions-row" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnNormSave">Сохранить</button>
+        <button class="btn btn-outline" id="btnNormReset">Вернуть общую базу</button>
+      </div>
+
+      <p class="muted" style="margin:10px 0 0;font-size:12.5px">
+        «На деталь» умножается на количество деталей, «на машину» списывается один раз на заказ.
+        Свои нормы есть у каждого маляра, общая база — для всех.
+      </p>
     </div>
   </section>
 

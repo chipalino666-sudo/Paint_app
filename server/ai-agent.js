@@ -20,7 +20,8 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 6. Ты не видишь чужие заказы: только те, что доступны этому сотруднику.
 7. Если материала нет в базе — так и скажи и предложи уточнить код.
 8. Если поиск по коду дал ровно один подходящий материал — сразу используй его, не переспрашивай. Переспрашивай, только когда подходящих несколько и они разные.
-9. Формулу краски понимай буквально: «110 — 800 грамм, лак 442 — 200» — это коды и граммы. Сразу вызывай propose_recipe, не спрашивай подтверждения.`;
+9. Формулу краски понимай буквально: «110 — 800 грамм, лак 442 — 200» — это коды и граммы. Сразу вызывай propose_recipe, не спрашивай подтверждения.
+10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.`;
 
 const TOOLS = [
   {
@@ -70,6 +71,22 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'apply_norms',
+      description: 'Подготовить списание по нормам цеха: на N деталей и на машину. Возвращает карточку для подтверждения.',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_id: { type: 'integer', description: 'id заказа' },
+          paint_code: { type: 'string', description: 'код краски (цвета), которую красят' },
+          parts: { type: 'number', description: 'количество деталей; по умолчанию 1' }
+        },
+        required: ['order_id']
       }
     }
   },
@@ -273,6 +290,72 @@ function makeContext(env) {
       return { found: true, docs };
     },
 
+    apply_norms({ order_id, paint_code, parts }) {
+      const order = visibleOrder(Number(order_id));
+      if (!order) return { error: 'Заказ не найден или недоступен' };
+
+      const count = Number(parts) > 0 ? Number(parts) : 1;
+      const paint = String(paint_code || '').trim();
+
+      const mine = db.prepare('SELECT * FROM norm_items WHERE owner_id = ? ORDER BY sort, id').all(Number(user.id));
+      const common = db.prepare('SELECT * FROM norm_items WHERE owner_id IS NULL ORDER BY sort, id').all();
+      const set = mine.length ? mine : common;
+
+      const items = [];
+      const questions = [];
+
+      for (const norm of set) {
+        const factor = norm.per === 'order' ? 1 : count;
+
+        let code = norm.code;
+        let name = '';
+
+        if (norm.role === 'paint') {
+          if (!paint) {
+            questions.push('Какую краску списываем? Назовите код или название.');
+            continue;
+          }
+
+          const material = resolveMaterial(db, paint);
+          if (!material) {
+            questions.push(`Краска «${paint}» не найдена — уточните код`);
+            continue;
+          }
+
+          code = material.code;
+          name = material.name;
+        } else {
+          const material = db.prepare('SELECT name FROM materials WHERE code = ?').get(norm.code);
+          name = material ? material.name : norm.code;
+        }
+
+        const used = db.prepare('SELECT COALESCE(SUM(qty), 0) AS n FROM order_materials WHERE code = ?').get(code).n;
+        const material = db.prepare('SELECT stock, unit FROM materials WHERE code = ?').get(code);
+
+        items.push({
+          code,
+          name,
+          unit: norm.unit || (material && material.unit) || 'г',
+          qty: round2(Number(norm.qty) * factor),
+          kind: (norm.role === 'paint' || (material && material.unit === 'г')) ? 'paint' : 'material',
+          left_after: material
+            ? round2((Number(material.stock) || 0) - (Number(used) || 0) - round2(Number(norm.qty) * factor))
+            : null
+        });
+      }
+
+      return {
+        proposal: {
+          order_id: order.id,
+          number: order.number,
+          plate: order.plate,
+          parts: count,
+          items
+        },
+        questions
+      };
+    },
+
     propose_recipe({ name, base, mixes }) {
       const title = String(name || '').trim();
       if (!title) return { error: 'Не указано название цвета' };
@@ -417,7 +500,7 @@ async function handle(env, { message, history, orderId }) {
 
         result = fn ? fn(args) : { error: `Неизвестный инструмент ${call.function.name}` };
 
-        if ((call.function.name === 'propose_write_off' || call.function.name === 'propose_recipe')
+        if ((call.function.name === 'propose_write_off' || call.function.name === 'propose_recipe' || call.function.name === 'apply_norms')
             && result && result.proposal) {
           proposal = result.proposal;
         }

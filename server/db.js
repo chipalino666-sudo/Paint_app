@@ -156,6 +156,20 @@ CREATE TABLE IF NOT EXISTS material_docs (
 
 CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
 
+/* Нормы списания: на деталь и на машину. owner_id NULL — общая база. */
+CREATE TABLE IF NOT EXISTS norm_items (
+  id       INTEGER PRIMARY KEY,
+  owner_id INTEGER,
+  code     TEXT,
+  role     TEXT NOT NULL DEFAULT 'material',
+  qty      REAL NOT NULL,
+  unit     TEXT NOT NULL DEFAULT 'г',
+  per      TEXT NOT NULL DEFAULT 'part',
+  sort     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS norm_items_owner_idx ON norm_items(owner_id);
+
 CREATE TABLE IF NOT EXISTS norms (
   id      INTEGER PRIMARY KEY,
   work_id INTEGER NOT NULL REFERENCES works(id) ON DELETE CASCADE,
@@ -588,6 +602,33 @@ function init() {
     }
 
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('stock-from-report', '1')").run();
+  }
+
+  /* Нормы списания по умолчанию: на деталь и на машину (общая база для всех) */
+  const normSeed = db.prepare("SELECT value FROM settings WHERE key = 'norm-set-seeded'").get();
+
+  if (!normSeed) {
+    const commonCount = db.prepare('SELECT COUNT(*) AS n FROM norm_items WHERE owner_id IS NULL').get().n;
+
+    if (!commonCount) {
+      const insertNorm = db.prepare(`INSERT INTO norm_items (owner_id, code, role, qty, unit, per, sort)
+                                     VALUES (NULL, ?, ?, ?, ?, ?, ?)`);
+
+      const defaults = [
+        ['', 'paint', 300, 'г', 'part'],            // краска — выбирается в наряде
+        ['SE343475', 'material', 300, 'г', 'part'], // лак Normex 2K VHS-455
+        ['SE339776', 'material', 150, 'г', 'part'], // отвердитель Normex 2K 822
+        ['SE300301', 'material', 150, 'г', 'part'], // разбавитель Brulex
+        ['SE313518', 'material', 1, 'шт', 'order'], // салфетка липкая — на машину
+        ['SE018866', 'material', 1, 'шт', 'order']  // растворитель 650 — на машину
+      ];
+
+      defaults.forEach((row, index) => insertNorm.run(row[0], row[1], row[2], row[3], row[4], index));
+
+      console.log('нормы списания: загружены значения по умолчанию');
+    }
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('norm-set-seeded', '1')").run();
   }
 
   // Работы измеряются в деталях: капот — 1, большой капот — 1,5.

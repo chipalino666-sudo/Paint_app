@@ -1481,7 +1481,136 @@ route('POST', '/api/stock', async ({ user, body }) => {
   return { ok: true, code };
 });
 
-/* ---- Нормы расхода: сколько материала на одну деталь --------------------- */
+/* ---- Нормы списания: на деталь и на машину ------------------------------- */
+
+function normRows(ownerId) {
+  return db.prepare(`
+    SELECT n.id, n.owner_id, n.code, n.role, n.qty, n.unit, n.per, n.sort,
+           COALESCE(m.name, '') AS name
+      FROM norm_items n
+      LEFT JOIN materials m ON m.code = n.code
+     WHERE n.owner_id ${ownerId === null ? 'IS NULL' : '= ?'}
+     ORDER BY n.sort, n.id
+  `).all(...(ownerId === null ? [] : [ownerId]));
+}
+
+/** Свои нормы маляра или общая база — что применяется сейчас. */
+function effectiveNorms(user) {
+  const mine = normRows(Number(user.id));
+  if (mine.length) return { items: mine, personal: true };
+
+  return { items: normRows(null), personal: false };
+}
+
+route('GET', '/api/norm-set', async ({ user }) => {
+  const mine = normRows(Number(user.id));
+
+  return {
+    common: normRows(null),
+    mine,
+    personal: mine.length > 0,
+    can_edit_common: canManage(user)
+  };
+});
+
+/** Сохраняем набор норм: свой личный или общий. */
+route('PUT', '/api/norm-set', async ({ user, body }) => {
+  const scope = body.scope === 'common' ? 'common' : 'mine';
+
+  if (scope === 'common' && !canManage(user)) {
+    throw new ApiError(403, 'Общую базу меняет приёмщик или админ');
+  }
+
+  const ownerId = scope === 'common' ? null : Number(user.id);
+  const items = Array.isArray(body.items) ? body.items : [];
+
+  db.exec('BEGIN');
+
+  try {
+    if (ownerId === null) db.prepare('DELETE FROM norm_items WHERE owner_id IS NULL').run();
+    else db.prepare('DELETE FROM norm_items WHERE owner_id = ?').run(ownerId);
+
+    const insert = db.prepare(`INSERT INTO norm_items (owner_id, code, role, qty, unit, per, sort)
+                               VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+    items.forEach((item, index) => {
+      const role = item.role === 'paint' ? 'paint' : 'material';
+      const code = role === 'paint' ? '' : str(item.code, 40);
+      const qty = round2(toNum(item.qty, 0));
+
+      if (!(qty > 0)) return;
+      if (role !== 'paint' && !code) return;
+
+      insert.run(ownerId, code, role, qty, str(item.unit, 10) || 'г',
+        item.per === 'order' ? 'order' : 'part', index);
+    });
+
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+  audit(user.id, 'update', 'norms', scope, { text: `Нормы списания (${scope}), позиций: ${items.length}` });
+
+  return { ok: true };
+});
+
+/** Вернуться к общей базе: удалить личные нормы. */
+route('DELETE', '/api/norm-set', async ({ user }) => {
+  db.prepare('DELETE FROM norm_items WHERE owner_id = ?').run(Number(user.id));
+  return { ok: true };
+});
+
+/** Быстрый набор: что уйдёт на N деталей и на машину целиком. */
+route('GET', '/api/norms/quick', async ({ user, url }) => {
+  const parts = Math.max(0.01, toNum(url.searchParams.get('parts'), 1));
+  const paintCode = str(url.searchParams.get('paint'), 40).toUpperCase();
+
+  const { items, personal } = effectiveNorms(user);
+  const rows = [];
+
+  for (const norm of items) {
+    const factor = norm.per === 'order' ? 1 : parts;
+    const qty = round2(Number(norm.qty) * factor);
+
+    // Строка «краска» — подставляем выбранную в наряде краску
+    let code = norm.code;
+    let name = norm.name;
+
+    if (norm.role === 'paint') {
+      if (!paintCode) continue;
+
+      const material = db.prepare('SELECT code, name FROM materials WHERE upper(code) = ?').get(paintCode);
+      if (!material) continue;
+
+      code = material.code;
+      name = material.name;
+    }
+
+    const stock = db.prepare(`
+      SELECT m.stock, m.unit,
+             COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+        FROM materials m WHERE m.code = ?
+    `).get(code);
+
+    rows.push({
+      code,
+      name,
+      unit: norm.unit || (stock && stock.unit) || 'г',
+      qty,
+      per: norm.per,
+      role: norm.role,
+      left_after: stock
+        ? round2((Number(stock.stock) || 0) - (Number(stock.used) || 0) - qty)
+        : null
+    });
+  }
+
+  return { parts, personal, items: rows };
+});
+
+/* ---- Нормы по работам (старая модель, оставлено для совместимости) ------- */
 
 route('GET', '/api/norms', async ({ url }) => {
   const workId = Number(url.searchParams.get('work_id')) || 0;
@@ -1530,41 +1659,6 @@ route('PUT', '/api/norms', async ({ user, body }) => {
   audit(user.id, 'update', 'norms', workId, { text: `Нормы расхода, позиций: ${items.length}` });
 
   return { ok: true };
-});
-
-/** Быстрый набор: сколько материалов нужно на N деталей этой работы. */
-route('GET', '/api/norms/quick', async ({ url }) => {
-  const workId = Number(url.searchParams.get('work_id')) || 0;
-  const parts = Math.max(0.01, toNum(url.searchParams.get('parts'), 1));
-
-  if (!workId) throw new ApiError(400, 'Не указана работа');
-
-  const work = db.prepare('SELECT id, name FROM works WHERE id = ?').get(workId);
-  if (!work) throw new ApiError(404, 'Работа не найдена');
-
-  const rows = db.prepare(`
-    SELECT n.code, n.qty, n.unit, m.name, m.stock, m.unit AS mat_unit,
-           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = n.code), 0) AS used
-      FROM norms n
-      JOIN materials m ON m.code = n.code
-     WHERE n.work_id = ?
-     ORDER BY m.name
-  `).all(workId);
-
-  const items = rows.map((row) => {
-    const qty = round2(Number(row.qty) * parts);
-    const left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
-
-    return {
-      code: row.code,
-      name: row.name,
-      unit: row.unit || row.mat_unit || 'г',
-      qty,
-      left_after: round2(left - qty)
-    };
-  });
-
-  return { work: { id: work.id, name: work.name }, parts, items };
 });
 
 /* ---- Техническая документация (ТДС) -------------------------------------- */
