@@ -1723,8 +1723,10 @@
     const stockClass = Number.isFinite(left) && left <= 0 ? 'stock-badge empty' : 'stock-badge';
 
     row.innerHTML = `
-      <span class="code">${esc(item.code)}</span>
-      <span class="name">${esc(item.name)}${item.aliases ? `<br><span class="muted">${esc(item.aliases)}</span>` : ''}${stockText ? `<br><span class="${stockClass}">${esc(stockText)}</span>` : ''}</span>
+      <div class="item-text">
+        <span class="code">${esc(item.code)}</span>
+        <span class="name">${esc(item.name)}${item.aliases ? `<br><span class="muted">${esc(item.aliases)}</span>` : ''}${stockText ? `<br><span class="${stockClass}">${esc(stockText)}</span>` : ''}</span>
+      </div>
       <button class="fav-star${favorites.has(item.code) ? ' active' : ''}" title="В избранное">${favorites.has(item.code) ? '★' : '☆'}</button>
       <button class="btn btn-left btn-sm" data-kind="paint">◀ Эмаль</button>
       <button class="btn btn-right btn-sm" data-kind="material">Материал ▶</button>
@@ -3140,26 +3142,8 @@
         : full;
     }
 
-    const nav = $('#nav');
-    const userbox = $('.userbox');
-    const install = $('#navInstall');
-    const password = $('#btnPassword');
-    const sound = $('#btnSound');
-    const logout = $('#btnLogout');
-
-    if (!nav || !userbox || !install || !password || !logout) return;
-
-    if (mobile) {
-      if (install.parentElement !== nav) {
-        nav.appendChild(install);
-        nav.appendChild(password);
-        if (sound) nav.appendChild(sound);
-      }
-    } else if (install.parentElement === nav) {
-      userbox.insertBefore(install, logout);
-      userbox.insertBefore(password, logout);
-      if (sound) userbox.insertBefore(sound, install);
-    }
+    // Кнопки «Установить», «Пароль» и «Выйти» теперь живут в меню пользователя,
+    // переставлять их между шапкой и меню больше не нужно
   }
 
   function applyRole() {
@@ -3194,6 +3178,62 @@
     $$('.nav-btn').forEach((button) => {
       button.addEventListener('click', () => showView(button.dataset.view));
     });
+
+    /* Меню в шапке: «Ещё» и меню пользователя */
+    const moreButton = $('#btnMore');
+    const moreMenu = $('#moreMenu');
+    const userButton = $('#btnUser');
+    const userDropdown = $('#userDropdown');
+
+    const closeMenus = () => {
+      if (moreMenu) moreMenu.classList.add('hidden');
+      if (userDropdown) userDropdown.classList.add('hidden');
+    };
+
+    const toggleMenu = (menu) => {
+      if (!menu) return;
+
+      const willOpen = menu.classList.contains('hidden');
+      closeMenus();
+      if (willOpen) menu.classList.remove('hidden');
+    };
+
+    if (moreButton) {
+      moreButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleMenu(moreMenu);
+      });
+    }
+
+    if (userButton) {
+      userButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleMenu(userDropdown);
+      });
+    }
+
+    // Пункты меню закрывают его после выбора
+    if (moreMenu) {
+      moreMenu.addEventListener('click', (event) => {
+        if (event.target.closest('.menu-item')) moreMenu.classList.add('hidden');
+      });
+    }
+
+    if (userDropdown) {
+      userDropdown.addEventListener('click', (event) => {
+        if (event.target.closest('.menu-item')) userDropdown.classList.add('hidden');
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('.nav-more') || event.target.closest('.user-menu')) return;
+      closeMenus();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeMenus();
+    });
+
 
     $('#btnLogout').addEventListener('click', async () => {
       try { await api('/api/logout', { method: 'POST' }); } catch (error) { /* всё равно уходим */ }
