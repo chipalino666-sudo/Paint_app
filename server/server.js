@@ -1758,13 +1758,18 @@ route('GET', '/api/tds/file/:name', async ({ params, res }) => {
     : ext === '.webp' ? 'image/webp'
     : 'image/jpeg';
 
+  const data = fs.readFileSync(file);
+
   res.writeHead(200, {
     'Content-Type': type,
+    'Content-Length': data.length,
     'Content-Disposition': `inline; filename="${name}"`,
     'Cache-Control': 'private, max-age=604800'
   });
+  res.end(data);
 
-  fs.createReadStream(file).pipe(res);
+  // Важно: иначе обработчик допишет JSON поверх файла и PDF сломается
+  return { __raw: true };
 });
 
 route('DELETE', '/api/tds/:id', async ({ user, params }) => {
