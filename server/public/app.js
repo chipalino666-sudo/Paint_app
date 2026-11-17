@@ -3097,7 +3097,7 @@ function renderWarehouse() {
     $('#incomingNote').value = '';
     if ($('#incomingMessage')) $('#incomingMessage').textContent = '';
 
-    modal.classList.remove('hidden');
+    modal.classList.add('open');
     $('#incomingQty').focus();
   }
 
@@ -3119,7 +3119,7 @@ function renderWarehouse() {
     try {
       await api('/api/stock/incoming', { method: 'POST', body: { code: incomingCode, qty, price, note } });
 
-      $('#stockIncomingModal').classList.add('hidden');
+      $('#stockIncomingModal').classList.remove('open');
       toast('Приход записан: +' + qty);
       incomingCode = null;
 
@@ -3146,7 +3146,7 @@ function renderWarehouse() {
     const item = state.stock.find((row) => row.code === code);
     $('#stockHistoryTitle').textContent = 'История: ' + (item ? item.name : code);
     $('#stockHistoryList').innerHTML = '<div class="spinner">Загрузка…</div>';
-    modal.classList.remove('hidden');
+    modal.classList.add('open');
 
     try {
       const data = await api('/api/stock/moves?code=' + encodeURIComponent(code));
@@ -4547,9 +4547,9 @@ function renderWarehouse() {
     }
 
     if ($('#btnSaveIncoming')) $('#btnSaveIncoming').addEventListener('click', saveIncoming);
-    if ($('#btnCancelIncoming')) $('#btnCancelIncoming').addEventListener('click', () => $('#stockIncomingModal').classList.add('hidden'));
-    if ($('#btnCloseIncoming')) $('#btnCloseIncoming').addEventListener('click', () => $('#stockIncomingModal').classList.add('hidden'));
-    if ($('#btnCloseHistory')) $('#btnCloseHistory').addEventListener('click', () => $('#stockHistoryModal').classList.add('hidden'));
+    if ($('#btnCancelIncoming')) $('#btnCancelIncoming').addEventListener('click', () => $('#stockIncomingModal').classList.remove('open'));
+    if ($('#btnCloseIncoming')) $('#btnCloseIncoming').addEventListener('click', () => $('#stockIncomingModal').classList.remove('open'));
+    if ($('#btnCloseHistory')) $('#btnCloseHistory').addEventListener('click', () => $('#stockHistoryModal').classList.remove('open'));
 
     if ($('#incomingQty')) {
       $('#incomingQty').addEventListener('keydown', (event) => {
