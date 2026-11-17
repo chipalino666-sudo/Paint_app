@@ -2397,3 +2397,63 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   50% { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
 }
 .ai-prop-total { font-weight: 700; border-bottom: none; }
+/* ---------- Быстрый набор по деталям -------------------------------------- */
+
+.quick-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.quick-head {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 8px;
+}
+
+.quick-row {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.quick-row input {
+  flex: 0 0 72px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: right;
+}
+
+.quick-list { margin-top: 10px; }
+
+.quick-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.quick-line:last-child { border-bottom: none; }

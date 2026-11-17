@@ -1641,6 +1641,16 @@
           </details>
 
           <div class="chips-row" id="matChips"></div>
+
+          <div class="quick-box" id="quickBox">
+            <div class="quick-head">Быстрый набор по деталям</div>
+            <div class="quick-row">
+              <select id="quickWork"></select>
+              <input type="number" id="quickParts" value="1" min="0.1" step="0.05" title="Сколько деталей">
+              <button class="btn btn-outline btn-sm" id="btnQuick">Подобрать</button>
+            </div>
+            <div id="quickResult"></div>
+          </div>
         </div>
 
         <div class="material-hint" id="matHint">
@@ -1684,6 +1694,10 @@
     let mode = 'materials';
 
     renderMaterialChips();
+    quickFillWorks();
+
+    if ($('#btnQuick')) $('#btnQuick').addEventListener('click', quickPreview);
+    if ($('#quickWork')) $('#quickWork').addEventListener('change', () => { if ($('#quickResult').innerHTML) quickPreview(); });
 
     const clearToggle = $('#matClearToggle');
 
@@ -1828,6 +1842,204 @@
 
     $('#manualCode').value = '';
     $('#manualName').value = '';
+  }
+
+  /* ---- Быстрый набор материалов по количеству деталей --------------------- */
+
+  function quickFillWorks() {
+    const select = $('#quickWork');
+    if (!select) return;
+
+    const current = select.value;
+
+    select.innerHTML = state.works
+      .map((work) => `<option value="${work.id}">${esc(work.name)}</option>`)
+      .join('');
+
+    if (current) select.value = current;
+  }
+
+  async function quickPreview() {
+    const select = $('#quickWork');
+    const partsInput = $('#quickParts');
+    const result = $('#quickResult');
+
+    if (!select || !result || !state.order) return;
+
+    const parts = Number(partsInput.value) || 1;
+
+    result.innerHTML = '<div class="muted" style="padding:8px 0">Считаю…</div>';
+
+    try {
+      const data = await api(`/api/norms/quick?work_id=${select.value}&parts=${encodeURIComponent(parts)}`);
+
+      if (!data.items.length) {
+        result.innerHTML = '<div class="muted" style="padding:8px 0">Для этой работы нормы не заданы. Их задаёт приёмщик в «Справочниках».</div>';
+        return;
+      }
+
+      result.innerHTML = `
+        <div class="quick-list">
+          ${data.items.map((item) => `
+            <div class="quick-line">
+              <span>${esc(item.name)}</span>
+              <span class="mono">${qty(item.qty)} ${esc(item.unit)}</span>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnQuickAdd" style="width:100%;margin-top:8px">
+          Добавить в списание (${data.items.length})
+        </button>
+      `;
+
+      $('#btnQuickAdd').addEventListener('click', async () => {
+        const button = $('#btnQuickAdd');
+        button.disabled = true;
+        button.textContent = 'Добавляю…';
+
+        try {
+          for (const item of data.items) {
+            await api(`/api/orders/${state.order.id}/materials`, {
+              method: 'POST',
+              body: {
+                code: item.code,
+                name: item.name,
+                unit: item.unit,
+                qty: item.qty,
+                kind: item.unit === 'г' ? 'paint' : 'material'
+              }
+            });
+          }
+
+          const fresh = await api('/api/orders/' + state.order.id);
+          state.order = fresh.order;
+          renderOrder();
+
+          toast(`Добавлено: ${data.work.name}, ${qty(parts)} дет.`);
+        } catch (error) {
+          toast(error.message);
+          button.disabled = false;
+          button.textContent = 'Добавить в списание';
+        }
+      });
+    } catch (error) {
+      result.innerHTML = `<div class="muted" style="padding:8px 0">${esc(error.message)}</div>`;
+    }
+  }
+
+  /* ---- Нормы расхода: редактор для приёмщика ------------------------------ */
+
+  let normsWork = null;
+  let normsDraft = [];
+
+  async function openNorms(work) {
+    normsWork = work;
+    normsDraft = [];
+
+    const modal = $('#normsModal');
+    if (!modal) return;
+
+    $('#normsTitle').textContent = 'Нормы: ' + work.name;
+    modal.classList.remove('hidden');
+
+    try {
+      const data = await api('/api/norms?work_id=' + work.id);
+      normsDraft = (data.norms || []).map((row) => ({
+        code: row.code,
+        name: row.name || row.code,
+        qty: row.qty,
+        unit: row.unit || 'г'
+      }));
+    } catch (error) {
+      normsDraft = [];
+    }
+
+    renderNormsDraft();
+  }
+
+  function renderNormsDraft() {
+    const host = $('#normsList');
+    if (!host) return;
+
+    if (!normsDraft.length) {
+      host.innerHTML = '<div class="muted" style="padding:8px 0">Пока пусто — добавьте материалы, которые уходят на деталь</div>';
+      return;
+    }
+
+    host.innerHTML = normsDraft.map((item, index) => `
+      <div class="quick-line">
+        <span>${esc(item.name)}</span>
+        <span class="mono">${qty(item.qty)} ${esc(item.unit)}</span>
+        <button class="row-del" data-norm-remove="${index}" title="Убрать">×</button>
+      </div>`).join('');
+
+    host.querySelectorAll('[data-norm-remove]').forEach((button) => {
+      button.addEventListener('click', () => {
+        normsDraft.splice(Number(button.dataset.normRemove), 1);
+        renderNormsDraft();
+      });
+    });
+  }
+
+  async function pickNormMaterial(term) {
+    const wrap = $('#normsResults');
+    if (!wrap) return;
+
+    if (!term) {
+      wrap.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const data = await api('/api/materials?q=' + encodeURIComponent(term));
+
+      wrap.innerHTML = data.materials.slice(0, 8).map((item) => `
+        <div class="row" data-norm-pick="${esc(item.code)}">
+          <span class="code">${esc(item.code)}</span>
+          <span class="name">${esc(item.name)}</span>
+        </div>
+      `).join('') || '<div class="row" style="cursor:default">Ничего не найдено</div>';
+
+      wrap.classList.remove('hidden');
+
+      wrap.querySelectorAll('[data-norm-pick]').forEach((row) => {
+        row.addEventListener('click', () => {
+          const item = data.materials.find((m) => m.code === row.dataset.normPick);
+          const amount = Number($('#normsQty').value) || 100;
+
+          normsDraft = normsDraft.filter((n) => n.code !== item.code);
+          normsDraft.push({
+            code: item.code,
+            name: item.name,
+            qty: amount,
+            unit: /\bг\b/.test(item.unit) || item.category === 'paint' ? 'г' : (item.unit || 'г')
+          });
+
+          renderNormsDraft();
+
+          $('#normsSearch').value = '';
+          $('#normsQty').value = '100';
+          wrap.classList.add('hidden');
+        });
+      });
+    } catch (error) {
+      wrap.classList.add('hidden');
+    }
+  }
+
+  async function saveNorms() {
+    if (!normsWork) return;
+
+    try {
+      await api('/api/norms', {
+        method: 'PUT',
+        body: { work_id: normsWork.id, items: normsDraft }
+      });
+
+      $('#normsModal').classList.add('hidden');
+      toast('Нормы сохранены');
+    } catch (error) {
+      toast(error.message);
+    }
   }
 
   async function searchMaterials(term) {
@@ -2783,7 +2995,7 @@
 
     host.innerHTML = `
       <table class="grid">
-        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th></tr></thead>
+        <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th><th>Нормы</th></tr></thead>
         <tbody>
           ${state.works.map((work) => `
             <tr>
@@ -2802,6 +3014,11 @@
                   ? `<input type="number" value="${work.price}" min="0" step="0.01" data-work-price="${work.id}"
                             style="width:120px;padding:6px;border:1px solid var(--border);border-radius:5px;text-align:right">`
                   : `<span class="mono">${money(work.price)}</span>`}
+              </td>
+              <td data-label="Нормы">
+                ${isManager()
+                  ? `<button class="btn btn-outline btn-sm" data-work-norms="${work.id}">Нормы</button>`
+                  : '<span class="muted">—</span>'}
               </td>
             </tr>`).join('')}
         </tbody>
@@ -3876,6 +4093,31 @@
     }
 
     if ($('#btnAddStock')) $('#btnAddStock').addEventListener('click', addStockItem);
+
+    /* Нормы расхода: кнопка в таблице работ и модальное окно */
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-work-norms]');
+      if (!button) return;
+
+      const work = state.works.find((w) => String(w.id) === button.dataset.workNorms);
+      if (work) openNorms(work);
+    });
+
+    if ($('#btnCloseNorms')) $('#btnCloseNorms').addEventListener('click', () => $('#normsModal').classList.add('hidden'));
+    if ($('#btnNormsCancel')) $('#btnNormsCancel').addEventListener('click', () => $('#normsModal').classList.add('hidden'));
+    if ($('#btnNormsSave')) $('#btnNormsSave').addEventListener('click', saveNorms);
+
+    const normsSearch = $('#normsSearch');
+
+    if (normsSearch) {
+      let normsTimer = null;
+
+      normsSearch.addEventListener('input', () => {
+        clearTimeout(normsTimer);
+        const value = normsSearch.value.trim();
+        normsTimer = setTimeout(() => pickNormMaterial(value), 220);
+      });
+    }
 
     /* ТДС: поиск по документам, выбор материала и добавление ссылки */
     const tdsSearch = $('#tdsSearch');

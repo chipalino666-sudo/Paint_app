@@ -1481,6 +1481,92 @@ route('POST', '/api/stock', async ({ user, body }) => {
   return { ok: true, code };
 });
 
+/* ---- Нормы расхода: сколько материала на одну деталь --------------------- */
+
+route('GET', '/api/norms', async ({ url }) => {
+  const workId = Number(url.searchParams.get('work_id')) || 0;
+  if (!workId) throw new ApiError(400, 'Не указана работа');
+
+  const norms = db.prepare(`
+    SELECT n.code, n.qty, n.unit, m.name
+      FROM norms n
+      LEFT JOIN materials m ON m.code = n.code
+     WHERE n.work_id = ?
+     ORDER BY m.name
+  `).all(workId);
+
+  return { norms };
+});
+
+/** Нормы задаёт приёмщик или админ: список заменяется целиком. */
+route('PUT', '/api/norms', async ({ user, body }) => {
+  if (!canManage(user)) throw new ApiError(403, 'Нормы задаёт приёмщик или админ');
+
+  const workId = Number(body.work_id) || 0;
+  if (!workId) throw new ApiError(400, 'Не указана работа');
+
+  const items = Array.isArray(body.items) ? body.items : [];
+
+  db.exec('BEGIN');
+
+  try {
+    db.prepare('DELETE FROM norms WHERE work_id = ?').run(workId);
+
+    for (const item of items) {
+      const code = str(item.code, 40);
+      const qty = round2(toNum(item.qty, 0));
+      if (!code || !(qty > 0)) continue;
+
+      db.prepare('INSERT INTO norms (work_id, code, qty, unit) VALUES (?, ?, ?, ?)')
+        .run(workId, code, qty, str(item.unit, 10) || 'г');
+    }
+
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+  audit(user.id, 'update', 'norms', workId, { text: `Нормы расхода, позиций: ${items.length}` });
+
+  return { ok: true };
+});
+
+/** Быстрый набор: сколько материалов нужно на N деталей этой работы. */
+route('GET', '/api/norms/quick', async ({ url }) => {
+  const workId = Number(url.searchParams.get('work_id')) || 0;
+  const parts = Math.max(0.01, toNum(url.searchParams.get('parts'), 1));
+
+  if (!workId) throw new ApiError(400, 'Не указана работа');
+
+  const work = db.prepare('SELECT id, name FROM works WHERE id = ?').get(workId);
+  if (!work) throw new ApiError(404, 'Работа не найдена');
+
+  const rows = db.prepare(`
+    SELECT n.code, n.qty, n.unit, m.name, m.stock, m.unit AS mat_unit,
+           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = n.code), 0) AS used
+      FROM norms n
+      JOIN materials m ON m.code = n.code
+     WHERE n.work_id = ?
+     ORDER BY m.name
+  `).all(workId);
+
+  const items = rows.map((row) => {
+    const qty = round2(Number(row.qty) * parts);
+    const left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
+
+    return {
+      code: row.code,
+      name: row.name,
+      unit: row.unit || row.mat_unit || 'г',
+      qty,
+      left_after: round2(left - qty)
+    };
+  });
+
+  return { work: { id: work.id, name: work.name }, parts, items };
+});
+
 /* ---- Техническая документация (ТДС) -------------------------------------- */
 
 /** Все документы одним списком: их немного, отдаём целиком. */

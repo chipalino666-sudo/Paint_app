@@ -842,6 +842,36 @@
 </datalist>
 
 <script src="/app.js"></script>
+  <!-- ======================= НОРМЫ РАСХОДА ======================= -->
+  <div class="modal hidden" id="normsModal">
+    <div class="modal-box" style="max-width:560px">
+      <div class="modal-head">
+        <h3 id="normsTitle">Нормы расхода</h3>
+        <button class="modal-close" id="btnCloseNorms">×</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="muted" style="margin:0 0 12px;font-size:13px">
+          Сколько материала уходит на <b>одну деталь</b> для этой работы.
+        </p>
+
+        <div class="quick-row">
+          <input type="text" id="normsSearch" placeholder="Материал: код или название" autocomplete="off">
+          <input type="number" id="normsQty" value="100" min="0.1" step="0.1" title="Граммы на деталь">
+          <button class="btn btn-outline btn-sm" id="btnNormsAdd">Добавить</button>
+        </div>
+
+        <div class="search-results hidden" id="normsResults"></div>
+
+        <div id="normsList" style="margin-top:10px"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="btnNormsCancel">Отмена</button>
+        <button class="btn btn-primary" id="btnNormsSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
   <!-- ======================= ИИ-ПОМОЩНИК ======================= -->
   <button class="ai-fab" id="aiFab" title="Спросить ИИ-помощника">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
