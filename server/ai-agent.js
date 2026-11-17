@@ -100,6 +100,17 @@ const TOOLS = [
   }
 ];
 
+/** SQLite не понимает регистр в кириллице — нормализуем на стороне JS. */
+function normalize(...parts) {
+  return parts
+    .filter((part) => part !== null && part !== undefined && part !== '')
+    .join(' ')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normQty(db, orderId, code) {
   const row = db.prepare(`
     SELECT COALESCE(SUM(n.qty * ow.qty), 0) AS q
@@ -130,14 +141,16 @@ function makeContext(env) {
           FROM orders o
           JOIN cars c ON c.id = o.car_id
           LEFT JOIN users u ON u.id = o.master_id
-         WHERE lower(o.number) LIKE ? OR lower(c.plate) LIKE ? OR lower(c.make) LIKE ?
-            OR lower(c.model) LIKE ? OR lower(COALESCE(u.full_name, '')) LIKE ?
          ORDER BY o.id DESC
-         LIMIT 8
-      `).all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+         LIMIT 300
+      `).all();
+
+      const needle = normalize(q);
 
       const orders = rows
+        .filter((row) => normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle))
         .filter((row) => visibleOrder(row.id))
+        .slice(0, 8)
         .map((row) => ({
           id: row.id,
           number: row.number,
@@ -173,14 +186,14 @@ function makeContext(env) {
       const q = String(query || '').trim();
       if (!q) return { materials: [] };
 
-      const like = `%${q.toLowerCase()}%`;
+      const needle = normalize(q);
+      const like = `%${needle}%`;
 
       const rows = db.prepare(`
         SELECT code, name, unit, category, price, stock,
                COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
           FROM materials
-         WHERE active = 1 AND (lower(code) LIKE ? OR lower(name) LIKE ?
-               OR EXISTS (SELECT 1 FROM json_each('[]') WHERE 0))
+         WHERE active = 1 AND (search LIKE ? OR lower(code) LIKE ?)
          ORDER BY name
          LIMIT 8
       `).all(like, like);
