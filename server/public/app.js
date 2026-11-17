@@ -4071,6 +4071,7 @@
     if (!panel) return;
 
     panel.classList.remove('hidden');
+    initVoice();
     $('#aiInput').focus();
 
     try {
@@ -4154,6 +4155,93 @@
         aiBubble('bot', 'Не получилось: ' + error.message);
         button.disabled = false;
         button.textContent = 'Списать';
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Голосовой ввод: распознавание речи прямо в браузере
+     ------------------------------------------------------------------------ */
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  let voice = null;
+  let voiceText = '';
+
+  function voiceSupported() {
+    return Boolean(SpeechRecognition);
+  }
+
+  function voiceButtonMark(active) {
+    const button = $('#aiMic');
+    if (!button) return;
+
+    button.classList.toggle('ai-mic-on', Boolean(active));
+    button.title = active ? 'Остановить' : 'Говорить';
+  }
+
+  function initVoice() {
+    const button = $('#aiMic');
+    if (!button) return;
+
+    if (!voiceSupported()) {
+      button.classList.add('hidden');
+      return;
+    }
+
+    button.classList.remove('hidden');
+
+    if (voice) return;
+
+    voice = new SpeechRecognition();
+    voice.lang = 'ru-RU';
+    voice.interimResults = true;
+    voice.continuous = false;
+    voice.maxAlternatives = 1;
+
+    voice.addEventListener('start', () => voiceButtonMark(true));
+
+    voice.addEventListener('result', (event) => {
+      let text = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        text += event.results[i][0].transcript;
+      }
+
+      voiceText = text.trim();
+
+      const input = $('#aiInput');
+      if (input) input.value = voiceText;
+    });
+
+    voice.addEventListener('end', () => {
+      voiceButtonMark(false);
+
+      // Распознали — сразу отправляем, как в голосовом помощнике
+      if (voiceText) {
+        const text = voiceText;
+        voiceText = '';
+        if ($('#aiInput')) $('#aiInput').value = '';
+        aiSend(text);
+      }
+    });
+
+    voice.addEventListener('error', (event) => {
+      voiceButtonMark(false);
+
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        aiBubble('bot', 'Браузер не дал доступ к микрофону. Разрешите его в настройках сайта.');
+      } else if (event.error === 'no-speech') {
+        aiBubble('bot', 'Ничего не услышал, попробуйте ещё раз.');
+      }
+    });
+
+    button.addEventListener('click', () => {
+      try {
+        if (voiceButtonMark && $('#aiMic').classList.contains('ai-mic-on')) voice.stop();
+        else { voiceText = ''; voice.start(); }
+      } catch (error) {
+        voiceButtonMark(false);
       }
     });
   }
