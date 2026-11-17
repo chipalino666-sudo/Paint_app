@@ -1967,6 +1967,7 @@
 
     panel.innerHTML = found.map((row) => `
       <div class="row" data-quick-recipe="${esc(row.name)}">
+        ${row.photo ? `<img class="quick-thumb" src="${esc(row.photo)}" alt="" loading="lazy">` : '<span class="quick-thumb quick-thumb-empty"></span>'}
         <span class="name">${esc(row.name)}</span>
         <span class="muted mono">${qty(row.base)} г</span>
       </div>
@@ -3519,7 +3520,7 @@ function renderWarehouse() {
         <tbody>
           ${recipes.map((recipe) => `
             <tr>
-              <td><b>${esc(recipe.name)}</b><br><span class="muted">на ${qty(recipe.base)} ${esc(recipe.unit)}</span></td>
+              <td><div class="recipe-name-cell">${recipe.photo ? `<img class="recipe-thumb" src="${esc(recipe.photo)}" alt="" loading="lazy">` : ''}<div><b>${esc(recipe.name)}</b><br><span class="muted">на ${qty(recipe.base)} ${esc(recipe.unit)}</span></div></div></td>
               <td class="muted">${esc(recipe.mixes.map((m) => `${m.name} — ${qty(m.amount)}`).join(' · '))}</td>
               <td class="num"><button class="btn btn-outline btn-sm" data-recipe="${esc(recipe.id)}">Изменить</button></td>
             </tr>`).join('')}
@@ -3600,6 +3601,7 @@ function renderWarehouse() {
     $('#btnDeleteRecipe').classList.toggle('hidden', !recipe);
 
     renderMixRows();
+    renderRecipePhoto(recipe ? recipe.photo : null);
     updateMixSum();
 
     $('#recipeModal').classList.add('open');
@@ -3714,6 +3716,101 @@ function renderWarehouse() {
       });
 
       list.classList.add('open');
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  /** Сжимаем фото до миниатюры 200x150: весит единицы килобайт. */
+  function cropRecipePhoto(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const image = new Image();
+
+        image.onload = () => {
+          const targetW = 200;
+          const targetH = 150;
+
+          // Берём центральную часть снимка — пропорции не важны
+          const scale = Math.max(targetW / image.width, targetH / image.height);
+          const drawW = targetW / scale;
+          const drawH = targetH / scale;
+          const sx = (image.width - drawW) / 2;
+          const sy = (image.height - drawH) / 2;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(image, sx, sy, drawW, drawH, 0, 0, targetW, targetH);
+
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+
+        image.onerror = () => reject(new Error('Не удалось прочитать фото'));
+        image.src = reader.result;
+      };
+
+      reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** Миниатюра в редакторе краски. */
+  function renderRecipePhoto(url) {
+    const preview = $('#recipePhotoPreview');
+    const del = $('#btnRecipePhotoDel');
+    if (!preview) return;
+
+    if (url) {
+      preview.innerHTML = `<img src="${esc(url)}" alt="Фото краски" loading="lazy">`;
+      if (del) del.classList.remove('hidden');
+    } else {
+      preview.innerHTML = '<span class="muted">нет фото</span>';
+      if (del) del.classList.add('hidden');
+    }
+  }
+
+  async function uploadRecipePhoto(file) {
+    if (!state.editingRecipe) return;
+
+    try {
+      const dataUrl = await cropRecipePhoto(file);
+
+      await api('/api/recipes/' + state.editingRecipe.id + '/photo', {
+        method: 'POST',
+        body: { file: dataUrl }
+      });
+
+      await loadRecipes();
+
+      const fresh = state.recipes.find((row) => row.id === state.editingRecipe.id);
+      state.editingRecipe = fresh || state.editingRecipe;
+
+      renderRecipePhoto(fresh ? fresh.photo : null);
+      renderRecipesRef();
+      toast('Фото сохранено');
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  async function removeRecipePhoto() {
+    if (!state.editingRecipe) return;
+
+    try {
+      await api('/api/recipes/' + state.editingRecipe.id + '/photo', { method: 'DELETE' });
+      await loadRecipes();
+
+      const fresh = state.recipes.find((row) => row.id === state.editingRecipe.id);
+      state.editingRecipe = fresh || state.editingRecipe;
+
+      renderRecipePhoto(null);
+      renderRecipesRef();
+      toast('Фото убрано');
     } catch (error) {
       toast(error.message);
     }
@@ -4488,6 +4585,23 @@ function renderWarehouse() {
     $('#btnLock').addEventListener('click', lockWorkstation);
 
     $('#btnPassword').addEventListener('click', openPasswordModal);
+
+    /* Фото готовой краски */
+    if ($('#btnRecipePhoto')) {
+      $('#btnRecipePhoto').addEventListener('click', () => $('#recipePhotoInput').click());
+    }
+
+    if ($('#recipePhotoInput')) {
+      $('#recipePhotoInput').addEventListener('change', async (event) => {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (file) await uploadRecipePhoto(file);
+      });
+    }
+
+    if ($('#btnRecipePhotoDel')) {
+      $('#btnRecipePhotoDel').addEventListener('click', removeRecipePhoto);
+    }
     $('#btnClosePassword').addEventListener('click', closePasswordModal);
     $('#btnCancelPassword').addEventListener('click', closePasswordModal);
     $('#btnSavePassword').addEventListener('click', savePassword);

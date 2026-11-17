@@ -297,6 +297,7 @@ addColumn('materials', 'paint_code', 'TEXT');
 addColumn('materials', 'aliases', 'TEXT');
 addColumn('materials', 'stock', 'REAL');
 addColumn('materials', 'min_stock', 'REAL DEFAULT 0');
+addColumn('recipes', 'photo', 'TEXT');
 addColumn('orders', 'inspection', 'TEXT');
 addColumn('code_pairs', 'brand_a', "TEXT DEFAULT 'Brulex'");
 addColumn('code_pairs', 'brand_b', "TEXT DEFAULT 'Standox'");

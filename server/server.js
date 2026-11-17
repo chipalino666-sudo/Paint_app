@@ -2008,7 +2008,11 @@ route('POST', '/api/ai/chat', async ({ user, body }) => {
 
 /* ---- Готовые краски ----------------------------------------------------- */
 
-const recipeOut = (row) => ({ ...row, mixes: JSON.parse(row.mixes || '[]') });
+const recipeOut = (row) => ({
+  ...row,
+  mixes: JSON.parse(row.mixes || '[]'),
+  photo: row.photo ? '/api/recipes/photo/' + row.photo : null
+});
 
 route('GET', '/api/recipes', async () => {
   const recipes = db.prepare('SELECT * FROM recipes ORDER BY name').all().map(recipeOut);
@@ -2043,6 +2047,80 @@ route('POST', '/api/recipes', async ({ user, body }) => {
 
   audit(user.id, 'create', 'recipe', id, { name: data.name });
   return { id };
+});
+
+/** Фото готовой краски: маленькая миниатюра 200x150. */
+route('POST', '/api/recipes/:id/photo', async ({ user, params, body }) => {
+  if (!isStaff(user) && user.role !== 'master') throw new ApiError(403, 'Фото может добавить мастер или кладовщик');
+
+  const recipe = db.prepare('SELECT id, name, photo FROM recipes WHERE id = ?').get(str(params.id, 40));
+  if (!recipe) throw new ApiError(404, 'Краска не найдена');
+
+  const raw = String(body.file || '');
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
+
+  if (!match) throw new ApiError(400, 'Ожидается картинка');
+
+  const data = Buffer.from(match[2], 'base64');
+
+  // Миниатюра крошечная: 200x150 jpeg — единицы килобайт
+  if (data.length > 400 * 1024) throw new ApiError(400, 'Фото слишком большое');
+
+  const ext = match[1] === 'png' ? '.png' : match[1] === 'webp' ? '.webp' : '.jpg';
+  const dir = path.join(UPLOAD_DIR, 'recipes');
+
+  fs.mkdirSync(dir, { recursive: true });
+
+  const name = `recipe-${recipe.id}-${Date.now()}${ext}`;
+  fs.writeFileSync(path.join(dir, name), data);
+
+  // Старое фото больше не нужно
+  if (recipe.photo && recipe.photo !== name) {
+    const old = path.join(dir, path.basename(String(recipe.photo)));
+    if (fs.existsSync(old)) fs.unlinkSync(old);
+  }
+
+  db.prepare('UPDATE recipes SET photo = ? WHERE id = ?').run(name, recipe.id);
+
+  return { ok: true, photo: '/api/recipes/photo/' + name };
+});
+
+route('GET', '/api/recipes/photo/:name', async ({ params, res }) => {
+  const name = path.basename(String(params.name || ''));
+
+  if (!/^[\w.-]+\.(jpe?g|png|webp)$/i.test(name)) throw new ApiError(404, 'Файл не найден');
+
+  const file = path.join(UPLOAD_DIR, 'recipes', name);
+  if (!fs.existsSync(file)) throw new ApiError(404, 'Файл не найден');
+
+  const ext = path.extname(name).toLowerCase();
+  const type = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  const data = fs.readFileSync(file);
+
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Length': data.length,
+    'Cache-Control': 'private, max-age=604800'
+  });
+  res.end(data);
+
+  return { __raw: true };
+});
+
+route('DELETE', '/api/recipes/:id/photo', async ({ user, params }) => {
+  if (!isStaff(user) && user.role !== 'master') throw new ApiError(403, 'Фото может убрать мастер или кладовщик');
+
+  const recipe = db.prepare('SELECT id, photo FROM recipes WHERE id = ?').get(str(params.id, 40));
+  if (!recipe) throw new ApiError(404, 'Краска не найдена');
+
+  if (recipe.photo) {
+    const file = path.join(UPLOAD_DIR, 'recipes', path.basename(String(recipe.photo)));
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+
+  db.prepare('UPDATE recipes SET photo = NULL WHERE id = ?').run(recipe.id);
+
+  return { ok: true };
 });
 
 route('PUT', '/api/recipes/:id', async ({ user, params, body }) => {

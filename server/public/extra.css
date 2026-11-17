@@ -2922,3 +2922,78 @@ html[data-theme="dark"] .chip:not(.active):hover {
 .quick-search-wrap .search-results .row {
   justify-content: space-between;
 }
+/* Фото готовой краски: маленькая миниатюра */
+.recipe-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.recipe-photo-preview {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  font-size: 11.5px;
+}
+
+.recipe-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.recipe-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recipe-photo-hint { font-size: 12px; }
+
+.recipe-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recipe-thumb {
+  width: 52px;
+  height: 39px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.quick-thumb {
+  width: 26px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.quick-thumb-empty {
+  display: inline-block;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 780px) {
+  .recipe-photo-row { flex-wrap: wrap; }
+  .recipe-photo-hint { flex-basis: 100%; }
+}

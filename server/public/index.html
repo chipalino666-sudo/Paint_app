@@ -881,6 +881,18 @@
       </div>
     </div>
 
+    <div class="recipe-photo-row">
+      <div class="recipe-photo-preview" id="recipePhotoPreview"></div>
+
+      <div class="recipe-photo-actions">
+        <button type="button" class="btn btn-outline btn-sm" id="btnRecipePhoto">📷 Фото краски</button>
+        <button type="button" class="btn btn-danger-outline btn-sm hidden" id="btnRecipePhotoDel">Убрать</button>
+        <span class="muted recipe-photo-hint">снимок детали или выкраса, обрежется до миниатюры</span>
+      </div>
+
+      <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden">
+    </div>
+
     <div class="section-title">Миксы на эту базу</div>
     <div id="recipeMixRows"></div>
 
