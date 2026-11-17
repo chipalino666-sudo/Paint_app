@@ -18,7 +18,9 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 4. Количество указывай только если человек его назвал или оно есть в нормах. Если нет — спроси.
 5. Отвечай по-русски, коротко, обычным текстом без таблиц и markdown.
 6. Ты не видишь чужие заказы: только те, что доступны этому сотруднику.
-7. Если материала нет в базе — так и скажи и предложи уточнить код.`;
+7. Если материала нет в базе — так и скажи и предложи уточнить код.
+8. Если поиск по коду дал ровно один подходящий материал — сразу используй его, не переспрашивай. Переспрашивай, только когда подходящих несколько и они разные.
+9. Формулу краски понимай буквально: «110 — 800 грамм, лак 442 — 200» — это коды и граммы. Сразу вызывай propose_recipe, не спрашивай подтверждения.`;
 
 const TOOLS = [
   {
@@ -74,6 +76,33 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'propose_recipe',
+      description: 'Подготовить новую готовую краску (рецепт) из названия и состава. Ничего не сохраняет — человек подтвердит кнопкой.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'название цвета, например «Серебро 570»' },
+          base: { type: 'number', description: 'сколько готовить, в граммах; по умолчанию 1000' },
+          mixes: {
+            type: 'array',
+            description: 'состав',
+            items: {
+              type: 'object',
+              properties: {
+                code: { type: 'string', description: 'код материала' },
+                qty: { type: 'number', description: 'граммы этого микса' }
+              },
+              required: ['code', 'qty']
+            }
+          }
+        },
+        required: ['name', 'mixes']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'propose_write_off',
       description: 'Подготовить списание материалов на заказ. Ничего не меняет — возвращает карточку для подтверждения человеком.',
       parameters: {
@@ -109,6 +138,32 @@ function normalize(...parts) {
     .replace(/ё/g, 'е')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Находит материал по коду, коду краски (110) или названию. */
+function resolveMaterial(db, query) {
+  const raw = String(query || '').trim();
+  if (!raw) return null;
+
+  const exact = db.prepare('SELECT * FROM materials WHERE upper(code) = ?').get(raw.toUpperCase());
+  if (exact) return exact;
+
+  const needle = normalize(raw);
+
+  let rows = db.prepare('SELECT * FROM materials WHERE active = 1 AND search LIKE ? LIMIT 30').all('%' + needle + '%');
+
+  if (!rows.length && /^\d{2,4}$/.test(needle)) {
+    rows = db.prepare('SELECT * FROM materials WHERE active = 1 AND paint_code LIKE ? LIMIT 30').all(needle + '%');
+  }
+
+  if (!rows.length) return null;
+
+  rows.sort((a, b) => {
+    const paint = (a.category === 'paint' ? 0 : 1) - (b.category === 'paint' ? 0 : 1);
+    return paint || String(a.name).length - String(b.name).length;
+  });
+
+  return rows[0];
 }
 
 function normQty(db, orderId, code) {
@@ -218,6 +273,50 @@ function makeContext(env) {
       return { found: true, docs };
     },
 
+    propose_recipe({ name, base, mixes }) {
+      const title = String(name || '').trim();
+      if (!title) return { error: 'Не указано название цвета' };
+
+      const list = [];
+      const questions = [];
+
+      for (const mix of Array.isArray(mixes) ? mixes : []) {
+        const code = String(mix.code || '').trim().toUpperCase();
+        if (!code) continue;
+
+        const material = resolveMaterial(db, mix.code);
+        if (!material) {
+          questions.push(`Микс с кодом ${mix.code} не найден — уточните код`);
+          continue;
+        }
+
+        const amount = Number(mix.qty) || 0;
+        if (!amount) {
+          questions.push(`Сколько грамм ${material.name}?`);
+          continue;
+        }
+
+        list.push({ code: material.code, name: material.name, amount: round2(amount) });
+      }
+
+      if (list.length < 1) {
+        return { error: 'В составе нет ни одного микса', questions };
+      }
+
+      const total = list.reduce((sum, item) => sum + item.amount, 0);
+
+      return {
+        proposal: {
+          kind: 'recipe',
+          name: title,
+          base: round2(Number(base) || total || 1000),
+          unit: 'г',
+          mixes: list
+        },
+        questions
+      };
+    },
+
     propose_write_off({ order_id, items }) {
       const order = visibleOrder(Number(order_id));
       if (!order) return { error: 'Заказ не найден или недоступен' };
@@ -229,7 +328,7 @@ function makeContext(env) {
         const code = String(item.code || '').trim().toUpperCase();
         if (!code) continue;
 
-        const material = db.prepare('SELECT * FROM materials WHERE upper(code) = ? OR code = ?').get(code, item.code);
+        const material = resolveMaterial(db, item.code);
         if (!material) {
           questions.push(`Материал с кодом ${item.code} не найден — уточните код`);
           continue;
@@ -318,7 +417,8 @@ async function handle(env, { message, history, orderId }) {
 
         result = fn ? fn(args) : { error: `Неизвестный инструмент ${call.function.name}` };
 
-        if (call.function.name === 'propose_write_off' && result && result.proposal) {
+        if ((call.function.name === 'propose_write_off' || call.function.name === 'propose_recipe')
+            && result && result.proposal) {
           proposal = result.proposal;
         }
       } catch (error) {

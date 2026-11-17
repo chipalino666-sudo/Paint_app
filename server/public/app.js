@@ -4101,6 +4101,58 @@
     const box = $('#aiProposal');
     if (!box) return;
 
+    // Новая готовая краска из диктовки
+    if (proposal && proposal.kind === 'recipe') {
+      box.innerHTML = `
+        <div class="ai-prop-head">Новая краска: ${esc(proposal.name)}</div>
+        ${proposal.mixes.map((mix) => `
+          <div class="ai-prop-row">
+            <span>${esc(mix.name)}</span>
+            <span class="mono">${qty(mix.amount)} г</span>
+          </div>`).join('')}
+        <div class="ai-prop-row ai-prop-total">
+          <span>Всего</span>
+          <span class="mono">${qty(proposal.base)} г</span>
+        </div>
+        <div class="ai-prop-actions">
+          <button class="btn btn-primary btn-sm" id="aiSaveRecipe">Сохранить краску</button>
+          <button class="btn btn-outline btn-sm" id="aiCancel">Отмена</button>
+        </div>
+      `;
+
+      box.classList.remove('hidden');
+
+      $('#aiCancel').addEventListener('click', () => {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+      });
+
+      $('#aiSaveRecipe').addEventListener('click', async () => {
+        const button = $('#aiSaveRecipe');
+        button.disabled = true;
+        button.textContent = 'Сохраняю…';
+
+        try {
+          await api('/api/recipes', {
+            method: 'POST',
+            body: { name: proposal.name, base: proposal.base, unit: 'г', mixes: proposal.mixes }
+          });
+
+          state.recipes = (await api('/api/recipes')).recipes;
+
+          box.classList.add('hidden');
+          box.innerHTML = '';
+          aiBubble('bot', `Готовая краска «${proposal.name}» сохранена.`);
+        } catch (error) {
+          aiBubble('bot', 'Не получилось: ' + error.message);
+          button.disabled = false;
+          button.textContent = 'Сохранить краску';
+        }
+      });
+
+      return;
+    }
+
     if (!proposal || !proposal.items || !proposal.items.length) {
       box.classList.add('hidden');
       box.innerHTML = '';

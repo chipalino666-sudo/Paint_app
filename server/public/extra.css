@@ -2396,3 +2396,4 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, .55); }
   50% { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
 }
+.ai-prop-total { font-weight: 700; border-bottom: none; }
