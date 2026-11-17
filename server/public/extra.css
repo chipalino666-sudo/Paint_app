@@ -2810,3 +2810,26 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   .stock-actions { display: flex; gap: 6px; }
   .stock-actions .btn { margin-left: 0; }
 }
+/* Фильтры-«чипсы»: при наведении текст не должен сливаться с фоном */
+.chip:not(.active):hover {
+  background: var(--surface-2);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.chip:not(.active):focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.chip.active:hover,
+.chip.active:focus-visible {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+  color: #fff;
+}
+
+html[data-theme="dark"] .chip:not(.active):hover {
+  background: var(--surface-3);
+  color: #dbeafe;
+}
