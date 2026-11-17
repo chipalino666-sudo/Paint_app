@@ -2044,8 +2044,10 @@ body.focus-mode .focus-only { display: block; }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
+
+body.focus-mode .chips-row { margin-bottom: 10px; }
 
 .chip {
   padding: 7px 12px;

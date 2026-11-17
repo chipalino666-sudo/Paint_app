@@ -1622,8 +1622,6 @@
         <input type="text" id="matSearch" placeholder="Код или название материала…" autocomplete="off">
 
         <div class="focus-only" id="matExtras">
-          <div class="chips-row" id="matChips"></div>
-
           <label class="clear-toggle mat-clear-toggle">
             <input type="checkbox" id="matClearToggle" checked>
             Очищать поиск при добавлении
@@ -1640,6 +1638,8 @@
               <button class="btn btn-right btn-sm" id="btnManualMaterial">В Материалы ▶</button>
             </div>
           </details>
+
+          <div class="chips-row" id="matChips"></div>
         </div>
 
         <div class="material-hint" id="matHint">
