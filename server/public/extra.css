@@ -2902,3 +2902,23 @@ html[data-theme="dark"] .chip:not(.active):hover {
   font-size: 12.5px;
   padding: 2px 0;
 }
+/* Поиск готовой краски: подсказки выпадают поверх, блок не растягивают */
+.quick-search-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quick-search-wrap .search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  max-height: 260px;
+  box-shadow: var(--shadow-md);
+}
+
+.quick-search-wrap .search-results .row {
+  justify-content: space-between;
+}

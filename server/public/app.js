@@ -1660,7 +1660,10 @@
 
           <div class="quick-box" id="quickBox">
             <div class="quick-row">
-              <select id="quickRecipe" class="quick-select" title="Готовая краска"></select>
+              <div class="quick-search-wrap">
+                <input type="text" id="quickRecipe" class="quick-select" placeholder="Готовая краска: название" autocomplete="off">
+                <div class="search-results hidden" id="quickRecipeResults"></div>
+              </div>
               <input type="number" id="quickParts" value="1" min="0.1" step="0.05" title="Сколько деталей" class="quick-parts">
               <button class="btn btn-outline btn-sm" id="btnQuick">Списать</button>
             </div>
@@ -1710,17 +1713,46 @@
 
     renderMaterialChips();
 
-    // Быстрый набор работает только с готовыми красками
+    // Быстрый набор работает только с готовыми красками: ищем по названию
     loadQuickRecipes();
 
     if ($('#btnQuick')) {
       $('#btnQuick').addEventListener('click', quickPreview);
     }
 
-    if ($('#quickRecipe')) {
-      $('#quickRecipe').addEventListener('change', () => {
-        const result = $('#quickResult');
-        if (result) result.innerHTML = '';
+    const quickInput = $('#quickRecipe');
+
+    if (quickInput) {
+      let quickSearchTimer = null;
+
+      quickInput.addEventListener('input', () => {
+        quickRecipeName = '';
+        clearTimeout(quickSearchTimer);
+        quickSearchTimer = setTimeout(() => quickFilterRecipes(quickInput.value.trim()), 150);
+      });
+
+      quickInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+
+        event.preventDefault();
+
+        const panel = $('#quickRecipeResults');
+        const first = panel && !panel.classList.contains('hidden')
+          ? panel.querySelector('[data-quick-recipe]')
+          : null;
+
+        if (first) {
+          pickQuickRecipe(first.dataset.quickRecipe);
+        } else {
+          quickPreview();
+        }
+      });
+
+      quickInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          const panel = $('#quickRecipeResults');
+          if (panel) panel.classList.add('hidden');
+        }, 180);
       });
     }
 
@@ -1879,52 +1911,104 @@
 
   /* ---- Быстрый набор материалов по количеству деталей --------------------- */
 
-  /** Список готовых красок для быстрого набора. */
-    async function loadQuickRecipes() {
-      const select = $('#quickRecipe');
-      if (!select) return;
+  /** Готовые краски держим в памяти: со временем их будет много. */
+  let quickRecipes = [];
+  let quickRecipeName = '';
 
-      try {
-        const data = await api('/api/recipes');
-        const recipes = data.recipes || [];
+  async function loadQuickRecipes() {
+    try {
+      const data = await api('/api/recipes');
+      quickRecipes = data.recipes || [];
 
-        if (!recipes.length) {
-          select.innerHTML = '<option value="">Готовых красок нет</option>';
-          select.disabled = true;
+      if (!quickRecipes.length) {
+        const input = $('#quickRecipe');
 
-          if ($('#btnQuick')) $('#btnQuick').disabled = true;
-
-          const result = $('#quickResult');
-          if (result) {
-            result.innerHTML = '<div class="muted quick-hint">Сначала создайте готовую краску — вкладка «Готовые краски».</div>';
-          }
-
-          return;
+        if (input) {
+          input.disabled = true;
+          input.placeholder = 'Готовых красок пока нет';
         }
 
-        select.disabled = false;
-        if ($('#btnQuick')) $('#btnQuick').disabled = false;
+        if ($('#btnQuick')) $('#btnQuick').disabled = true;
 
-        select.innerHTML = recipes.map((row) => '<option value="' + esc(row.name) + '">' + esc(row.name) + '</option>').join('');
-      } catch (error) {
-        select.innerHTML = '<option value="">Не удалось загрузить</option>';
-        select.disabled = true;
+        const result = $('#quickResult');
+        if (result) {
+          result.innerHTML = '<div class="muted quick-hint">Сначала создайте готовую краску — вкладка «Готовые краски».</div>';
+        }
       }
+    } catch (error) {
+      const input = $('#quickRecipe');
+
+      if (input) {
+        input.disabled = true;
+        input.placeholder = 'Не удалось загрузить краски';
+      }
+
+      if ($('#btnQuick')) $('#btnQuick').disabled = true;
+    }
+  }
+
+  /** Подсказки по названию: ищем только среди готовых красок. */
+  function quickFilterRecipes(term) {
+    const panel = $('#quickRecipeResults');
+    if (!panel) return;
+
+    const needle = String(term || '').toLowerCase();
+
+    const found = (needle
+      ? quickRecipes.filter((row) => String(row.name).toLowerCase().includes(needle))
+      : quickRecipes
+    ).slice(0, 8);
+
+    if (!found.length) {
+      panel.innerHTML = '<div class="row" style="cursor:default">Краска не найдена</div>';
+      panel.classList.remove('hidden');
+      return;
     }
 
-    async function quickPreview() {
-      const partsInput = $('#quickParts');
-      const result = $('#quickResult');
-      const select = $('#quickRecipe');
+    panel.innerHTML = found.map((row) => `
+      <div class="row" data-quick-recipe="${esc(row.name)}">
+        <span class="name">${esc(row.name)}</span>
+        <span class="muted mono">${qty(row.base)} г</span>
+      </div>
+    `).join('');
 
-      if (!result || !state.order) return;
+    panel.classList.remove('hidden');
 
-      const recipe = select ? select.value : '';
+    panel.querySelectorAll('[data-quick-recipe]').forEach((element) => {
+      element.addEventListener('click', () => pickQuickRecipe(element.dataset.quickRecipe));
+    });
+  }
 
-      if (!recipe) {
-        result.innerHTML = '<div class="muted quick-hint">Выберите готовую краску.</div>';
-        return;
-      }
+  function pickQuickRecipe(name) {
+    const input = $('#quickRecipe');
+    const panel = $('#quickRecipeResults');
+    const result = $('#quickResult');
+
+    if (input) input.value = name;
+    if (panel) panel.classList.add('hidden');
+    if (result) result.innerHTML = '';
+
+    quickRecipeName = name;
+  }
+
+  async function quickPreview() {
+    const partsInput = $('#quickParts');
+    const result = $('#quickResult');
+    const input = $('#quickRecipe');
+
+    if (!result || !state.order) return;
+
+    // Краска должна быть выбрана из подсказок
+    const typed = input ? input.value.trim() : '';
+    const exact = quickRecipes.find((row) => String(row.name).toLowerCase() === typed.toLowerCase());
+    const recipe = quickRecipeName || (exact ? exact.name : '');
+
+    if (!recipe) {
+      result.innerHTML = '<div class="muted quick-hint">Выберите готовую краску из подсказок.</div>';
+      return;
+    }
+
+    quickRecipeName = recipe;
 
       const parts = Number(partsInput.value) || 1;
 
