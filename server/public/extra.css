@@ -2035,3 +2035,145 @@ body.focus-mode .material-entry .search-results { max-height: none; }
 @media (max-width: 1100px) {
   body.focus-mode .material-layout { grid-template-columns: 1fr; }
 }
+/* ---------- Полноэкранное списание: управление как в бланках -------------- */
+
+.focus-only { display: none; }
+body.focus-mode .focus-only { display: block; }
+
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip:hover { border-color: var(--blue); color: var(--blue); }
+
+.chip.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.clear-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.clear-toggle input { width: 17px; height: 17px; accent-color: var(--blue); cursor: pointer; }
+
+.manual-add {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0;
+}
+
+.manual-add summary {
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.manual-add summary::-webkit-details-marker { display: none; }
+.manual-add[open] summary { border-bottom: 1px solid var(--border-soft); }
+
+.manual-inputs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.manual-inputs input {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+.manual-btns {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.manual-btns .btn { flex: 1 1 auto; min-height: 36px; }
+/* ---------- Новая готовая краска из списания ------------------------------ */
+
+.recipe-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
+.recipe-form input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+.recipe-form-row { display: flex; gap: 6px; }
+.recipe-form-row input { min-width: 0; }
+.recipe-form-row input:nth-child(2) { flex: 0 0 90px; }
+.recipe-form-row input:nth-child(3) { flex: 1 1 auto; }
+.recipe-form-row input:nth-child(4) { flex: 0 0 70px; }
+
+.recipe-mixes {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 4px 10px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.recipe-mix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+
+.recipe-mix-row:last-child { border-bottom: none; }
+.recipe-mix-name { flex: 1 1 auto; min-width: 0; }
+
+@media (max-width: 780px) {
+  .recipe-form-row { flex-wrap: wrap; }
+  .recipe-form-row input:nth-child(2),
+  .recipe-form-row input:nth-child(4) { flex: 1 1 40%; }
+}

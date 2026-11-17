@@ -1620,6 +1620,28 @@
 
       <div id="addSearchWrap">
         <input type="text" id="matSearch" placeholder="Код или название материала…" autocomplete="off">
+
+        <div class="focus-only" id="matExtras">
+          <div class="chips-row" id="matChips"></div>
+
+          <label class="clear-toggle mat-clear-toggle">
+            <input type="checkbox" id="matClearToggle" checked>
+            Очищать поиск при добавлении
+          </label>
+
+          <details class="manual-add" id="manualBlock">
+            <summary>✏️ Добавить вручную</summary>
+            <div class="manual-inputs">
+              <input type="text" id="manualCode" placeholder="Код" style="width:35%">
+              <input type="text" id="manualName" placeholder="Наименование" style="width:65%">
+            </div>
+            <div class="manual-btns">
+              <button class="btn btn-left btn-sm" id="btnManualPaint">◀ В Эмаль</button>
+              <button class="btn btn-right btn-sm" id="btnManualMaterial">В Материалы ▶</button>
+            </div>
+          </details>
+        </div>
+
         <div class="material-hint" id="matHint">
           Начните вводить код или название — например, <b>110</b>, <b>127</b> или <b>скотч</b>.
           Коды Brulex и Standox работают в обе стороны.
@@ -1629,11 +1651,71 @@
 
       <div id="addRecipeWrap" class="hidden">
         <input type="text" id="recipeSearch" placeholder="Название цвета или код микса…" autocomplete="off">
+
+        <button class="btn btn-outline btn-sm focus-only" id="woNewRecipe" style="margin-top:10px;width:100%">
+          ＋ Новая готовая краска
+        </button>
+
+        <div class="focus-only hidden" id="woRecipeEditor">
+          <div class="recipe-form">
+            <input type="text" id="woRecipeName" placeholder="Название цвета, например «Серебро 570»">
+            <div class="recipe-form-row">
+              <input type="number" id="woRecipeBase" value="1000" min="1" step="1" placeholder="Сколько готовить, г">
+              <input type="text" id="woMixCode" placeholder="Код микса">
+              <input type="text" id="woMixName" placeholder="Название микса">
+              <input type="number" id="woMixAmount" placeholder="г" min="0.1" step="0.1">
+            </div>
+            <button class="btn btn-outline btn-sm" id="woAddMix" style="width:100%">＋ Добавить микс в состав</button>
+          </div>
+
+          <div id="woMixList" class="recipe-mixes"></div>
+
+          <div class="manual-btns">
+            <button class="btn btn-primary btn-sm" id="woSaveRecipe">Сохранить</button>
+            <button class="btn btn-outline btn-sm" id="woCancelRecipe">Отмена</button>
+          </div>
+        </div>
+
         <div class="search-results" id="recipeResults" style="margin-top:8px"></div>
       </div>
     `;
 
     let mode = 'materials';
+
+    renderMaterialChips();
+
+    const clearToggle = $('#matClearToggle');
+
+    if (clearToggle) {
+      clearToggle.checked = clearAfterAdd;
+      clearToggle.addEventListener('change', () => {
+        clearAfterAdd = clearToggle.checked;
+        writeBool('paintShopClearAfterAdd', clearAfterAdd);
+      });
+    }
+
+    if ($('#btnManualPaint')) $('#btnManualPaint').addEventListener('click', () => addManualMaterial('paint'));
+    if ($('#btnManualMaterial')) $('#btnManualMaterial').addEventListener('click', () => addManualMaterial('material'));
+
+    /* Новая готовая краска прямо из списания */
+    if ($('#woNewRecipe')) {
+      $('#woNewRecipe').addEventListener('click', () => {
+        $('#woRecipeEditor').classList.remove('hidden');
+        renderWriteOffDraft();
+        $('#woRecipeName').focus();
+      });
+    }
+
+    if ($('#woCancelRecipe')) {
+      $('#woCancelRecipe').addEventListener('click', () => {
+        writeOffDraft = [];
+        renderWriteOffDraft();
+        $('#woRecipeEditor').classList.add('hidden');
+      });
+    }
+
+    if ($('#woAddMix')) $('#woAddMix').addEventListener('click', addWriteOffMix);
+    if ($('#woSaveRecipe')) $('#woSaveRecipe').addEventListener('click', saveWriteOffRecipe);
 
     box.querySelectorAll('.mode-tabs button').forEach((button) => {
       button.addEventListener('click', () => {
@@ -1669,6 +1751,84 @@
     renderRecipeSearch('');
   }
 
+  /* ------------------------------------------------------------------------
+     Как в отдельной программе: категории, очистка поиска, ручное добавление
+     ------------------------------------------------------------------------ */
+
+  const MATERIAL_CATEGORIES = [
+    ['paint', 'Краски'],
+    ['primer', 'Грунты'],
+    ['putty', 'Шпатлёвки'],
+    ['clear', 'Лаки'],
+    ['abrasive', 'Абразивы'],
+    ['thinner', 'Растворители'],
+    ['hardener', 'Отвердители'],
+    ['consumable', 'Расходники'],
+    ['other', 'Прочее']
+  ];
+
+  let materialCategory = 'all';
+  let clearAfterAdd = readBool('paintShopClearAfterAdd', true);
+
+  function readBool(key, fallback) {
+    try {
+      const value = localStorage.getItem(key);
+      return value === null ? fallback : value === '1';
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function writeBool(key, value) {
+    try { localStorage.setItem(key, value ? '1' : '0'); } catch (error) { /* приватный режим */ }
+  }
+
+  function renderMaterialChips() {
+    const box = $('#matChips');
+    if (!box) return;
+
+    box.innerHTML = '';
+
+    const make = (id, label) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip' + (materialCategory === id ? ' active' : '');
+      chip.textContent = label;
+
+      chip.addEventListener('click', () => {
+        materialCategory = id;
+        renderMaterialChips();
+        searchMaterials($('#matSearch').value.trim());
+      });
+
+      box.appendChild(chip);
+    };
+
+    make('all', 'Все');
+    make('favorites', '★ Избранное');
+
+    for (const [id, label] of MATERIAL_CATEGORIES) make(id, label);
+  }
+
+  async function addManualMaterial(kind) {
+    const code = $('#manualCode').value.trim();
+    const name = $('#manualName').value.trim();
+
+    if (!name) {
+      toast('Введите наименование');
+      return;
+    }
+
+    await addMaterial({
+      code: code || 'MAN-' + Date.now().toString(36).toUpperCase(),
+      name,
+      unit: kind === 'paint' ? 'г' : 'шт'
+    }, kind);
+
+    $('#manualCode').value = '';
+    $('#manualName').value = '';
+  }
+
   async function searchMaterials(term) {
     const wrap = $('#matResults');
 
@@ -1685,7 +1845,19 @@
         return;
       }
 
-      data.materials.forEach((item) => wrap.appendChild(materialRow(item)));
+      const list = materialCategory === 'all'
+        ? data.materials
+        : data.materials.filter((item) => (materialCategory === 'favorites'
+            ? favorites.has(item.code)
+            : item.category === materialCategory));
+
+      if (!list.length) {
+        wrap.innerHTML = '<div class="row" style="cursor:default">В этой категории ничего нет</div>';
+        wrap.classList.remove('hidden');
+        return;
+      }
+
+      list.forEach((item) => wrap.appendChild(materialRow(item)));
 
       wrap.classList.remove('hidden');
     } catch (error) {
@@ -1819,7 +1991,126 @@
 
       state.order = data.order;
       renderOrder();
+
+      // «Очищать поиск при добавлении» — как в отдельной программе
+      if (clearAfterAdd) {
+        const input = $('#matSearch');
+        const results = $('#matResults');
+
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+
+        if (results) {
+          results.innerHTML = '';
+          results.classList.add('hidden');
+        }
+      }
+
       toast(`${item.name} — добавлено`);
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     Новая готовая краска прямо из списания
+     ------------------------------------------------------------------------ */
+
+  let writeOffDraft = [];
+
+  function renderWriteOffDraft() {
+    const host = $('#woMixList');
+    if (!host) return;
+
+    if (!writeOffDraft.length) {
+      host.innerHTML = '<div class="muted" style="padding:8px 0">Состав пуст</div>';
+      return;
+    }
+
+    host.innerHTML = writeOffDraft.map((mix, index) => `
+      <div class="recipe-mix-row">
+        <span class="recipe-mix-name">${esc(mix.name)}</span>
+        <span class="mono">${qty(mix.amount)} г</span>
+        <button class="row-del" data-mix-remove="${index}" title="Убрать">×</button>
+      </div>
+    `).join('');
+
+    host.querySelectorAll('[data-mix-remove]').forEach((button) => {
+      button.addEventListener('click', () => {
+        writeOffDraft.splice(Number(button.dataset.mixRemove), 1);
+        renderWriteOffDraft();
+      });
+    });
+  }
+
+  async function addWriteOffMix() {
+    const code = $('#woMixCode').value.trim();
+    const name = $('#woMixName').value.trim();
+    const amount = Number($('#woMixAmount').value) || 0;
+
+    if (!amount || amount <= 0) {
+      toast('Укажите количество в граммах');
+      return;
+    }
+
+    // Если код указан, а названия нет — подставим название из справочника
+    let mixName = name;
+    let mixCode = code || '—';
+
+    if (!mixName && code) {
+      try {
+        const found = (await api('/api/materials?q=' + encodeURIComponent(code))).materials;
+        if (found.length) {
+          mixName = found[0].name;
+          mixCode = found[0].code;
+        }
+      } catch (error) {
+        /* ниже покажем ошибку */
+      }
+    }
+
+    if (!mixName) {
+      toast('Укажите код или название микса');
+      return;
+    }
+
+    writeOffDraft.push({ code: mixCode, name: mixName, amount });
+    renderWriteOffDraft();
+
+    ['woMixCode', 'woMixName', 'woMixAmount'].forEach((id) => { $('#' + id).value = ''; });
+    $('#woMixCode').focus();
+  }
+
+  async function saveWriteOffRecipe() {
+    const name = $('#woRecipeName').value.trim();
+    const base = Number($('#woRecipeBase').value) || 0;
+
+    if (!name) {
+      toast('Введите название цвета');
+      return;
+    }
+
+    if (!writeOffDraft.length) {
+      toast('Добавьте хотя бы один микс');
+      return;
+    }
+
+    try {
+      await api('/api/recipes', {
+        method: 'POST',
+        body: { name, base: base || 1000, unit: 'г', mixes: writeOffDraft }
+      });
+
+      state.recipes = (await api('/api/recipes')).recipes;
+      toast('Готовая краска сохранена');
+
+      writeOffDraft = [];
+      renderWriteOffDraft();
+      $('#woRecipeName').value = '';
+      $('#woRecipeEditor').classList.add('hidden');
+      renderRecipeSearch('');
     } catch (error) {
       toast(error.message);
     }
