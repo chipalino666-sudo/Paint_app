@@ -1820,6 +1820,7 @@ route('POST', '/api/ai/chat', async ({ user, body }) => {
   return {
     reply: result.reply,
     proposal: result.proposal || null,
+    opened: result.opened || null,
     usage: result.usage || null
   };
 });

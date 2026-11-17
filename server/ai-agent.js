@@ -27,6 +27,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
 19. Если инструмент вернул несколько подходящих заказов (ambiguity), покажи их списком — номер, госномер, статус — и спроси, какой именно. Никогда не выбирай за человека.
+20. Если просят открыть заказ или раздел («открой списание по Шкоде», «покажи склад») — вызывай open_in_app. После вызова коротко подтверди: «Открываю заказ 2026-0025, вкладка «Списание материала»».
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
 16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
 14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
@@ -83,6 +84,29 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'open_in_app',
+      description: 'Открыть в программе заказ, его вкладку или раздел. Используй, когда просят «открой заказ», «покажи списание», «открой склад».',
+      parameters: {
+        type: 'object',
+        properties: {
+          order: { type: 'string', description: 'номер, госномер или марка машины' },
+          tab: {
+            type: 'string',
+            enum: ['order', 'inspection', 'materials', 'photos', 'history', 'chat'],
+            description: 'вкладка внутри заказа: order — карточка, inspection — осмотр, materials — списание, photos — фото, history — история, chat — обсуждение'
+          },
+          view: {
+            type: 'string',
+            enum: ['orders', 'chat', 'stock', 'tds', 'norms', 'refs', 'report'],
+            description: 'раздел программы, если открыть надо не заказ'
+          }
+        }
       }
     }
   },
@@ -465,6 +489,40 @@ function makeContext(env) {
       return { found: true, docs };
     },
 
+    open_in_app({ order, tab, view }) {
+      const allowedViews = ['orders', 'chat', 'stock', 'tds', 'norms', 'refs', 'report'];
+      const allowedTabs = ['order', 'inspection', 'materials', 'photos', 'history', 'chat'];
+
+      // Открыть раздел программы
+      if (view && allowedViews.includes(view)) {
+        return {
+          opened: { type: 'view', view },
+          message: `Открываю раздел «${view}»`
+        };
+      }
+
+      if (!order) return { error: 'Не указано, что открыть' };
+
+      const found = orderRef({ order });
+      if (found.ambiguous) return ambiguityAnswer(found);
+
+      const target = found.order;
+      if (!target) return { error: 'Заказ не найден или недоступен' };
+
+      const tabName = allowedTabs.includes(tab) ? tab : 'order';
+
+      return {
+        opened: { type: 'order', order_id: target.id, tab: tabName },
+        order: {
+          number: target.number,
+          plate: target.plate,
+          car: [target.make, target.model].filter(Boolean).join(' '),
+          status: target.status
+        },
+        message: `Открываю заказ ${target.number}`
+      };
+    },
+
     lookup_code({ code, only_paints }) {
       const raw = String(code || '').trim();
       if (!raw) return { found: false, materials: [] };
@@ -795,6 +853,7 @@ async function handle(env, { message, history, orderId }) {
   messages.push({ role: 'user', content: String(message || '').slice(0, 2000) });
 
   let proposal = null;
+  let opened = null;
   let usage = { prompt_tokens: 0, completion_tokens: 0 };
 
   for (let round = 0; round < 4; round++) {
@@ -807,7 +866,7 @@ async function handle(env, { message, history, orderId }) {
     messages.push(choice);
 
     if (!choice.tool_calls || !choice.tool_calls.length) {
-      return { reply: String(choice.content || '').trim(), proposal, usage };
+      return { reply: String(choice.content || '').trim(), proposal, opened, usage };
     }
 
     for (const call of choice.tool_calls) {
@@ -823,6 +882,10 @@ async function handle(env, { message, history, orderId }) {
             && result && result.proposal) {
           proposal = result.proposal;
         }
+
+        if (call.function.name === 'open_in_app' && result && result.opened) {
+          opened = result.opened;
+        }
       } catch (error) {
         result = { error: error.message };
       }
@@ -835,7 +898,7 @@ async function handle(env, { message, history, orderId }) {
     }
   }
 
-  return { reply: 'Не смог разобрать запрос. Уточните, пожалуйста: какой заказ и какой материал?', proposal, usage };
+  return { reply: 'Не смог разобрать запрос. Уточните, пожалуйста: какой заказ и какой материал?', proposal, opened, usage };
 }
 
 module.exports = { handle, SYSTEM };

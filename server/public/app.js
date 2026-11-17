@@ -4872,6 +4872,29 @@
     });
   }
 
+  /** Переход по просьбе помощника: заказ, его вкладка или раздел программы. */
+  async function aiNavigate(action) {
+    try {
+      if (action.type === 'view' && action.view) {
+        showView(action.view);
+        aiClose();
+        return;
+      }
+
+      if (action.type === 'order' && action.order_id) {
+        await openOrder(action.order_id);
+
+        if (action.tab && action.tab !== 'order') {
+          selectOrderTab(action.tab);
+        }
+
+        aiClose();
+      }
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
   async function aiSend(text) {
     if (aiBusy || !text.trim()) return;
 
@@ -4905,6 +4928,7 @@
       aiHistory.push({ role: 'assistant', content: data.reply || '' });
 
       if (data.proposal) aiRenderProposal(data.proposal);
+      if (data.opened) aiNavigate(data.opened);
     } catch (error) {
       if (thinking) thinking.remove();
       aiBubble('bot', 'Ошибка: ' + error.message);
