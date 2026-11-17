@@ -724,6 +724,11 @@ function applyUiMode() {
 
   document.body.classList.toggle('ui-desk', desk);
 
+  // Кнопка «Стол» нужна только в режиме рабочего стола
+  document.querySelectorAll('[data-view="home"]').forEach((button) => {
+    button.classList.toggle('hidden', !desk);
+  });
+
   const layer = $('#deskLayer');
   const taskbar = $('#deskTaskbar');
 
@@ -857,7 +862,7 @@ function detachWindowView(name) {
   const view = document.getElementById('view-' + name);
   const main = document.querySelector('main.main');
 
-  if (view && main && view.parentElement && !main.contains(view)) {
+  if (view && main && view.parentElement !== main) {
     main.appendChild(view);
     view.classList.add('hidden');
   }
