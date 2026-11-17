@@ -1711,6 +1711,19 @@ route('DELETE', '/api/norm-set', async ({ user }) => {
 route('GET', '/api/norms/quick', async ({ user, url }) => {
   const parts = Math.max(0.01, toNum(url.searchParams.get('parts'), 1));
   const paintCode = str(url.searchParams.get('paint'), 40).toUpperCase();
+  const recipeName = str(url.searchParams.get('recipe'), 200);
+
+  // Готовая краска: её состав раскладываем на микс по деталям
+  let recipe = null;
+
+  if (recipeName) {
+    const all = db.prepare('SELECT * FROM recipes').all().map(recipeOut);
+    const needle = normalizeSearch(recipeName);
+
+    recipe = all.find((row) => normalizeSearch(row.name) === needle)
+      || all.find((row) => normalizeSearch(row.name).includes(needle))
+      || null;
+  }
 
   const { items, personal } = effectiveNorms(user);
   const rows = [];
@@ -1724,13 +1737,37 @@ route('GET', '/api/norms/quick', async ({ user, url }) => {
     let name = norm.name;
 
     if (norm.role === 'paint') {
-      if (!paintCode) continue;
+      // Краска берётся только из готовой краски
+      if (!recipe) continue;
 
-      const material = db.prepare('SELECT code, name FROM materials WHERE upper(code) = ?').get(paintCode);
-      if (!material) continue;
+      const paintNorm = round2(Number(norm.qty) * (norm.per === 'order' ? 1 : parts));
+      const scale = recipe.base > 0 ? paintNorm / recipe.base : 0;
 
-      code = material.code;
-      name = material.name;
+      for (const mix of recipe.mixes || []) {
+        const mixQty = round2(Number(mix.amount) * scale);
+        if (!(mixQty > 0)) continue;
+
+        const mixStock = db.prepare(`
+          SELECT m.stock, m.unit,
+                 COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+            FROM materials m WHERE m.code = ?
+        `).get(mix.code);
+
+        rows.push({
+          code: mix.code,
+          name: mix.name,
+          unit: (mixStock && mixStock.unit) || 'г',
+          qty: mixQty,
+          per: norm.per,
+          role: 'paint',
+          recipe: recipe.name,
+          left_after: mixStock
+            ? round2((Number(mixStock.stock) || 0) - (Number(mixStock.used) || 0) - mixQty)
+            : null
+        });
+      }
+
+      continue;
     }
 
     const stock = db.prepare(`
@@ -1752,7 +1789,7 @@ route('GET', '/api/norms/quick', async ({ user, url }) => {
     });
   }
 
-  return { parts, personal, items: rows };
+  return { parts, personal, recipe: recipe ? recipe.name : null, items: rows };
 });
 
 /* ---- Нормы по работам (старая модель, оставлено для совместимости) ------- */

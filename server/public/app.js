@@ -1659,13 +1659,11 @@
           <div class="chips-row" id="matChips"></div>
 
           <div class="quick-box" id="quickBox">
-            <div class="quick-head">Быстрый набор по деталям</div>
             <div class="quick-row">
-              <input type="text" id="quickPaint" placeholder="Краска: код или название" autocomplete="off">
-              <input type="number" id="quickParts" value="1" min="0.1" step="0.05" title="Сколько деталей">
-              <button class="btn btn-outline btn-sm" id="btnQuick">Подобрать</button>
+              <select id="quickRecipe" class="quick-select" title="Готовая краска"></select>
+              <input type="number" id="quickParts" value="1" min="0.1" step="0.05" title="Сколько деталей" class="quick-parts">
+              <button class="btn btn-outline btn-sm" id="btnQuick">Списать</button>
             </div>
-            <div class="search-results hidden" id="quickPaintResults"></div>
             <div id="quickResult"></div>
           </div>
         </div>
@@ -1712,24 +1710,23 @@
 
     renderMaterialChips();
 
-    let quickPaintItem = null;
+    // Быстрый набор работает только с готовыми красками
+    loadQuickRecipes();
 
     if ($('#btnQuick')) {
-      $('#btnQuick').addEventListener('click', () => quickPreview(quickPaintItem));
+      $('#btnQuick').addEventListener('click', quickPreview);
     }
 
-    const quickPaint = $('#quickPaint');
+    if ($('#quickRecipe')) {
+      $('#quickRecipe').addEventListener('change', () => {
+        const result = $('#quickResult');
+        if (result) result.innerHTML = '';
+      });
+    }
 
-    if (quickPaint) {
-      let quickTimer = null;
-
-      quickPaint.addEventListener('input', () => {
-        clearTimeout(quickTimer);
-        quickTimer = setTimeout(() => quickPickPaint(quickPaint.value.trim(), (item) => {
-          quickPaintItem = item;
-          quickPaint.value = item.name;
-          $('#quickPaintResults').classList.add('hidden');
-        }), 220);
+    if ($('#quickParts')) {
+      $('#quickParts').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') quickPreview();
       });
     }
 
@@ -1882,111 +1879,114 @@
 
   /* ---- Быстрый набор материалов по количеству деталей --------------------- */
 
-  /** Выбор краски для наряда: по коду или названию. */
-  async function quickPickPaint(term, onPick) {
-    const wrap = $('#quickPaintResults');
-    if (!wrap) return;
+  /** Список готовых красок для быстрого набора. */
+    async function loadQuickRecipes() {
+      const select = $('#quickRecipe');
+      if (!select) return;
 
-    if (!term) {
-      wrap.classList.add('hidden');
-      return;
+      try {
+        const data = await api('/api/recipes');
+        const recipes = data.recipes || [];
+
+        if (!recipes.length) {
+          select.innerHTML = '<option value="">Готовых красок нет</option>';
+          select.disabled = true;
+
+          if ($('#btnQuick')) $('#btnQuick').disabled = true;
+
+          const result = $('#quickResult');
+          if (result) {
+            result.innerHTML = '<div class="muted quick-hint">Сначала создайте готовую краску — вкладка «Готовые краски».</div>';
+          }
+
+          return;
+        }
+
+        select.disabled = false;
+        if ($('#btnQuick')) $('#btnQuick').disabled = false;
+
+        select.innerHTML = recipes.map((row) => '<option value="' + esc(row.name) + '">' + esc(row.name) + '</option>').join('');
+      } catch (error) {
+        select.innerHTML = '<option value="">Не удалось загрузить</option>';
+        select.disabled = true;
+      }
     }
 
-    try {
-      const data = await api('/api/materials?q=' + encodeURIComponent(term));
-      const paints = data.materials.filter((item) => item.category === 'paint').slice(0, 8);
+    async function quickPreview() {
+      const partsInput = $('#quickParts');
+      const result = $('#quickResult');
+      const select = $('#quickRecipe');
 
-      wrap.innerHTML = paints.map((item) => `
-        <div class="row" data-quick-pick="${esc(item.code)}">
-          <span class="code">${esc(item.code)}</span>
-          <span class="name">${esc(item.name)}</span>
-        </div>
-      `).join('') || '<div class="row" style="cursor:default">Краска не найдена</div>';
+      if (!result || !state.order) return;
 
-      wrap.classList.remove('hidden');
+      const recipe = select ? select.value : '';
 
-      wrap.querySelectorAll('[data-quick-pick]').forEach((row) => {
-        row.addEventListener('click', () => {
-          const item = paints.find((p) => p.code === row.dataset.quickPick);
-          if (item && onPick) onPick(item);
-        });
-      });
-    } catch (error) {
-      wrap.classList.add('hidden');
-    }
-  }
-
-  async function quickPreview(paintItem) {
-    const partsInput = $('#quickParts');
-    const result = $('#quickResult');
-
-    if (!result || !state.order) return;
-
-    const parts = Number(partsInput.value) || 1;
-    const paint = paintItem ? paintItem.code : '';
-
-    result.innerHTML = '<div class="muted" style="padding:8px 0">Считаю…</div>';
-
-    try {
-      const data = await api(`/api/norms/quick?parts=${encodeURIComponent(parts)}${paint ? '&paint=' + encodeURIComponent(paint) : ''}`);
-
-      if (!data.items.length) {
-        result.innerHTML = '<div class="muted" style="padding:8px 0">Нормы не заданы. Задайте их в разделе «Нормы списания».</div>';
+      if (!recipe) {
+        result.innerHTML = '<div class="muted quick-hint">Выберите готовую краску.</div>';
         return;
       }
 
-      const hasPaintRow = data.items.some((item) => item.role === 'paint');
+      const parts = Number(partsInput.value) || 1;
 
-      result.innerHTML = `
-        <div class="quick-list">
-          ${data.items.map((item) => `
-            <div class="quick-line">
-              <span>${esc(item.name)}</span>
-              <span class="mono">${qty(item.qty)} ${esc(item.unit)}${item.per === 'order' ? ' <span class="muted">на машину</span>' : ''}</span>
-            </div>`).join('')}
-        </div>
-        ${hasPaintRow ? '' : '<div class="muted" style="margin-top:6px">Краска не выбрана — выберите её в поле выше.</div>'}
-        <button class="btn btn-primary btn-sm" id="btnQuickAdd" style="width:100%;margin-top:8px">
-          Добавить в списание (${data.items.length})
-        </button>
-      `;
+      result.innerHTML = '<div class="muted quick-hint">Считаю…</div>';
 
-      $('#btnQuickAdd').addEventListener('click', async () => {
-        const button = $('#btnQuickAdd');
-        button.disabled = true;
-        button.textContent = 'Добавляю…';
+      try {
+        const data = await api(`/api/norms/quick?parts=${encodeURIComponent(parts)}&recipe=${encodeURIComponent(recipe)}`);
 
-        try {
-          for (const item of data.items) {
-            await api(`/api/orders/${state.order.id}/materials`, {
-              method: 'POST',
-              body: {
-                code: item.code,
-                name: item.name,
-                unit: item.unit,
-                qty: item.qty,
-                kind: item.unit === 'г' ? 'paint' : 'material'
-              }
-            });
-          }
-
-          const fresh = await api('/api/orders/' + state.order.id);
-          state.order = fresh.order;
-          renderOrder();
-
-          toast(`Добавлено: ${qty(parts)} дет.`);
-        } catch (error) {
-          toast(error.message);
-          button.disabled = false;
-          button.textContent = 'Добавить в списание';
+        if (!data.items.length) {
+          result.innerHTML = '<div class="muted quick-hint">Нормы не заданы. Задайте их в разделе «Нормы списания».</div>';
+          return;
         }
-      });
-    } catch (error) {
-      result.innerHTML = `<div class="muted" style="padding:8px 0">${esc(error.message)}</div>`;
-    }
-  }
 
-  /* ---- Нормы списания: свой набор у каждого маляра, общая база для всех --- */
+        result.innerHTML = `
+          <div class="quick-list">
+            ${data.items.map((item) => `
+              <div class="quick-line">
+                <span>${esc(item.name)}</span>
+                <span class="mono">${qty(item.qty)} ${esc(item.unit)}${item.per === 'order' ? ' <span class="muted">на машину</span>' : ''}</span>
+              </div>`).join('')}
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnQuickAdd" style="width:100%;margin-top:6px">
+            Добавить в списание (${data.items.length})
+          </button>
+        `;
+
+        $('#btnQuickAdd').addEventListener('click', async () => {
+          const button = $('#btnQuickAdd');
+          button.disabled = true;
+          button.textContent = 'Добавляю…';
+
+          try {
+            for (const item of data.items) {
+              await api(`/api/orders/${state.order.id}/materials`, {
+                method: 'POST',
+                body: {
+                  code: item.code,
+                  name: item.name,
+                  unit: item.unit,
+                  qty: item.qty,
+                  kind: item.unit === 'г' ? 'paint' : 'material'
+                }
+              });
+            }
+
+            const fresh = await api('/api/orders/' + state.order.id);
+            state.order = fresh.order;
+            renderOrder();
+
+            toast(`Добавлено: ${qty(parts)} дет., краска «${data.recipe}»`);
+          } catch (error) {
+            toast(error.message);
+            button.disabled = false;
+            button.textContent = 'Добавить в списание';
+          }
+        });
+      } catch (error) {
+        result.innerHTML = `<div class="muted quick-hint">${esc(error.message)}</div>`;
+      }
+    }
+
+/* ---- Нормы списания: свой набор у каждого маляра, общая база для всех --- */
 
   let normsCommon = [];
   let normsMine = [];
