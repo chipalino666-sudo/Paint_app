@@ -10,7 +10,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { db, init, rebuildPaintAliases, nowISO, normalizeSearch, hashPassword, verifyPassword, nextOrderNumber, audit } = require('./db');
+const { db, init, rebuildPaintAliases, nowISO, normalizeSearch, hashPassword, verifyPassword, nextOrderNumber, audit, looseSearch } = require('./db');
 const auth = require('./auth');
 
 /* Ключ ИИ и прочие настройки читаем из .env рядом с сервером (файл в .gitignore) */
@@ -1081,6 +1081,30 @@ route('GET', '/api/materials', async ({ url }) => {
      LIMIT 60
   `).all(...params, ...orderParams);
 
+  // Ничего не нашли — пробуем без пробелов и дефисов: «SE-305 283» = «SE305283»
+  if (!materials.length && q) {
+    const loose = looseSearch(q);
+
+    if (loose.length >= 3) {
+      const all = db.prepare(`
+        SELECT code, name, unit, category, price, paint_code, aliases, stock,
+               COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
+          FROM materials
+         WHERE active = 1
+         ORDER BY name
+      `).all();
+
+      for (const row of all) {
+        if (category && category !== 'all' && row.category !== category) continue;
+
+        const haystack = looseSearch([row.code, row.name, row.paint_code, row.aliases].filter(Boolean).join(' '));
+
+        if (haystack.includes(loose)) materials.push(row);
+        if (materials.length >= 60) break;
+      }
+    }
+  }
+
   // Остаток: склад минус всё, что уже списано в заказах
   for (const row of materials) {
     row.stock_left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
@@ -1419,10 +1443,17 @@ route('GET', '/api/stock', async ({ url }) => {
 
   const items = [];
 
+  const looseQ = looseSearch(q);
+
   for (const row of rows) {
-    if (q && !String(row.name).toLowerCase().includes(q) && !String(row.code).toLowerCase().includes(q)) {
-      continue;
-    }
+    // Обычное сравнение, а если не совпало — рыхлое: «SE-316 461» = «SE316461»
+    const plain = q
+      ? String(row.name).toLowerCase().includes(q) || String(row.code).toLowerCase().includes(q)
+      : true;
+
+    const loose = q && looseQ ? looseSearch(row.code + ' ' + row.name).includes(looseQ) : false;
+
+    if (q && !plain && !loose) continue;
 
     const stock = round2(Number(row.stock) || 0);
     const used = round2(Number(row.used) || 0);

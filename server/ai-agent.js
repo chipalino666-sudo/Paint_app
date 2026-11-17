@@ -365,6 +365,14 @@ function makeNeedle(text) {
   return { plain: normalize(text), sound: phonetic(text) };
 }
 
+/** Рыхлый ключ: пробелы, дефисы и точки не мешают сравнению. */
+function looseKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[\s\-_.\/\\]+/g, '');
+}
+
 /** Совпадает ли значение с запросом — по обычному ключу или по звуковому. */
 function matchesText(value, needle) {
   const plain = normalize(value);
@@ -372,6 +380,7 @@ function matchesText(value, needle) {
 
   return plain.includes(needle.plain)
     || (needle.sound.length > 1 && sound.includes(needle.sound))
+    || looseKey(value).includes(looseKey(needle.plain))
     || fuzzyMatch(value, needle.plain);
 }
 
@@ -387,6 +396,10 @@ function resolveMaterial(db, query, options = {}) {
     if (paintOnly && exact.category !== 'paint') return null;
     return exact;
   }
+
+  // Код могли надиктовать с пробелами или дефисами
+  const looseMatch = resolveByLoose(db, raw, { paintOnly });
+  if (looseMatch) return looseMatch;
 
   const needle = normalize(raw);
 
@@ -415,6 +428,23 @@ function resolveMaterial(db, query, options = {}) {
   });
 
   return rows[0];
+}
+
+/** Поиск по «рыхлому» коду: «SE-305 283» и «SE305283» — одно и то же. */
+function resolveByLoose(db, query, options = {}) {
+  const paintOnly = Boolean(options.paintOnly);
+  const loose = looseKey(query);
+
+  if (loose.length < 3) return null;
+
+  const rows = db.prepare('SELECT * FROM materials WHERE active = 1').all();
+  const found = rows.find((row) => {
+    if (paintOnly && row.category !== 'paint') return false;
+
+    return looseKey([row.code, row.name, row.paint_code, row.aliases].filter(Boolean).join(' ')).includes(loose);
+  });
+
+  return found || null;
 }
 
 /** Пары кодов Brulex ↔ Standox: 110 ↔ 570 и т.п. */

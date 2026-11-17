@@ -278,6 +278,17 @@ function normalizeSearch(...parts) {
     .trim();
 }
 
+/**
+ * Рыхлый ключ: пробелы, дефисы, точки и слэши не мешают сравнению.
+ * «SE-305 283», «se305283» и «SE 305.283» дают одно и то же.
+ */
+function looseSearch(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[\s\-_.\/\\]+/g, '');
+}
+
 addColumn('materials', 'search', 'TEXT');
 addColumn('users', 'search', 'TEXT');
 addColumn('cars', 'search', 'TEXT');
@@ -706,6 +717,7 @@ module.exports = {
   init,
   nowISO,
   normalizeSearch,
+  looseSearch,
   randomToken,
   hashPassword,
   verifyPassword,

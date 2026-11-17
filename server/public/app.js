@@ -121,6 +121,14 @@
    * Раньше здесь был readonly и стирание «чужих» значений — из-за этого
    * пропадали названия, которые программа подставила сама.
    */
+  /** Рыхлое сравнение: пробелы, дефисы и точки не мешают искать. */
+  function looseKey(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/[\s\-_.\/\\]+/g, '');
+  }
+
   function shieldInput(input) {
     if (!input || input.dataset.shielded === '1') return;
     if (input.getAttribute('autocomplete') === 'tel') return;
@@ -1917,7 +1925,7 @@
     const needle = String(term || '').toLowerCase();
 
     const found = (needle
-      ? quickRecipes.filter((row) => String(row.name).toLowerCase().includes(needle))
+      ? quickRecipes.filter((row) => String(row.name).toLowerCase().includes(needle) || (looseKey(needle).length > 1 && looseKey(row.name).includes(looseKey(needle))))
       : quickRecipes
     ).slice(0, 8);
 
@@ -4168,7 +4176,7 @@ function renderWarehouse() {
         if (!query) return true;
 
         return [doc.name, doc.code, doc.title].filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query));
+          .some((value) => String(value).toLowerCase().includes(query) || (looseKey(query).length > 1 && looseKey(value).includes(looseKey(query))));
       });
 
       if (!docs.length) {
