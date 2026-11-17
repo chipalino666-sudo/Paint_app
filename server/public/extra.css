@@ -2677,3 +2677,40 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
 .form-message:empty { display: none; }
 .form-message-error { color: #e05252; font-weight: 600; }
 .form-message-ok { color: #2e9d5a; font-weight: 600; }
+/* Телефон: меню не обрезается рядом кнопок — снимаем прокрутку и переносим вниз */
+@media (max-width: 780px) {
+  .nav {
+    overflow: visible;
+    flex-wrap: wrap;
+    padding-bottom: 0;
+  }
+
+  .nav-more { position: relative; }
+
+  .nav-more .menu {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 220px;
+    max-width: calc(100vw - 24px);
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 300;
+  }
+
+  .nav-more .menu .menu-item {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+
+  .user-menu .menu {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 220px;
+    max-width: calc(100vw - 16px);
+    z-index: 300;
+  }
+}
