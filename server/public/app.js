@@ -219,7 +219,8 @@
     unreadOrders: {},
     orderTab: 'order',
     codes: [],
-    clients: []
+    clients: [],
+    stock: []
   };
 
   // Переписка: общий канал и обсуждение текущего заказа
@@ -337,6 +338,7 @@
     if (name === 'report') loadReport();
     if (name === 'refs') loadRefs();
     if (name === 'clients') loadClients();
+    if (name === 'stock') loadWarehouse();
     if (name === 'users') loadUsers();
     if (name === 'new') resetNewOrder();
   }
@@ -2263,6 +2265,109 @@
   function closeClient() {
     const card = $('#clientCard');
     if (card) card.classList.add('hidden');
+  }
+
+  /* ---- Склад: видно всем, правит кладовщик -------------------------------- */
+
+  const canStore = () => state.user && (state.user.role === 'admin' || state.user.role === 'store');
+
+  async function loadWarehouse(term) {
+    const host = $('#warehouseList');
+    if (!host) return;
+
+    const card = $('#stockAddCard');
+    if (card) card.classList.toggle('hidden', !canStore());
+
+    host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      const query = term !== undefined
+        ? term
+        : ($('#warehouseSearch') ? $('#warehouseSearch').value.trim() : '');
+
+      const data = await api('/api/stock' + (query ? '?q=' + encodeURIComponent(query) : ''));
+
+      state.stock = data.items;
+      renderWarehouse();
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  function renderWarehouse() {
+    const host = $('#warehouseList');
+    if (!host) return;
+
+    if (!state.stock.length) {
+      host.innerHTML = '<div class="empty-line">Ничего не найдено</div>';
+      return;
+    }
+
+    host.innerHTML = `
+      <table class="grid">
+        <thead>
+          <tr><th>Код</th><th>Наименование</th><th class="num">Остаток</th><th class="num">Списано</th></tr>
+        </thead>
+        <tbody>
+          ${state.stock.map((item) => `
+            <tr>
+              <td class="code-cell" data-label="Код">${esc(item.code)}</td>
+              <td data-label="Наименование">${esc(item.name)}</td>
+              <td class="num" data-label="Остаток">
+                ${canStore()
+                  ? `<span class="stock-inline">
+                       <input type="number" min="0" step="0.01" value="${item.left}"
+                              data-stock-code="${esc(item.code)}" class="stock-input">
+                       <span class="unit">${esc(item.unit)}</span>
+                     </span>`
+                  : `<span class="stock-badge${item.left <= 0 ? ' empty' : ''}">${qty(item.left)} ${esc(item.unit)}</span>`}
+              </td>
+              <td class="muted" data-label="Списано">${qty(item.used)} ${esc(item.unit)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    host.querySelectorAll('[data-stock-code]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        try {
+          await api('/api/stock/' + encodeURIComponent(input.dataset.stockCode), {
+            method: 'PATCH',
+            body: { left: Number(input.value) || 0 }
+          });
+
+          toast('Остаток обновлён');
+          loadWarehouse();
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+    });
+  }
+
+  async function addStockItem() {
+    const name = $('#stockName').value.trim();
+    const code = $('#stockCode').value.trim();
+    const unit = $('#stockUnit').value;
+    const category = $('#stockCategory').value;
+    const left = Number($('#stockLeft').value) || 0;
+
+    if (!name) {
+      toast('Введите наименование');
+      return;
+    }
+
+    try {
+      await api('/api/stock', { method: 'POST', body: { name, code, unit, category, stock: left } });
+
+      ['stockName', 'stockCode'].forEach((id) => { $('#' + id).value = ''; });
+      $('#stockLeft').value = '0';
+
+      toast('Материал добавлен на склад');
+      loadWarehouse();
+    } catch (error) {
+      toast(error.message);
+    }
   }
 
   /* ---- Перевод кодов красок ------------------------------------------------ */

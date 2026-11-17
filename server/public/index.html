@@ -77,6 +77,7 @@
     <button class="nav-btn active" data-view="orders">Заказы<span class="nav-badge hidden" id="ordersBadge">0</span></button>
     <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
     <button class="nav-btn" data-view="report">Отчёт</button>
+    <button class="nav-btn" data-view="stock" id="navStock">Склад</button>
     <button class="nav-btn" data-view="clients" id="navClients">Клиенты</button>
     <button class="nav-btn" data-view="refs">Справочники</button>
     <button class="nav-btn hidden" data-view="users" id="navUsers">Сотрудники</button>
@@ -286,6 +287,78 @@
       </div>
 
       <div id="clientCardBody"></div>
+    </div>
+  </section>
+
+  <!-- ======================= СКЛАД ======================= -->
+  <section class="view hidden" id="view-stock">
+    <h1 class="page-title">Склад</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Остатки на складе</h2>
+        <span class="muted">остаток = что было на складе минус всё списанное</span>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="warehouseSearch" placeholder="Код или название материала…" autocomplete="off">
+      </div>
+
+      <div id="warehouseList"></div>
+    </div>
+
+    <div class="card hidden" id="stockAddCard">
+      <div class="card-head">
+        <h2>Добавить материал</h2>
+        <span class="muted">только кладовщик или администратор</span>
+      </div>
+
+      <div class="stock-form">
+        <div class="field">
+          <label for="stockName">Наименование</label>
+          <input type="text" id="stockName" placeholder="Например: Скотч малярный 50 мм">
+        </div>
+
+        <div class="field">
+          <label for="stockCode">Код (не обязательно)</label>
+          <input type="text" id="stockCode" placeholder="оставьте пустым — создам автоматически">
+        </div>
+
+        <div class="field">
+          <label for="stockUnit">Единица</label>
+          <select id="stockUnit">
+            <option value="шт">шт</option>
+            <option value="г">г</option>
+            <option value="л">л</option>
+            <option value="кг">кг</option>
+            <option value="м">м</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="stockCategory">Категория</label>
+          <select id="stockCategory">
+            <option value="paint">Краска</option>
+            <option value="primer">Грунт</option>
+            <option value="putty">Шпатлёвка</option>
+            <option value="clear">Лак</option>
+            <option value="hardener">Отвердитель</option>
+            <option value="thinner">Разбавитель</option>
+            <option value="abrasive">Абразив</option>
+            <option value="consumable">Расходник</option>
+            <option value="other" selected>Прочее</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="stockLeft">Остаток</label>
+          <input type="number" id="stockLeft" min="0" step="0.01" value="0">
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btnAddStock">Добавить на склад</button>
+      </div>
     </div>
   </section>
 

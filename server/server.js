@@ -1376,6 +1376,94 @@ route('DELETE', '/api/codes/:id', async ({ user, params }) => {
   return { ok: true };
 });
 
+/* ---- Склад --------------------------------------------------------------- */
+
+/** Склад видят все сотрудники: сколько чего есть на самом деле. */
+route('GET', '/api/stock', async ({ url }) => {
+  const q = normalizeSearch(str(url.searchParams.get('q'), 100));
+
+  const rows = db.prepare(`
+    SELECT m.code, m.name, m.unit, m.category, m.price, m.stock,
+           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+      FROM materials m
+     WHERE m.active = 1
+     ORDER BY m.name
+  `).all();
+
+  const items = [];
+
+  for (const row of rows) {
+    if (q && !String(row.name).toLowerCase().includes(q) && !String(row.code).toLowerCase().includes(q)) {
+      continue;
+    }
+
+    const stock = round2(Number(row.stock) || 0);
+    const used = round2(Number(row.used) || 0);
+
+    items.push({
+      code: row.code,
+      name: row.name,
+      unit: row.unit,
+      category: row.category,
+      price: row.price,
+      stock,
+      used,
+      left: round2(stock - used)
+    });
+  }
+
+  return { items };
+});
+
+/** Остаток меняет кладовщик: вводит «сколько есть сейчас». */
+route('PATCH', '/api/stock/:code', async ({ user, params, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Остатки меняет кладовщик или админ');
+
+  const material = db.prepare('SELECT * FROM materials WHERE code = ?').get(params.code);
+  if (!material) throw new ApiError(404, 'Материал не найден');
+
+  const used = db.prepare('SELECT COALESCE(SUM(qty), 0) AS n FROM order_materials WHERE code = ?')
+    .get(material.code).n;
+
+  // В базе храним «сколько было на складе», кладовщик вводит «сколько осталось»
+  const left = Math.max(0, toNum(body.left, 0));
+  const stock = round2(left + (Number(used) || 0));
+
+  db.prepare('UPDATE materials SET stock = ? WHERE code = ?').run(stock, material.code);
+
+  audit(user.id, 'stock', 'material', null, {
+    code: material.code,
+    text: `Склад: «${material.name}» остаток ${left} ${material.unit}`
+  });
+
+  return { ok: true, left };
+});
+
+/** Новый материал на склад добавляет кладовщик или админ. */
+route('POST', '/api/stock', async ({ user, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Материалы добавляет кладовщик или админ');
+
+  const name = str(body.name, 300);
+  if (!name) throw new ApiError(400, 'Укажите наименование');
+
+  const code = str(body.code, 40) || `MAN-${Date.now().toString(36).toUpperCase()}`;
+  const unit = str(body.unit, 10) || 'шт';
+  const category = str(body.category, 30) || 'other';
+  const price = round2(toNum(body.price, 0));
+  const stock = Math.max(0, toNum(body.stock, 0));
+
+  const exists = db.prepare('SELECT code FROM materials WHERE code = ?').get(code);
+  if (exists) throw new ApiError(400, 'Такой код уже есть');
+
+  db.prepare(`INSERT INTO materials (code, name, unit, category, price, stock, active, synced_at, search)
+              VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+    .run(code, name, unit, category, price, stock, nowISO(), normalizeSearch(code, name));
+
+  audit(user.id, 'create', 'material', null, { text: `На склад добавлен «${name}»` });
+
+  return { ok: true, code };
+});
+
 /* ---- Готовые краски ----------------------------------------------------- */
 
 const recipeOut = (row) => ({ ...row, mixes: JSON.parse(row.mixes || '[]') });

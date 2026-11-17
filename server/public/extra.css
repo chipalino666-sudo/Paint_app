@@ -1724,3 +1724,50 @@ td.empty-line,
 
 .fav-star:hover { color: #e0a800; }
 .fav-star.active { color: #e0a800; }
+/* ---------- Склад --------------------------------------------------------- */
+
+.stock-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-input {
+  width: 96px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  text-align: right;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-inline .unit { color: var(--grey); font-size: 12.5px; }
+
+.stock-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.stock-form .field { margin: 0; }
+
+.stock-form input,
+.stock-form select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+@media (max-width: 780px) {
+  .stock-form { grid-template-columns: 1fr; }
+}
