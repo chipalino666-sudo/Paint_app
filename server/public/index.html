@@ -87,6 +87,7 @@
       <div class="menu hidden" id="moreMenu">
         <button class="nav-btn menu-item" data-view="report">Отчёт</button>
         <button class="nav-btn menu-item" data-view="stock" id="navStock">Склад</button>
+        <button class="nav-btn menu-item" data-view="tds" id="navTds">ТДС и паспорта</button>
         <button class="nav-btn menu-item" data-view="clients" id="navClients">Клиенты</button>
         <button class="nav-btn menu-item" data-view="refs">Справочники</button>
         <button class="nav-btn menu-item hidden" data-view="users" id="navUsers">Сотрудники</button>
@@ -380,6 +381,54 @@
 
       <div class="actions-row">
         <button class="btn btn-primary" id="btnAddStock">Добавить на склад</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= ТДС ======================= -->
+  <section class="view hidden" id="view-tds">
+    <h1 class="page-title">ТДС и паспорта</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Документы на материалы</h2>
+        <span class="muted">техкарты, паспорта, инструкции — открываются в новой вкладке</span>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="tdsSearch" placeholder="Материал, код или название документа…" autocomplete="off">
+      </div>
+
+      <div id="tdsList"></div>
+    </div>
+
+    <div class="card hidden" id="tdsAddCard">
+      <div class="card-head">
+        <h2>Добавить документ</h2>
+        <span class="muted">кладовщик, приёмщик или админ</span>
+      </div>
+
+      <div class="stock-form">
+        <div class="field" style="grid-column: span 2">
+          <label for="tdsMatSearch">Материал</label>
+          <input type="text" id="tdsMatSearch" placeholder="Начните вводить код или название…" autocomplete="off">
+          <div class="search-results hidden" id="tdsMatResults"></div>
+          <div class="muted" id="tdsPicked" style="margin-top:6px"></div>
+        </div>
+
+        <div class="field">
+          <label for="tdsTitle">Название документа</label>
+          <input type="text" id="tdsTitle" placeholder="TDS Brulex MIX 110B">
+        </div>
+
+        <div class="field">
+          <label for="tdsUrl">Ссылка</label>
+          <input type="text" id="tdsUrl" placeholder="https://…">
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btnAddTds">Добавить</button>
       </div>
     </div>
   </section>

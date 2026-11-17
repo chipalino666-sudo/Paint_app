@@ -339,6 +339,7 @@
     if (name === 'refs') loadRefs();
     if (name === 'clients') loadClients();
     if (name === 'stock') loadWarehouse();
+    if (name === 'tds') loadTdsView();
     if (name === 'users') loadUsers();
     if (name === 'new') resetNewOrder();
   }
@@ -1926,7 +1927,7 @@
     row.innerHTML = `
       <div class="item-text">
         <span class="code">${esc(item.code)}</span>
-        <span class="name">${esc(item.name)}${item.aliases ? `<br><span class="muted">${esc(item.aliases)}</span>` : ''}${stockText ? `<br><span class="${stockClass}">${esc(stockText)}</span>` : ''}</span>
+        <span class="name">${esc(item.name)}${tdsButton(item)}${item.aliases ? `<br><span class="muted">${esc(item.aliases)}</span>` : ''}${stockText ? `<br><span class="${stockClass}">${esc(stockText)}</span>` : ''}</span>
       </div>
       <button class="fav-star${favorites.has(item.code) ? ' active' : ''}" title="В избранное">${favorites.has(item.code) ? '★' : '☆'}</button>
       <button class="btn btn-left btn-sm" data-kind="paint">◀ Эмаль</button>
@@ -2634,7 +2635,7 @@
           ${state.stock.map((item) => `
             <tr>
               <td class="code-cell" data-label="Код">${esc(item.code)}</td>
-              <td data-label="Наименование">${esc(item.name)}</td>
+              <td data-label="Наименование">${esc(item.name)} ${tdsButton(item)}</td>
               <td class="num" data-label="Остаток">
                 ${canStore()
                   ? `<span class="stock-inline">
@@ -3386,6 +3387,171 @@
     state.works = data.works;
   }
 
+  /* ---- ТДС: техническая документация на материалы -------------------------- */
+
+  async function loadTds() {
+    try {
+      const data = await api('/api/tds');
+      state.docs = data.docs || [];
+    } catch (error) {
+      state.docs = [];
+    }
+  }
+
+  function docsOf(code) {
+    return state.docs.filter((doc) => doc.code === code);
+  }
+
+  /** Маленькая кнопка «ТДС» в строках материала. */
+  function tdsButton(item) {
+    const docs = docsOf(item.code);
+    if (!docs.length) return '';
+
+    return `<a class="tds-link" href="${esc(docs[0].url)}" target="_blank" rel="noopener"
+               title="${esc(docs.map((d) => d.title).join('\n'))}">ТДС ↗</a>`;
+  }
+
+  /* ---- ТДС: раздел со справочником документов ------------------------------ */
+
+  const canEditDocs = () => state.user
+    && ['admin', 'manager', 'store'].includes(state.user.role);
+
+  let tdsPicked = null;
+
+  async function loadTdsView(term) {
+    const host = $('#tdsList');
+    if (!host) return;
+
+    const card = $('#tdsAddCard');
+    if (card) card.classList.toggle('hidden', !canEditDocs());
+
+    host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+    try {
+      await loadTds();
+
+      const query = (term !== undefined ? term : ($('#tdsSearch') ? $('#tdsSearch').value : '')).trim().toLowerCase();
+
+      const docs = state.docs.filter((doc) => {
+        if (!query) return true;
+
+        return [doc.name, doc.code, doc.title].filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+      });
+
+      if (!docs.length) {
+        host.innerHTML = '<div class="empty-line">Документов пока нет</div>';
+        return;
+      }
+
+      // Группируем по материалу
+      const groups = new Map();
+
+      for (const doc of docs) {
+        const key = doc.code;
+        if (!groups.has(key)) groups.set(key, { code: doc.code, name: doc.name || doc.code, items: [] });
+        groups.get(key).items.push(doc);
+      }
+
+      host.innerHTML = [...groups.values()].map((group) => `
+        <div class="tds-group">
+          <div class="tds-group-head">
+            <span class="code mono">${esc(group.code)}</span>
+            <b>${esc(group.name)}</b>
+          </div>
+
+          ${group.items.map((doc) => `
+            <div class="tds-row">
+              <a href="${esc(doc.url)}" target="_blank" rel="noopener">${esc(doc.title)} ↗</a>
+              ${canEditDocs() ? `<button class="row-del" data-tds-del="${doc.id}" title="Удалить">×</button>` : ''}
+            </div>`).join('')}
+        </div>
+      `).join('');
+
+      host.querySelectorAll('[data-tds-del]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          try {
+            await api('/api/tds/' + button.dataset.tdsDel, { method: 'DELETE' });
+            await loadTdsView();
+            toast('Документ удалён');
+          } catch (error) {
+            toast(error.message);
+          }
+        });
+      });
+    } catch (error) {
+      host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+    }
+  }
+
+  async function pickTdsMaterial(term) {
+    const wrap = $('#tdsMatResults');
+    if (!wrap) return;
+
+    if (!term) {
+      wrap.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const data = await api('/api/materials?q=' + encodeURIComponent(term));
+
+      wrap.innerHTML = data.materials.slice(0, 8).map((item) => `
+        <div class="row" data-tds-pick="${esc(item.code)}">
+          <span class="code">${esc(item.code)}</span>
+          <span class="name">${esc(item.name)}</span>
+        </div>
+      `).join('') || '<div class="row" style="cursor:default">Ничего не найдено</div>';
+
+      wrap.classList.remove('hidden');
+
+      wrap.querySelectorAll('[data-tds-pick]').forEach((row) => {
+        row.addEventListener('click', () => {
+          const item = data.materials.find((m) => m.code === row.dataset.tdsPick);
+          tdsPicked = item;
+
+          if ($('#tdsPicked')) {
+            $('#tdsPicked').textContent = `${item.code} — ${item.name}`;
+          }
+
+          if ($('#tdsMatSearch')) $('#tdsMatSearch').value = item.name;
+          wrap.classList.add('hidden');
+
+          if (!$('#tdsTitle').value) {
+            $('#tdsTitle').value = 'TDS ' + item.name;
+          }
+        });
+      });
+    } catch (error) {
+      wrap.classList.add('hidden');
+    }
+  }
+
+  async function addTdsLink() {
+    if (!tdsPicked) {
+      toast('Выберите материал из списка');
+      return;
+    }
+
+    const title = $('#tdsTitle').value.trim();
+    const url = $('#tdsUrl').value.trim();
+
+    try {
+      await api('/api/tds', { method: 'POST', body: { code: tdsPicked.code, title, url } });
+
+      tdsPicked = null;
+      $('#tdsMatSearch').value = '';
+      $('#tdsTitle').value = '';
+      $('#tdsUrl').value = '';
+      $('#tdsPicked').textContent = '';
+
+      await loadTdsView();
+      toast('Документ добавлен');
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
   async function loadRecipes() {
     const data = await api('/api/recipes');
     state.recipes = data.recipes;
@@ -3682,6 +3848,46 @@
 
     if ($('#btnCloseClient')) $('#btnCloseClient').addEventListener('click', closeClient);
 
+    /* Склад: поиск и добавление материала */
+    const warehouseSearch = $('#warehouseSearch');
+
+    if (warehouseSearch) {
+      let stockTimer = null;
+
+      warehouseSearch.addEventListener('input', () => {
+        clearTimeout(stockTimer);
+        const value = warehouseSearch.value.trim();
+        stockTimer = setTimeout(() => loadWarehouse(value), 220);
+      });
+    }
+
+    if ($('#btnAddStock')) $('#btnAddStock').addEventListener('click', addStockItem);
+
+    /* ТДС: поиск по документам, выбор материала и добавление ссылки */
+    const tdsSearch = $('#tdsSearch');
+
+    if (tdsSearch) {
+      let tdsTimer = null;
+
+      tdsSearch.addEventListener('input', () => {
+        clearTimeout(tdsTimer);
+        tdsTimer = setTimeout(() => loadTdsView(tdsSearch.value), 220);
+      });
+    }
+
+    const tdsMatSearch = $('#tdsMatSearch');
+
+    if (tdsMatSearch) {
+      let pickTimer = null;
+
+      tdsMatSearch.addEventListener('input', () => {
+        clearTimeout(pickTimer);
+        pickTimer = setTimeout(() => pickTdsMaterial(tdsMatSearch.value.trim()), 220);
+      });
+    }
+
+    if ($('#btnAddTds')) $('#btnAddTds').addEventListener('click', addTdsLink);
+
     const codesBulkButton = $('#btnImportCodes');
     if (codesBulkButton) codesBulkButton.addEventListener('click', importCodes);
 
@@ -3861,7 +4067,7 @@
     renderStatusChips();
 
     try {
-      await Promise.all([loadWorks(), loadRecipes()]);
+      await Promise.all([loadWorks(), loadRecipes(), loadTds()]);
       const users = await api('/api/users').catch(() => ({ users: [] }));
       state.users = users.users || [];
     } catch (error) {

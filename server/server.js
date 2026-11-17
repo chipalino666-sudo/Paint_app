@@ -1464,6 +1464,47 @@ route('POST', '/api/stock', async ({ user, body }) => {
   return { ok: true, code };
 });
 
+/* ---- Техническая документация (ТДС) -------------------------------------- */
+
+/** Все документы одним списком: их немного, отдаём целиком. */
+route('GET', '/api/tds', async () => {
+  const docs = db.prepare(`
+    SELECT d.id, d.code, d.title, d.url, d.created_at, m.name
+      FROM material_docs d
+      LEFT JOIN materials m ON m.code = d.code
+     ORDER BY m.name, d.created_at DESC
+  `).all();
+
+  return { docs };
+});
+
+/** Ссылку на ТДС добавляет кладовщик, приёмщик или админ. */
+route('POST', '/api/tds', async ({ user, body }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Ссылки на ТДС добавляет кладовщик или приёмщик');
+
+  const code = str(body.code, 40);
+  const title = str(body.title, 200);
+  const url = str(body.url, 500);
+
+  if (!code) throw new ApiError(400, 'Не указан материал');
+  if (!title) throw new ApiError(400, 'Укажите название документа');
+  if (!/^https?:\/\/\S+$/i.test(url)) throw new ApiError(400, 'Ссылка должна начинаться с http:// или https://');
+
+  const info = db.prepare('INSERT INTO material_docs (code, title, url, created_at) VALUES (?, ?, ?, ?)')
+    .run(code, title, url, nowISO());
+
+  audit(user.id, 'create', 'material_doc', Number(info.lastInsertRowid), { text: `ТДС: ${title}` });
+
+  return { ok: true, id: Number(info.lastInsertRowid) };
+});
+
+route('DELETE', '/api/tds/:id', async ({ user, params }) => {
+  if (!isStaff(user)) throw new ApiError(403, 'Удаляет кладовщик или приёмщик');
+
+  db.prepare('DELETE FROM material_docs WHERE id = ?').run(Number(params.id));
+  return { ok: true };
+});
+
 /* ---- Готовые краски ----------------------------------------------------- */
 
 const recipeOut = (row) => ({ ...row, mixes: JSON.parse(row.mixes || '[]') });

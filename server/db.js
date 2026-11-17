@@ -145,6 +145,17 @@ CREATE TABLE IF NOT EXISTS favorites (
   PRIMARY KEY (user_id, code)
 );
 
+/* Техническая документация на материалы: ТДС, паспорта, инструкции */
+CREATE TABLE IF NOT EXISTS material_docs (
+  id         INTEGER PRIMARY KEY,
+  code       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  url        TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
+
 CREATE TABLE IF NOT EXISTS norms (
   id      INTEGER PRIMARY KEY,
   work_id INTEGER NOT NULL REFERENCES works(id) ON DELETE CASCADE,
