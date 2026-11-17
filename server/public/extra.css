@@ -2672,3 +2672,8 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   #view-tds .stock-form input[type=file] { width: 100%; font-size: 12.5px; }
   #view-tds .actions-row .btn { width: 100%; }
 }
+/* Сообщение в форме ТДС */
+.form-message { margin-top: 10px; font-size: 13px; line-height: 1.4; }
+.form-message:empty { display: none; }
+.form-message-error { color: #e05252; font-weight: 600; }
+.form-message-ok { color: #2e9d5a; font-weight: 600; }

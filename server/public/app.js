@@ -120,6 +120,9 @@
     if (!input || input.dataset.shielded === '1') return;
     if (input.getAttribute('autocomplete') === 'tel') return;
 
+    // Поисковые поля не защищаем: щит ставит readonly и стирает набранное
+    if (input.dataset.noshield === '1') return;
+
     input.dataset.shielded = '1';
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('data-form-type', 'other');
@@ -3911,11 +3914,53 @@
     }
   }
 
-  async function addTdsLink() {
-    if (!tdsPicked) {
-      toast('Выберите материал из списка');
-      return;
+  /** Сообщение прямо в форме: чтобы не гадать, почему «ничего не происходит». */
+  function tdsSay(text, isError = true) {
+    const box = $('#tdsMessage');
+    if (!box) return;
+
+    box.textContent = text || '';
+    box.classList.toggle('form-message-error', Boolean(text) && isError);
+    box.classList.toggle('form-message-ok', Boolean(text) && !isError);
+  }
+
+  /** Если материал не выбран из подсказок — ищем его по введённому тексту. */
+  async function resolveTdsMaterial(text) {
+    const query = String(text || '').trim();
+    if (!query) return null;
+
+    try {
+      const data = await api('/api/materials?q=' + encodeURIComponent(query));
+      const list = data.materials || [];
+      if (!list.length) return null;
+
+      const upper = query.toUpperCase();
+      return list.find((m) => m.code.toUpperCase() === upper) || list[0];
+    } catch (error) {
+      return null;
     }
+  }
+
+  async function addTdsLink() {
+    const materialText = $('#tdsMatSearch') ? $('#tdsMatSearch').value.trim() : '';
+
+    // Материал могли ввести руками, не выбрав из подсказок
+    if (!tdsPicked) {
+      if (!materialText) {
+        tdsSay('Сначала выберите материал или введите его код');
+        return;
+      }
+
+      const found = await resolveTdsMaterial(materialText);
+      if (!found) {
+        tdsSay('Материал не найден — начните вводить код или название и выберите из списка');
+        return;
+      }
+
+      tdsPicked = found;
+    }
+
+    tdsSay('');
 
     const title = $('#tdsTitle').value.trim();
     const url = $('#tdsUrl').value.trim();
@@ -4323,6 +4368,41 @@
         renderRecipesRef();
       });
     }
+
+    /* ТДС: поиск по документам, выбор материала и добавление */
+    const tdsSearch = $('#tdsSearch');
+
+    if (tdsSearch) {
+      let tdsTimer = null;
+
+      tdsSearch.addEventListener('input', () => {
+        clearTimeout(tdsTimer);
+        tdsTimer = setTimeout(() => loadTdsView(tdsSearch.value), 220);
+      });
+    }
+
+    const tdsMatSearch = $('#tdsMatSearch');
+
+    if (tdsMatSearch) {
+      let pickTimer = null;
+
+      tdsMatSearch.addEventListener('input', () => {
+        tdsSay('');
+        clearTimeout(pickTimer);
+        pickTimer = setTimeout(() => pickTdsMaterial(tdsMatSearch.value.trim()), 220);
+      });
+
+      // Enter — взять первый найденный материал из подсказок
+      tdsMatSearch.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+
+        const first = document.querySelector('#tdsMatResults [data-tds-pick]');
+        if (first) first.click();
+      });
+    }
+
+    if ($('#btnAddTds')) $('#btnAddTds').addEventListener('click', addTdsLink);
 
     /* Нормы списания: выбор набора, добавление материалов, сохранение */
     const normSearch = $('#normSearch');
