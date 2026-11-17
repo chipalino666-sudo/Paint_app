@@ -3846,6 +3846,20 @@
       });
     }
 
+    /* ИИ-помощник */
+    if ($('#aiFab')) $('#aiFab').addEventListener('click', () => {
+      const panel = $('#aiPanel');
+      if (panel && !panel.classList.contains('hidden')) aiClose();
+      else aiOpen();
+    });
+
+    if ($('#aiClose')) $('#aiClose').addEventListener('click', aiClose);
+
+    if ($('#aiForm')) $('#aiForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      aiSend($('#aiInput').value);
+    });
+
     if ($('#btnCloseClient')) $('#btnCloseClient').addEventListener('click', closeClient);
 
     /* Склад: поиск и добавление материала */
@@ -4030,6 +4044,159 @@
       const photo = event.target.closest && event.target.closest('.msg-photo');
       if (photo) openLightbox(photo.src);
     });
+  }
+
+  /* ------------------------------------------------------------------------
+     ИИ-помощник: чат в углу экрана
+     ------------------------------------------------------------------------ */
+
+  let aiHistory = [];
+  let aiBusy = false;
+
+  function aiBubble(role, text) {
+    const body = $('#aiBody');
+    if (!body) return null;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-msg ' + (role === 'user' ? 'ai-msg-user' : 'ai-msg-bot');
+    bubble.textContent = text;
+    body.appendChild(bubble);
+    body.scrollTop = body.scrollHeight;
+
+    return bubble;
+  }
+
+  async function aiOpen() {
+    const panel = $('#aiPanel');
+    if (!panel) return;
+
+    panel.classList.remove('hidden');
+    $('#aiInput').focus();
+
+    try {
+      const status = await api('/api/ai/status');
+      const label = $('#aiStatus');
+
+      if (label) {
+        label.textContent = status.configured
+          ? `осталось ${Math.max(0, status.limit_today - status.used_today)} запросов сегодня`
+          : 'не настроен';
+      }
+
+      if (!status.configured) {
+        aiBubble('bot', 'Помощник ещё не настроен: на сервере нет ключа DeepSeek. Скажите администратору.');
+      }
+    } catch (error) {
+      /* статус не критичен */
+    }
+  }
+
+  function aiClose() {
+    const panel = $('#aiPanel');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function aiRenderProposal(proposal) {
+    const box = $('#aiProposal');
+    if (!box) return;
+
+    if (!proposal || !proposal.items || !proposal.items.length) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="ai-prop-head">
+        Заказ ${esc(proposal.number)} · ${esc(proposal.plate)}
+      </div>
+      ${proposal.items.map((item) => `
+        <div class="ai-prop-row">
+          <span>${esc(item.name)}</span>
+          <span class="mono">${qty(item.qty)} ${esc(item.unit)}</span>
+        </div>`).join('')}
+      <div class="ai-prop-actions">
+        <button class="btn btn-primary btn-sm" id="aiConfirm">Списать</button>
+        <button class="btn btn-outline btn-sm" id="aiCancel">Отмена</button>
+      </div>
+    `;
+
+    box.classList.remove('hidden');
+
+    $('#aiCancel').addEventListener('click', () => {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+    });
+
+    $('#aiConfirm').addEventListener('click', async () => {
+      const button = $('#aiConfirm');
+      button.disabled = true;
+      button.textContent = 'Списываю…';
+
+      try {
+        for (const item of proposal.items) {
+          await api(`/api/orders/${proposal.order_id}/materials`, {
+            method: 'POST',
+            body: { code: item.code, name: item.name, unit: item.unit, qty: item.qty, kind: item.kind }
+          });
+        }
+
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        aiBubble('bot', 'Списано. Обновите заказ, чтобы увидеть строки.');
+
+        if (state.order && Number(state.order.id) === Number(proposal.order_id)) {
+          const fresh = await api('/api/orders/' + proposal.order_id);
+          state.order = fresh.order;
+          renderOrder();
+        }
+      } catch (error) {
+        aiBubble('bot', 'Не получилось: ' + error.message);
+        button.disabled = false;
+        button.textContent = 'Списать';
+      }
+    });
+  }
+
+  async function aiSend(text) {
+    if (aiBusy || !text.trim()) return;
+
+    const message = text.trim();
+    aiBusy = true;
+
+    const input = $('#aiInput');
+    if (input) input.value = '';
+
+    aiBubble('user', message);
+    aiRenderProposal(null);
+
+    const thinking = aiBubble('bot', 'Думаю…');
+    if (thinking) thinking.classList.add('ai-thinking');
+
+    try {
+      const data = await api('/api/ai/chat', {
+        method: 'POST',
+        body: {
+          message,
+          history: aiHistory.slice(-8),
+          order_id: state.order ? state.order.id : null
+        }
+      });
+
+      if (thinking) thinking.remove();
+
+      aiBubble('bot', data.reply || 'Готово.');
+
+      aiHistory.push({ role: 'user', content: message });
+      aiHistory.push({ role: 'assistant', content: data.reply || '' });
+
+      if (data.proposal) aiRenderProposal(data.proposal);
+    } catch (error) {
+      if (thinking) thinking.remove();
+      aiBubble('bot', 'Ошибка: ' + error.message);
+    } finally {
+      aiBusy = false;
+    }
   }
 
   async function boot() {

@@ -842,5 +842,38 @@
 </datalist>
 
 <script src="/app.js"></script>
+  <!-- ======================= ИИ-ПОМОЩНИК ======================= -->
+  <button class="ai-fab" id="aiFab" title="Спросить ИИ-помощника">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v3"/><rect x="4" y="7" width="16" height="12" rx="4"/>
+      <circle cx="9" cy="13" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="15" cy="13" r="1.4" fill="currentColor" stroke="none"/>
+      <path d="M9.5 17h5"/>
+    </svg>
+  </button>
+
+  <section class="ai-panel hidden" id="aiPanel">
+    <div class="ai-head">
+      <b>Помощник цеха</b>
+      <span class="ai-status" id="aiStatus"></span>
+      <button class="ai-close" id="aiClose" title="Закрыть">×</button>
+    </div>
+
+    <div class="ai-body" id="aiBody">
+      <div class="ai-hello">
+        Спросите обычным языком:<br>
+        «K555KK77, 110, капот»<br>
+        «тдс на лак 442»<br>
+        «сколько осталось 110»
+      </div>
+    </div>
+
+    <div class="ai-proposal hidden" id="aiProposal"></div>
+
+    <form class="ai-form" id="aiForm" autocomplete="off">
+      <input type="text" id="aiInput" placeholder="Напишите сообщение…">
+      <button class="btn btn-primary" type="submit" id="aiSend" title="Отправить">→</button>
+    </form>
+  </section>
 </body>
 </html>

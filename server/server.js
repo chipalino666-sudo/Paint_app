@@ -13,6 +13,23 @@ const path = require('node:path');
 const { db, init, rebuildPaintAliases, nowISO, normalizeSearch, hashPassword, verifyPassword, nextOrderNumber, audit } = require('./db');
 const auth = require('./auth');
 
+/* Ключ ИИ и прочие настройки читаем из .env рядом с сервером (файл в .gitignore) */
+(() => {
+  const envFile = path.join(__dirname, '.env');
+  if (!fs.existsSync(envFile)) return;
+
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+    if (!match) continue;
+
+    const value = match[2].replace(/^["']|["']$/g, '');
+    if (!process.env[match[1]]) process.env[match[1]] = value;
+  }
+})();
+
+const ai = require('./ai');
+const aiAgent = require('./ai-agent');
+
 const PORT = Number(process.env.PAINT_PORT || 3000);
 const HOST = process.env.PAINT_HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -1503,6 +1520,56 @@ route('DELETE', '/api/tds/:id', async ({ user, params }) => {
 
   db.prepare('DELETE FROM material_docs WHERE id = ?').run(Number(params.id));
   return { ok: true };
+});
+
+/* ---- ИИ-помощник --------------------------------------------------------- */
+
+/** Настроен ли помощник и сколько запросов уже израсходовано. */
+route('GET', '/api/ai/status', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const used = db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action = 'ai' AND at >= ?").get(today).n;
+  const limit = Number(process.env.AI_DAILY_LIMIT || 300);
+
+  return {
+    configured: ai.configured(),
+    model: ai.MODEL,
+    used_today: used,
+    limit_today: limit
+  };
+});
+
+/** Диалог с помощником. Запись в базу делает человек кнопкой, не модель. */
+route('POST', '/api/ai/chat', async ({ user, body }) => {
+  if (!ai.configured()) {
+    throw new ApiError(503, 'ИИ-помощник не настроен: на сервере нет ключа DeepSeek');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const used = db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action = 'ai' AND at >= ?").get(today).n;
+  const limit = Number(process.env.AI_DAILY_LIMIT || 300);
+
+  if (used >= limit) {
+    throw new ApiError(429, `Дневной лимит запросов к помощнику исчерпан (${limit}). Попробуйте завтра.`);
+  }
+
+  const message = str(body.message, 2000);
+  if (!message) throw new ApiError(400, 'Пустой запрос');
+
+  const result = await aiAgent.handle(
+    { db, user, canSeeOrder, orderView, round2 },
+    { message, history: body.history, orderId: body.order_id ? Number(body.order_id) : null }
+  );
+
+  audit(user.id, 'ai', 'chat', null, {
+    text: message.slice(0, 300),
+    tokens: result.usage ? result.usage.prompt_tokens + result.usage.completion_tokens : 0
+  });
+
+  return {
+    reply: result.reply,
+    proposal: result.proposal || null,
+    usage: result.usage || null
+  };
 });
 
 /* ---- Готовые краски ----------------------------------------------------- */
