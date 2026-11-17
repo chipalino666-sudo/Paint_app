@@ -2665,3 +2665,10 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   /* Подсказка нужна один раз — на телефоне место дороже */
   .material-hint { display: none; }
 }
+/* ТДС на телефоне: поля в один столбец */
+@media (max-width: 780px) {
+  #view-tds .stock-form { grid-template-columns: 1fr; }
+  #view-tds .stock-form .field { grid-column: auto !important; }
+  #view-tds .stock-form input[type=file] { width: 100%; font-size: 12.5px; }
+  #view-tds .actions-row .btn { width: 100%; }
+}

@@ -3798,7 +3798,7 @@
   /* ---- ТДС: раздел со справочником документов ------------------------------ */
 
   const canEditDocs = () => state.user
-    && ['admin', 'manager', 'store'].includes(state.user.role);
+    && ['admin', 'manager', 'store', 'master'].includes(state.user.role);
 
   let tdsPicked = null;
 
