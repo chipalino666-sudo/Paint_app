@@ -479,10 +479,21 @@
   <section class="view hidden" id="view-refs">
     <h1 class="page-title">Справочники</h1>
 
-    <div class="card">
+    <div class="refs-tabs" id="refsTabs">
+      <button class="refs-tab active" data-refs="works">Работы</button>
+      <button class="refs-tab" data-refs="recipes">Готовые краски</button>
+      <button class="refs-tab" data-refs="materials">Материалы</button>
+      <button class="refs-tab" data-refs="codes">Коды Brulex/Standox</button>
+    </div>
+
+    <div class="card refs-panel" data-refs-panel="works">
       <div class="card-head">
         <h2>Работы и цены</h2>
         <span class="muted">Цены можно править прямо в строке</span>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="refWorkSearch" placeholder="Название или категория работы…" autocomplete="off">
       </div>
 
       <div id="worksTable"></div>
@@ -495,15 +506,19 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card refs-panel" data-refs-panel="recipes">
       <div class="card-head">
         <h2>Готовые краски</h2>
         <button class="btn btn-primary" id="btnNewRecipe">+ Новая краска</button>
       </div>
+      <div class="toolbar">
+        <input type="search" id="refRecipeSearch" placeholder="Название краски или код микса…" autocomplete="off">
+      </div>
+
       <div id="recipesList"></div>
     </div>
 
-    <div class="card">
+    <div class="card refs-panel" data-refs-panel="materials">
       <div class="card-head">
         <h2>Материалы и цены</h2>
         <span class="muted">Цена за единицу — для расчёта стоимости списания</span>
@@ -516,7 +531,7 @@
       <div id="refMaterials"></div>
     </div>
 
-    <div class="card">
+    <div class="card refs-panel" data-refs-panel="codes">
       <div class="card-head">
         <h2>Перевод кодов красок</h2>
         <span class="muted">Brulex ↔ Standox: при списании ищется по обоим</span>

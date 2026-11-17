@@ -2798,6 +2798,7 @@
      ------------------------------------------------------------------------ */
 
   async function loadRefs() {
+    selectRefsTab(refsTab);
     renderWorksRef();
     renderRecipesRef();
     renderMaterialsRef();
@@ -3122,8 +3123,14 @@
   function renderWorksRef() {
     const host = $('#worksTable');
 
-    if (!state.works.length) {
-      host.innerHTML = '<div class="empty-line">Прайс пуст</div>';
+    const query = refsWorkQuery.trim().toLowerCase();
+
+    const works = query
+      ? state.works.filter((work) => `${work.name} ${work.category || ''}`.toLowerCase().includes(query))
+      : state.works;
+
+    if (!works.length) {
+      host.innerHTML = `<div class="empty-line">${query ? 'Ничего не найдено' : 'Прайс пуст'}</div>`;
       return;
     }
 
@@ -3131,7 +3138,7 @@
       <table class="grid">
         <thead><tr><th>Работа</th><th>Категория</th><th class="num">Детали</th><th class="num">Цена</th></tr></thead>
         <tbody>
-          ${state.works.map((work) => `
+          ${works.map((work) => `
             <tr>
               <td data-label="Работа">${esc(work.name)}</td>
               <td class="muted" data-label="Категория">${esc(work.category || '—')}</td>
@@ -3190,11 +3197,42 @@
     });
   }
 
+  /* ---- Справочники: разделы вместо длинной ленты -------------------------- */
+
+  let refsTab = (() => {
+    try { return localStorage.getItem('refsTab') || 'works'; } catch (error) { return 'works'; }
+  })();
+  let refsWorkQuery = '';
+  let refsRecipeQuery = '';
+
+  function selectRefsTab(name) {
+    refsTab = name || 'works';
+
+    try { localStorage.setItem('refsTab', refsTab); } catch (error) { /* приватный режим */ }
+
+    document.querySelectorAll('.refs-tab').forEach((button) => {
+      button.classList.toggle('active', button.dataset.refs === refsTab);
+    });
+
+    document.querySelectorAll('[data-refs-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.refsPanel !== refsTab);
+    });
+  }
+
   function renderRecipesRef() {
     const host = $('#recipesList');
 
-    if (!state.recipes.length) {
-      host.innerHTML = '<div class="empty-line">Готовых красок пока нет</div>';
+    const query = refsRecipeQuery.trim().toLowerCase();
+
+    const recipes = query
+      ? state.recipes.filter((recipe) => {
+          const haystack = `${recipe.name} ${recipe.mixes.map((m) => `${m.name} ${m.code}`).join(' ')}`.toLowerCase();
+          return haystack.includes(query);
+        })
+      : state.recipes;
+
+    if (!recipes.length) {
+      host.innerHTML = `<div class="empty-line">${query ? 'Ничего не найдено' : 'Готовых красок пока нет'}</div>`;
       return;
     }
 
@@ -3202,7 +3240,7 @@
       <table class="grid">
         <thead><tr><th>Название</th><th>Состав</th><th></th></tr></thead>
         <tbody>
-          ${state.recipes.map((recipe) => `
+          ${recipes.map((recipe) => `
             <tr>
               <td><b>${esc(recipe.name)}</b><br><span class="muted">на ${qty(recipe.base)} ${esc(recipe.unit)}</span></td>
               <td class="muted">${esc(recipe.mixes.map((m) => `${m.name} — ${qty(m.amount)}`).join(' · '))}</td>
@@ -4223,59 +4261,31 @@
 
     if ($('#btnAddStock')) $('#btnAddStock').addEventListener('click', addStockItem);
 
-    /* Нормы расхода: кнопка в таблице работ и модальное окно */
-    document.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-work-norms]');
-      if (!button) return;
-
-      const work = state.works.find((w) => String(w.id) === button.dataset.workNorms);
-      if (work) openNorms(work);
+    /* Справочники: разделы и поиск внутри раздела */
+    document.querySelectorAll('.refs-tab').forEach((button) => {
+      button.addEventListener('click', () => selectRefsTab(button.dataset.refs));
     });
 
-    if ($('#btnCloseNorms')) $('#btnCloseNorms').addEventListener('click', () => $('#normsModal').classList.add('hidden'));
-    if ($('#btnNormsCancel')) $('#btnNormsCancel').addEventListener('click', () => $('#normsModal').classList.add('hidden'));
-    if ($('#btnNormsSave')) $('#btnNormsSave').addEventListener('click', saveNorms);
+    const refWorkSearch = $('#refWorkSearch');
 
-    const normsSearch = $('#normsSearch');
-
-    if (normsSearch) {
-      let normsTimer = null;
-
-      normsSearch.addEventListener('input', () => {
-        clearTimeout(normsTimer);
-        const value = normsSearch.value.trim();
-        normsTimer = setTimeout(() => pickNormMaterial(value), 220);
+    if (refWorkSearch) {
+      refWorkSearch.addEventListener('input', () => {
+        refsWorkQuery = refWorkSearch.value;
+        renderWorksRef();
       });
     }
 
-    /* ТДС: поиск по документам, выбор материала и добавление ссылки */
-    const tdsSearch = $('#tdsSearch');
+    const refRecipeSearch = $('#refRecipeSearch');
 
-    if (tdsSearch) {
-      let tdsTimer = null;
-
-      tdsSearch.addEventListener('input', () => {
-        clearTimeout(tdsTimer);
-        tdsTimer = setTimeout(() => loadTdsView(tdsSearch.value), 220);
+    if (refRecipeSearch) {
+      refRecipeSearch.addEventListener('input', () => {
+        refsRecipeQuery = refRecipeSearch.value;
+        renderRecipesRef();
       });
     }
-
-    const tdsMatSearch = $('#tdsMatSearch');
-
-    if (tdsMatSearch) {
-      let pickTimer = null;
-
-      tdsMatSearch.addEventListener('input', () => {
-        clearTimeout(pickTimer);
-        pickTimer = setTimeout(() => pickTdsMaterial(tdsMatSearch.value.trim()), 220);
-      });
-    }
-
-    if ($('#btnAddTds')) $('#btnAddTds').addEventListener('click', addTdsLink);
 
     /* Нормы списания: выбор набора, добавление материалов, сохранение */
     const normSearch = $('#normSearch');
-
     if (normSearch) {
       let normTimer = null;
 

@@ -2498,3 +2498,44 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
 #view-norms .quick-row input[type=text] { flex: 1 1 auto; min-width: 0; }
 #view-norms .quick-row select { flex: 0 0 130px; }
 #view-norms .quick-row input[type=number] { flex: 0 0 90px; }
+/* ---------- Вкладки в справочниках ---------------------------------------- */
+
+.refs-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 6px 0;
+  background: var(--bg);
+}
+
+.refs-tab {
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.refs-tab:hover { border-color: var(--blue); color: var(--blue); }
+
+.refs-tab.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.refs-panel.hidden { display: none; }
+
+@media (max-width: 640px) {
+  .refs-tabs { gap: 5px; }
+  .refs-tab { padding: 8px 12px; font-size: 12.5px; }
+}
