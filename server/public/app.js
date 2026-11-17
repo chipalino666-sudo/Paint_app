@@ -531,6 +531,10 @@
         buttons.push({ status: 'cancelled', label: 'Отменить', cls: 'btn-danger-outline' });
       }
     } else if (isMaster() && Number(order.master_id) === Number(state.user.id)) {
+      // Мастер сам берёт принятый заказ в работу
+      if (order.status === 'accepted') {
+        buttons.push({ status: 'in_work', label: 'Принял', cls: 'btn-primary' });
+      }
       if (order.status === 'in_work') {
         buttons.push({ status: 'ready', label: 'Готово', cls: 'btn-success' });
       }

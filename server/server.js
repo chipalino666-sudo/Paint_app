@@ -158,22 +158,6 @@ function canSeeOrder(user, order) {
 }
 
 /** Списание правится, только пока заказ не сдан. */
-/**
- * «Принят» → «В работе» сам, как только по заказу начали работать:
- * добавили работу или списали материал. Статус отражает реальность.
- */
-function startWorkIfNeeded(order, user, reason) {
-  if (order.status !== 'accepted') return order;
-
-  db.prepare("UPDATE orders SET status = 'in_work', updated_at = ? WHERE id = ?")
-    .run(nowISO(), order.id);
-
-  audit(user.id, 'change', 'order', order.id, {
-    text: `Статус: Принят → В работе (${reason})`
-  });
-
-  return orderView(order.id);
-}
 
 function assertEditable(order) {
   if (order.status !== 'accepted' && order.status !== 'in_work') {
@@ -592,6 +576,8 @@ route('PATCH', '/api/orders/:id', async ({ user, params, body }) => {
 
     if (status === 'ready') {
       if (!isManager && !isOwnMaster) throw new ApiError(403, 'Сдать заказ может мастер или приёмщик');
+    } else if (status === 'in_work' && isOwnMaster && order.status === 'accepted') {
+      // Мастер сам берёт свой принятый заказ в работу — кнопка «Принял»
     } else if (!isManager) {
       throw new ApiError(403, 'Статус может менять только приёмщик');
     }
@@ -865,10 +851,8 @@ route('POST', '/api/orders/:id/works', async ({ user, params, body }) => {
     work: work.name, qty, text: `Добавлена работа: ${work.name}`
   });
 
-  // Добавили работу — значит, заказ в работе
-  const startedWork = startWorkIfNeeded(order, user, 'добавлена работа');
 
-  return { order: startedWork || orderView(order.id) };
+  return { order: orderView(order.id) };
 });
 
 route('PATCH', '/api/orders/:id/works/:wid', async ({ user, params, body }) => {
@@ -955,10 +939,8 @@ route('POST', '/api/orders/:id/materials', async ({ user, params, body }) => {
     code, qty, kind, text: `Списано: ${name} — ${qty} ${unit}`
   });
 
-  // Первое списание значит, что по заказу начали работать
-  const started = startWorkIfNeeded(order, user, 'первое списание материала');
 
-  return { order: started || orderView(order.id) };
+  return { order: orderView(order.id) };
 });
 
 route('PATCH', '/api/orders/:id/materials/:mid', async ({ user, params, body }) => {
