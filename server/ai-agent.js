@@ -26,6 +26,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
+19. Если инструмент вернул несколько подходящих заказов (ambiguity), покажи их списком — номер, госномер, статус — и спроси, какой именно. Никогда не выбирай за человека.
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
 16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
 14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
@@ -283,13 +284,16 @@ function makeContext(env) {
     return order;
   };
 
-  /** Заказ по номеру, госномеру, марке или мастеру — если id не подошёл. */
-  const visibleOrderByText = (value) => {
+  /**
+   * Заказ по номеру, госномеру, марке или мастеру.
+   * Возвращает { order } или { ambiguous: [...] } — если подходит несколько.
+   */
+  const findOrder = (value) => {
     const text = String(value ?? '').trim();
-    if (!text) return null;
+    if (!text) return { order: null };
 
     const rows = db.prepare(`
-      SELECT o.id, o.number, c.plate, c.make, c.model, u.full_name AS master
+      SELECT o.id, o.number, o.status, c.plate, c.make, c.model, u.full_name AS master
         FROM orders o
         JOIN cars c ON c.id = o.car_id
         LEFT JOIN users u ON u.id = o.master_id
@@ -300,33 +304,61 @@ function makeContext(env) {
     const visible = rows.filter((row) => visibleOrder(row.id));
     const needle = normalize(text);
 
-    const found = visible.find((row) => normalize(row.number) === needle)
-      || visible.find((row) => normalize(row.plate) === needle)
-      || visible.find((row) => normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle));
+    // Точные совпадения: номер заказа или госномер — они уникальны
+    const exact = visible.filter((row) => normalize(row.number) === needle || normalize(row.plate) === needle);
+    if (exact.length === 1) return { order: visibleOrder(exact[0].id) };
 
-    return found ? visibleOrder(found.id) : null;
+    const partial = visible.filter((row) =>
+      normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle));
+
+    // Машины с одинаковым названием: не угадываем, показываем варианты
+    if (partial.length > 1) {
+      const open = partial.filter((row) => row.status !== 'closed');
+      const list = open.length ? open : partial;
+
+      if (list.length > 1) {
+        return {
+          order: null,
+          ambiguous: list.slice(0, 8).map((row) => ({
+            number: row.number,
+            plate: row.plate,
+            car: [row.make, row.model].filter(Boolean).join(' '),
+            master: row.master,
+            status: row.status
+          }))
+        };
+      }
+
+      return { order: visibleOrder(list[0].id) };
+    }
+
+    return { order: partial.length ? visibleOrder(partial[0].id) : null };
   };
 
   /** Разбор ссылки на заказ: «2026-0025», «Skoda Rapid», «P654HP30» или id. */
   const orderRef = (args) => {
-    const candidates = [args.order, args.order_id];
-
-    for (const value of candidates) {
+    for (const value of [args.order, args.order_id]) {
       const text = String(value ?? '').trim();
       if (!text) continue;
 
       const asNumber = Number(text);
       if (Number.isFinite(asNumber) && String(asNumber) === text) {
         const byId = visibleOrder(asNumber);
-        if (byId) return byId;
+        if (byId) return { order: byId };
       }
 
-      const byText = visibleOrderByText(text);
-      if (byText) return byText;
+      const found = findOrder(text);
+      if (found.order || found.ambiguous) return found;
     }
 
-    return null;
+    return { order: null };
   };
+
+  /** Единый ответ на неоднозначный заказ. */
+  const ambiguityAnswer = (found) => ({
+    error: 'Под этот запрос подходит несколько заказов — уточните, какой именно',
+    orders: found.ambiguous
+  });
 
   return {
     search_orders({ query }) {
@@ -361,7 +393,10 @@ function makeContext(env) {
     },
 
     get_order({ order_id, order: orderText }) {
-      const order = orderRef({ order_id, order: orderText });
+      const found = orderRef({ order_id, order: orderText });
+      if (found.ambiguous) return ambiguityAnswer(found);
+
+      const order = found.order;
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       return {
@@ -508,7 +543,10 @@ function makeContext(env) {
     },
 
     apply_norms({ order_id, order: orderText, paint_code, recipe, parts }) {
-      const order = orderRef({ order_id, order: orderText });
+      const found = orderRef({ order_id, order: orderText });
+      if (found.ambiguous) return ambiguityAnswer(found);
+
+      const order = found.order;
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       const count = Number(parts) > 0 ? Number(parts) : 1;
@@ -679,7 +717,10 @@ function makeContext(env) {
     },
 
     propose_write_off({ order_id, order: orderText, items }) {
-      const order = orderRef({ order_id, order: orderText });
+      const found = orderRef({ order_id, order: orderText });
+      if (found.ambiguous) return ambiguityAnswer(found);
+
+      const order = found.order;
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       const list = [];
