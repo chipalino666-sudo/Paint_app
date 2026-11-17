@@ -5025,6 +5025,52 @@ function renderWarehouse() {
     ].join('\n'));
   }
 
+  /** Разрешение не выдано — объясняем, куда нажать именно в Edge. */
+  function voiceExplainPermission(error) {
+    const name = error && error.name ? error.name : 'NotAllowedError';
+
+    const reasons = {
+      NotAllowedError: 'браузер запретил доступ к микрофону',
+      PermissionDeniedError: 'браузер запретил доступ к микрофону',
+      NotFoundError: 'микрофон не найден — проверьте, подключён ли он',
+      NotReadableError: 'микрофон занят другой программой',
+      SecurityError: 'страница открыта не по https'
+    };
+
+    aiBubble('bot', [
+      'Доступ к микрофону закрыт: ' + (reasons[name] || name) + '.',
+      '',
+      'Как открыть в Edge:',
+      '1. Нажмите значок замка (или ползунки) слева от адреса сайта.',
+      '2. «Разрешения для этого сайта» → Микрофон → Разрешить.',
+      '3. Перезагрузите страницу.',
+      '',
+      'Если значка нет (в установленном приложении он бывает скрыт):',
+      '• откройте edge://settings/content/microphone',
+      '• в списке «Разрешить» добавьте https://ceh-lonjeron.ru',
+      '• уберите сайт из списка «Блокировать», если он там есть.',
+      '',
+      'Ещё проверьте Windows: Параметры → Конфиденциальность → Микрофон.',
+      'Там должны быть включены «Доступ к микрофону», «Разрешить приложениям» и ' +
+      '«Разрешить классическим приложениям».'
+    ].join('\n'));
+  }
+
+  /** Просим доступ к микрофону заранее: так Edge показывает запрос. */
+  async function askMicPermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return { ok: false, error: { name: 'SecurityError' } };
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => { try { track.stop(); } catch (e) { /* уже остановлен */ } });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  }
+
   function initVoice() {
     const button = $('#aiMic');
     if (!button) return;
@@ -5103,7 +5149,7 @@ function renderWarehouse() {
       }
     });
 
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       if (voiceBroken) {
         voiceExplain();
         button.blur();
@@ -5115,6 +5161,17 @@ function renderWarehouse() {
       } else {
         voiceText = '';
         voiceStarted = false;
+
+        // Сначала явно просим доступ: иначе Edge молча блокирует
+        const permission = await askMicPermission();
+
+        if (!permission.ok) {
+          voiceBroken = true;
+          voiceButtonMark(false);
+          voiceExplainPermission(permission.error);
+          button.blur();
+          return;
+        }
 
         try {
           voice.start();
