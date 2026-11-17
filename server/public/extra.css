@@ -3171,3 +3171,116 @@ html[data-theme="dark"] .chip:not(.active):hover {
   .desk-tile-title { font-size: 12.5px; }
   .desk-title { font-size: 19px; }
 }
+
+
+/* ---------- Режим «рабочий стол» ----------------------------------------- */
+
+body.ui-desk .main { padding-bottom: 84px; }
+
+.desk-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.desk-layer.hidden { display: none; }
+
+.desk-windows { position: absolute; inset: 0; pointer-events: none; }
+
+.desk-window {
+  position: absolute;
+  width: min(880px, 96vw);
+  height: min(620px, calc(100vh - 160px));
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .45);
+  overflow: hidden;
+  resize: both;
+}
+
+.desk-window.minimized { display: none; }
+
+.desk-window-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+}
+
+.desk-window-title { font-size: 13px; font-weight: 700; }
+
+.desk-window-btns { display: flex; gap: 4px; }
+
+.desk-win-btn {
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.desk-win-btn:hover { color: var(--ink); border-color: var(--blue); }
+
+.desk-window-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 14px;
+}
+
+.desk-window-body .view { padding: 0; }
+
+.desk-taskbar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+.desk-task {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.desk-task.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+.desk-taskbar-hint { font-size: 12px; color: var(--ink-soft); padding: 2px 6px; }
+
+@media (max-width: 780px) {
+  .desk-window {
+    width: calc(100vw - 12px);
+    height: calc(100vh - 150px);
+    left: 6px !important;
+    top: 64px !important;
+  }
+
+  .desk-taskbar { bottom: 8px; gap: 6px; padding: 6px 8px; }
+  .desk-task { padding: 6px 10px; font-size: 12px; }
+}

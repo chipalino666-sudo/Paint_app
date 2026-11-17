@@ -301,6 +301,13 @@
   }
 
   function showView(name) {
+    // В режиме рабочего стола разделы открываются окнами, а не подменяют экран
+    if (typeof uiMode === 'function' && uiMode() === 'desk') {
+      if (name === 'home') { showDeskHome(); return; }
+
+      openDeskWindow(name);
+      return;
+    }
     if (name === 'home' && typeof loadDesk === 'function') loadDesk();
     state.view = name;
     shieldInputs();
@@ -502,7 +509,9 @@ async function loadDesk() {
   if (hello) {
     const hour = new Date().getHours();
     const part = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-    const name = String(user.full_name || '').split(' ')[0];
+    // В базе «Фамилия Имя» — здороваемся по имени
+    const parts = String(user.full_name || '').trim().split(/\s+/).filter(Boolean);
+    const name = parts.length > 1 ? parts[1] : parts[0];
     hello.textContent = name ? `${part}, ${name}` : 'Рабочий стол';
   }
 
@@ -678,6 +687,280 @@ function rememberOrder(order) {
   while (state.openOrders.length > 5) state.openOrders.shift();
 }
 
+/* --------------------------------------------------------------------------
+   Режим «рабочий стол»: разделы открываются окнами, которые можно
+   свернуть, закрыть и перетащить. Классический режим не затрагивается.
+   -------------------------------------------------------------------------- */
+
+const UI_MODE_KEY = 'paintShopUiMode';
+
+const WINDOW_TITLES = {
+  orders: 'Заказы',
+  order: 'Заказ',
+  new: 'Новый заказ',
+  chat: 'Обсуждения',
+  report: 'Отчёт',
+  clients: 'Клиенты',
+  stock: 'Склад',
+  tds: 'ТДС и паспорта',
+  norms: 'Нормы списания',
+  refs: 'Справочники',
+  users: 'Сотрудники'
+};
+
+function uiMode() {
+  return localStorage.getItem(UI_MODE_KEY) === 'desk' ? 'desk' : 'classic';
+}
+
+function uiModeLabel() {
+  const button = $('#btnUiMode');
+  if (!button) return;
+
+  button.textContent = uiMode() === 'desk' ? 'Режим: рабочий стол' : 'Режим: обычный';
+}
+
+function applyUiMode() {
+  const desk = uiMode() === 'desk';
+
+  document.body.classList.toggle('ui-desk', desk);
+
+  const layer = $('#deskLayer');
+  const taskbar = $('#deskTaskbar');
+
+  if (desk) {
+    if (layer) layer.classList.remove('hidden');
+    if (taskbar) taskbar.classList.remove('hidden');
+
+    showDeskHome();
+  } else {
+    closeAllWindows();
+
+    if (layer) layer.classList.add('hidden');
+    if (taskbar) taskbar.classList.add('hidden');
+
+    showView('orders');
+  }
+
+  uiModeLabel();
+}
+
+function toggleUiMode() {
+  localStorage.setItem(UI_MODE_KEY, uiMode() === 'desk' ? 'classic' : 'desk');
+  applyUiMode();
+}
+
+/** Стол как фон: показываем только домашнюю вьюху. */
+function showDeskHome() {
+  $$('.view').forEach((view) => view.classList.add('hidden'));
+
+  const home = $('#view-home');
+  if (home) home.classList.remove('hidden');
+
+  state.view = 'home';
+  if (typeof loadDesk === 'function') loadDesk();
+}
+
+function windowTitle(name) {
+  if (name === 'order' && state.order) return `Заказ ${state.order.number}`;
+  return WINDOW_TITLES[name] || 'Раздел';
+}
+
+let windowZ = 100;
+
+function openDeskWindow(name) {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const view = document.getElementById('view-' + name);
+  if (!view) return;
+
+  let win = host.querySelector('[data-window="' + name + '"]');
+
+  if (!win) {
+    win = document.createElement('div');
+    win.className = 'desk-window';
+    win.dataset.window = name;
+
+    win.innerHTML = `
+      <div class="desk-window-head">
+        <span class="desk-window-title"></span>
+        <span class="desk-window-btns">
+          <button class="desk-win-btn" data-win-min title="Свернуть">–</button>
+          <button class="desk-win-btn" data-win-close title="Закрыть">×</button>
+        </span>
+      </div>
+      <div class="desk-window-body"></div>
+    `;
+
+    const count = host.querySelectorAll('.desk-window').length;
+    const offset = (count % 5) * 26;
+
+    win.style.left = Math.max(10, 40 + offset) + 'px';
+    win.style.top = Math.max(10, 90 + offset) + 'px';
+
+    win.querySelector('.desk-window-body').appendChild(view);
+    view.classList.remove('hidden');
+
+    win.querySelector('[data-win-close]').addEventListener('click', () => closeDeskWindow(name));
+    win.querySelector('[data-win-min]').addEventListener('click', () => minimizeDeskWindow(name));
+    win.querySelector('.desk-window-head').addEventListener('pointerdown', (event) => startWindowDrag(event, win));
+
+    host.appendChild(win);
+  } else {
+    win.querySelector('.desk-window-body').appendChild(view);
+    view.classList.remove('hidden');
+  }
+
+  focusDeskWindow(name);
+  refreshWindowTitles();
+
+  if (name === 'orders') loadOrders();
+  if (name === 'chat') openGeneralChat();
+  if (name === 'report') loadReport();
+  if (name === 'refs') loadRefs();
+  if (name === 'clients') loadClients();
+  if (name === 'stock') loadWarehouse();
+  if (name === 'tds') loadTdsView();
+  if (name === 'norms') loadNormsView();
+  if (name === 'users') loadUsers();
+}
+
+function focusDeskWindow(name) {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const win = host.querySelector('[data-window="' + name + '"]');
+  if (!win) return;
+
+  windowZ += 1;
+  win.style.zIndex = String(windowZ);
+  win.classList.remove('minimized');
+
+  host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('active'));
+  win.classList.add('active');
+
+  renderDeskTaskbar();
+}
+
+function minimizeDeskWindow(name) {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const win = host.querySelector('[data-window="' + name + '"]');
+  if (win) win.classList.add('minimized');
+
+  renderDeskTaskbar();
+}
+
+/** Вернуть раздел в общий контейнер — как в обычном режиме. */
+function detachWindowView(name) {
+  const view = document.getElementById('view-' + name);
+  const main = document.querySelector('main.main');
+
+  if (view && main && view.parentElement && !main.contains(view)) {
+    main.appendChild(view);
+    view.classList.add('hidden');
+  }
+}
+
+function closeDeskWindow(name) {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const win = host.querySelector('[data-window="' + name + '"]');
+
+  detachWindowView(name);
+
+  if (win) win.remove();
+
+  renderDeskTaskbar();
+
+  // Закрыли заказы — закрываем и карточку заказа
+  if (name === 'orders') closeDeskWindow('order');
+}
+
+function closeAllWindows() {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  host.querySelectorAll('.desk-window').forEach((win) => {
+    detachWindowView(win.dataset.window);
+    win.remove();
+  });
+
+  renderDeskTaskbar();
+}
+
+function refreshWindowTitles() {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  host.querySelectorAll('.desk-window').forEach((win) => {
+    const title = win.querySelector('.desk-window-title');
+    if (title) title.textContent = windowTitle(win.dataset.window);
+  });
+
+  renderDeskTaskbar();
+}
+
+function renderDeskTaskbar() {
+  const bar = $('#deskTaskbar');
+  if (!bar) return;
+
+  const host = $('#deskWindows');
+  const wins = host ? [...host.querySelectorAll('.desk-window')] : [];
+
+  if (!wins.length) {
+    bar.innerHTML = '<span class="desk-taskbar-hint">Открывайте разделы с рабочего стола</span>';
+    return;
+  }
+
+  bar.innerHTML = wins.map((win) => {
+    const name = win.dataset.window;
+    const active = win.classList.contains('active') && !win.classList.contains('minimized');
+
+    return `<button class="desk-task ${active ? 'active' : ''}" data-task="${esc(name)}">${esc(windowTitle(name))}</button>`;
+  }).join('');
+
+  bar.querySelectorAll('[data-task]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const name = button.dataset.task;
+      const win = host.querySelector('[data-window="' + name + '"]');
+
+      if (!win) return;
+
+      if (win.classList.contains('active') && !win.classList.contains('minimized')) {
+        minimizeDeskWindow(name);
+      } else {
+        focusDeskWindow(name);
+      }
+    });
+  });
+}
+
+/** Перетаскивание окна за заголовок. */
+function startWindowDrag(event, win) {
+  if (event.target.closest('button')) return;
+
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const left = parseFloat(win.style.left || '0');
+  const top = parseFloat(win.style.top || '0');
+
+  const move = (e) => {
+    win.style.left = Math.max(0, left + e.clientX - startX) + 'px';
+    win.style.top = Math.max(0, top + e.clientY - startY) + 'px';
+  };
+
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+  };
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
+
 async function openOrder(id) {
     try {
       const data = await api('/api/orders/' + id);
@@ -685,6 +968,7 @@ async function openOrder(id) {
       rememberOrder(data.order);
       renderOrderTabs();
       showView('order');
+      refreshWindowTitles();
       renderOrder();
     } catch (error) {
       toast(error.message);
@@ -2986,6 +3270,7 @@ async function openOrder(id) {
 
       state.order = data.order;
       showView('order');
+      refreshWindowTitles();
       renderOrder();
       toast('Заказ ' + data.order.number + ' создан');
     } catch (error) {
@@ -4776,6 +5061,8 @@ function renderWarehouse() {
 
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
+    if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
+
     /* Поиск с рабочего стола */
     const deskInput = $('#deskSearch');
 
@@ -5819,8 +6106,7 @@ function renderWarehouse() {
 
     pushAppState();
 
-    showView('home');
-      loadDesk();
+    applyUiMode();
   }
 
   /* ------------------------------------------------------------------------

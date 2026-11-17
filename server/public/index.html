@@ -108,6 +108,7 @@
       </button>
 
       <div class="menu menu-right hidden" id="userDropdown">
+      <button class="menu-item" id="btnUiMode">Режим: обычный</button>
         <button class="menu-item" id="navInstall">Установить приложение</button>
         <button class="menu-item" id="btnPassword">Сменить пароль</button>
         <button class="menu-item danger" id="btnLogout">Выйти</button>
@@ -658,6 +659,12 @@
     </div>
   </section>
 
+
+  <!-- Слой окон режима «рабочий стол» -->
+  <div class="desk-layer hidden" id="deskLayer">
+    <div class="desk-windows" id="deskWindows"></div>
+    <div class="desk-taskbar hidden" id="deskTaskbar"></div>
+  </div>
 </main>
 
 <!-- ======================= УСТАНОВКА ПРИЛОЖЕНИЯ ======================= -->
