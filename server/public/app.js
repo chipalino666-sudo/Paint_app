@@ -116,59 +116,21 @@
    * Держим поле «закрытым» до первого касания и стираем всё, что появилось без ввода.
    * Opera умеет вставлять значение молча, без событий, поэтому ещё и проверяем таймером.
    */
+  /**
+   * Только подсказки для менеджеров паролей.
+   * Раньше здесь был readonly и стирание «чужих» значений — из-за этого
+   * пропадали названия, которые программа подставила сама.
+   */
   function shieldInput(input) {
     if (!input || input.dataset.shielded === '1') return;
     if (input.getAttribute('autocomplete') === 'tel') return;
-
-    // Поисковые поля не защищаем: щит ставит readonly и стирает набранное
     if (input.dataset.noshield === '1') return;
 
     input.dataset.shielded = '1';
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('data-form-type', 'other');
     input.setAttribute('data-lpignore', 'true');
-    input.setAttribute('readonly', '');
-
-    let typed = false;
-    let guard = null;
-
-    const clearIfForeign = () => {
-      if (!typed && input.value) {
-        input.value = '';
-        return true;
-      }
-      return false;
-    };
-
-    const unlock = () => {
-      input.removeAttribute('readonly');
-      clearIfForeign();
-
-      // Менеджер паролей может вписать логин уже после фокуса
-      if (!guard) {
-        guard = setInterval(() => {
-          clearIfForeign();
-          if (typed || document.activeElement !== input) {
-            clearInterval(guard);
-            guard = null;
-          }
-        }, 300);
-      }
-    };
-
-    input.addEventListener('focus', unlock);
-    input.addEventListener('pointerdown', unlock);
-
-    input.addEventListener('keydown', (event) => {
-      // Стрелки и Tab — не ввод, но и не повод стирать
-      if (event.key.length === 1) typed = true;
-    });
-
-    input.addEventListener('paste', () => { typed = true; });
-    input.addEventListener('beforeinput', () => { typed = true; });
-    input.addEventListener('input', clearIfForeign);
   }
-
   function shieldInputs(root) {
     const host = root || document;
     host.querySelectorAll('input[type="text"], input[type="search"], input:not([type])').forEach(shieldInput);
