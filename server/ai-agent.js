@@ -27,6 +27,8 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
 19. Если инструмент вернул несколько подходящих заказов (ambiguity), покажи их списком — номер, госномер, статус — и спроси, какой именно. Никогда не выбирай за человека.
+23. Ссылки на документы НЕ вставляй в текст ответа — программа сама покажет их кнопками «открыть». Просто скажи, что нашёл.
+22. ТДС ищи через find_tds — по коду материала, названию материала или названию документа. Если человек говорит «тдс на грунт 590», ищи по названию, а не только по коду.
 21. Понимаешь и русский, и латиницу: «Skoda Rapid» = «Шкода Рапид», «Lada» = «Лада», «Fetisov» = «Фетисов». Если инструмент не нашёл по одному написанию — попробуй другое, не сдавайся сразу.
 20. Если просят открыть заказ или раздел («открой списание по Шкоде», «покажи склад») — вызывай open_in_app. После вызова коротко подтверди: «Открываю заказ 2026-0025, вкладка «Списание материала»».
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
@@ -85,6 +87,20 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'find_tds',
+      description: 'Найти техническую документацию (ТДС, паспорт, инструкцию) по коду материала, названию материала или названию документа. Возвращает ссылки.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'что искать: код (590, SE334376), название материала или документа' }
+        },
+        required: ['query']
       }
     }
   },
@@ -619,8 +635,65 @@ function makeContext(env) {
       return { materials };
     },
 
-    get_tds({ code }) {
-      const docs = db.prepare('SELECT title, url FROM material_docs WHERE code = ?').all(String(code || ''));
+    find_tds({ query }) {
+      const raw = String(query || '').trim();
+      if (!raw) return { found: false, docs: [] };
+
+      const needle = makeNeedle(raw);
+
+      // Все документы вместе с названием материала
+      const all = db.prepare(`
+        SELECT d.id, d.code, d.title, d.url, COALESCE(m.name, '') AS material
+          FROM material_docs d
+          LEFT JOIN materials m ON m.code = d.code
+      `).all();
+
+      const docs = all.filter((doc) => {
+        if (!raw) return true;
+        if (normalize(doc.code) === needle.plain) return true;
+        if (matchesText(doc.title, needle)) return true;
+        if (doc.material && matchesText(doc.material, needle)) return true;
+        return false;
+      });
+
+      // Уточняем материал по справочнику: «грунт 590» → нужный код
+      if (!docs.length) {
+        const material = resolveMaterial(db, raw);
+
+        if (material) {
+          const byCode = all.filter((doc) => doc.code === material.code);
+          if (byCode.length) {
+            return {
+              found: true,
+              via: material.name,
+              docs: byCode.map((doc) => ({ title: doc.title, url: doc.url, material: material.name }))
+            };
+          }
+        }
+      }
+
+      return {
+        found: docs.length > 0,
+        docs: docs.map((doc) => ({ title: doc.title, url: doc.url, material: doc.material || null }))
+      };
+    },
+
+    get_tds({ code, query }) {
+      const asked = String(code || query || '').trim();
+
+      if (!asked) return { found: false, message: 'Не указан материал' };
+
+      let materialCode = asked.toUpperCase();
+
+      // Могли назвать не код, а название материала
+      const direct = db.prepare('SELECT title, url FROM material_docs WHERE code = ?').all(materialCode);
+
+      if (!direct.length) {
+        const material = resolveMaterial(db, asked);
+        if (material) materialCode = material.code;
+      }
+
+      const docs = db.prepare('SELECT title, url FROM material_docs WHERE code = ?').all(materialCode);
 
       if (!docs.length) {
         return { found: false, message: 'На этот материал ТДС не заведён' };
@@ -993,6 +1066,7 @@ async function handle(env, { message, history, orderId }) {
 
   let proposal = null;
   let opened = null;
+  let documents = null;
   let usage = { prompt_tokens: 0, completion_tokens: 0 };
 
   for (let round = 0; round < 4; round++) {
@@ -1005,7 +1079,7 @@ async function handle(env, { message, history, orderId }) {
     messages.push(choice);
 
     if (!choice.tool_calls || !choice.tool_calls.length) {
-      return { reply: String(choice.content || '').trim(), proposal, opened, usage };
+      return { reply: String(choice.content || '').trim(), proposal, opened, documents, usage };
     }
 
     for (const call of choice.tool_calls) {
@@ -1025,6 +1099,11 @@ async function handle(env, { message, history, orderId }) {
         if (call.function.name === 'open_in_app' && result && result.opened) {
           opened = result.opened;
         }
+
+        if ((call.function.name === 'find_tds' || call.function.name === 'get_tds')
+            && result && result.docs && result.docs.length) {
+          documents = result.docs;
+        }
       } catch (error) {
         result = { error: error.message };
       }
@@ -1037,7 +1116,7 @@ async function handle(env, { message, history, orderId }) {
     }
   }
 
-  return { reply: 'Не смог разобрать запрос. Уточните, пожалуйста: какой заказ и какой материал?', proposal, opened, usage };
+  return { reply: 'Не смог разобрать запрос. Уточните, пожалуйста: какой заказ и какой материал?', proposal, opened, documents, usage };
 }
 
 module.exports = { handle, SYSTEM };

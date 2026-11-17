@@ -2714,3 +2714,26 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
     z-index: 300;
   }
 }
+/* Карточка найденных документов в чате */
+.ai-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--ink);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.ai-doc-row:last-of-type { border-bottom: none; }
+.ai-doc-row:hover { color: var(--blue); }
+
+.ai-doc-open {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}

@@ -1824,6 +1824,7 @@ route('POST', '/api/ai/chat', async ({ user, body }) => {
     reply: result.reply,
     proposal: result.proposal || null,
     opened: result.opened || null,
+    documents: result.documents || null,
     usage: result.usage || null
   };
 });

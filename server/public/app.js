@@ -4900,6 +4900,34 @@
     }
   }
 
+  /** Карточка найденных документов: тап — открыть в новой вкладке. */
+  function aiRenderDocs(docs) {
+    const box = $('#aiProposal');
+    if (!box) return;
+
+    if (!docs || !docs.length) return;
+
+    box.innerHTML = `
+      <div class="ai-prop-head">Документы</div>
+      ${docs.map((doc) => `
+        <a class="ai-doc-row" href="${esc(doc.url)}" target="_blank" rel="noopener">
+          <span>${esc(doc.title)}</span>
+          <span class="ai-doc-open">открыть ↗</span>
+        </a>`).join('')}
+      <div class="ai-prop-actions">
+        <button class="btn btn-outline btn-sm" id="aiDocsClose">Закрыть</button>
+      </div>
+    `;
+
+    box.classList.remove('hidden');
+
+    const close = $('#aiDocsClose');
+    if (close) close.addEventListener('click', () => {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+    });
+  }
+
   async function aiSend(text) {
     if (aiBusy || !text.trim()) return;
 
@@ -4934,6 +4962,7 @@
 
       if (data.proposal) aiRenderProposal(data.proposal);
       if (data.opened) aiNavigate(data.opened);
+      if (data.documents) aiRenderDocs(data.documents);
     } catch (error) {
       if (thinking) thinking.remove();
       aiBubble('bot', 'Ошибка: ' + error.message);
