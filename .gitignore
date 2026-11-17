@@ -1,13 +1,11 @@
-# Данные и служебные файлы — не в репозиторий
-server/data/
-server/shots/
-*.db
-*.db-wal
-*.db-shm
-node_modules/
-.idea/
-.vscode/
+# Мусор, который не должен попадать в репозиторий
+Photo/
+photo/
+_crops/
+tmp_ocr/
+car/
+*.py
+__pycache__/
+.venv/
 *.log
-
-# Временная папка для выкладки на сервер
-.deploy-tmp/
+server/shots/

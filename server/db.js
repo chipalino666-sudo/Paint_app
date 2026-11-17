@@ -138,6 +138,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS code_pairs_uniq ON code_pairs (code_a, code_b)
 CREATE INDEX IF NOT EXISTS code_pairs_a ON code_pairs (code_a);
 CREATE INDEX IF NOT EXISTS code_pairs_b ON code_pairs (code_b);
 
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code       TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, code)
+);
+
 CREATE TABLE IF NOT EXISTS norms (
   id      INTEGER PRIMARY KEY,
   work_id INTEGER NOT NULL REFERENCES works(id) ON DELETE CASCADE,
@@ -249,6 +256,7 @@ addColumn('works', 'parts', 'REAL DEFAULT 1');
 addColumn('order_works', 'parts', 'REAL');
 addColumn('materials', 'paint_code', 'TEXT');
 addColumn('materials', 'aliases', 'TEXT');
+addColumn('materials', 'stock', 'REAL');
 addColumn('orders', 'inspection', 'TEXT');
 addColumn('code_pairs', 'brand_a', "TEXT DEFAULT 'Brulex'");
 addColumn('code_pairs', 'brand_b', "TEXT DEFAULT 'Standox'");
@@ -547,6 +555,28 @@ function init() {
   for (const paint of paintsWithoutCode) {
     const match = /(?:^|\s)(\d{3})(?=[A-Za-zА-Яа-я]|\s|$)/.exec(paint.name);
     if (match) setPaintCode.run(match[1], paint.code);
+  }
+
+  // Остатки со склада: разово переносим из отчёта (server/data-stock.json)
+  const stockApplied = db.prepare("SELECT value FROM settings WHERE key = 'stock-from-report'").get();
+
+  if (!stockApplied) {
+    const stockFile = path.join(__dirname, 'data-stock.json');
+
+    if (fs.existsSync(stockFile)) {
+      const stockRows = JSON.parse(fs.readFileSync(stockFile, 'utf8'));
+      const setStock = db.prepare('UPDATE materials SET stock = ?, unit = ? WHERE code = ?');
+
+      let applied = 0;
+      for (const row of stockRows) {
+        const info = setStock.run(Number(row.stock) || 0, row.unit || 'шт', row.code);
+        if (info.changes > 0) applied++;
+      }
+
+      console.log('остатки со склада применены:', applied);
+    }
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('stock-from-report', '1')").run();
   }
 
   // Работы измеряются в деталях: капот — 1, большой капот — 1,5.

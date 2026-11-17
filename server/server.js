@@ -1046,12 +1046,18 @@ route('GET', '/api/materials', async ({ url }) => {
   }
 
   const materials = db.prepare(`
-    SELECT code, name, unit, category, price, paint_code, aliases
+    SELECT code, name, unit, category, price, paint_code, aliases, stock,
+           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
       FROM materials
      WHERE ${where.join(' AND ')}
      ${order}
      LIMIT 60
   `).all(...params, ...orderParams);
+
+  // Остаток: склад минус всё, что уже списано в заказах
+  for (const row of materials) {
+    row.stock_left = round2((Number(row.stock) || 0) - (Number(row.used) || 0));
+  }
 
   return { materials };
 });
@@ -1251,6 +1257,43 @@ route('GET', '/api/clients/:phone', async ({ params }) => {
     })),
     orders
   };
+});
+
+/* ---- Избранные материалы ------------------------------------------------ */
+
+route('GET', '/api/favorites', async ({ user }) => {
+  const rows = db.prepare(`
+    SELECT f.code, m.name, m.unit, m.stock,
+           COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = m.code), 0) AS used
+      FROM favorites f
+      LEFT JOIN materials m ON m.code = f.code
+     WHERE f.user_id = ?
+     ORDER BY f.created_at DESC
+  `).all(user.id);
+
+  return {
+    favorites: rows.map((row) => ({
+      code: row.code,
+      name: row.name || row.code,
+      unit: row.unit || 'шт',
+      stock_left: round2((Number(row.stock) || 0) - (Number(row.used) || 0))
+    }))
+  };
+});
+
+route('POST', '/api/favorites', async ({ user, body }) => {
+  const code = str(body.code, 40);
+  if (!code) throw new ApiError(400, 'Не указан материал');
+
+  db.prepare('INSERT OR IGNORE INTO favorites (user_id, code, created_at) VALUES (?, ?, ?)')
+    .run(user.id, code, nowISO());
+
+  return { ok: true };
+});
+
+route('DELETE', '/api/favorites/:code', async ({ user, params }) => {
+  db.prepare('DELETE FROM favorites WHERE user_id = ? AND code = ?').run(user.id, params.code);
+  return { ok: true };
 });
 
 /* ---- Перевод кодов красок ------------------------------------------------ */

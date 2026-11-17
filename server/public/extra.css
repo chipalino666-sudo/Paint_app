@@ -1448,7 +1448,7 @@ td.empty-line,
 /* Строка результата поиска: код, наименование, две кнопки — по своим местам */
 .search-results .row {
   display: grid;
-  grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) auto auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -1697,3 +1697,30 @@ td.empty-line,
   .inspect-layout { grid-template-columns: 1fr; }
   .inspect-svg { max-height: 260px; }
 }
+/* Остаток и избранное в подборе материала */
+.stock-badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stock-badge.empty { background: #fdecea; color: #b3261e; }
+[data-theme="dark"] .stock-badge.empty { background: #3a1d1c; color: #ff8b80; }
+
+.fav-star {
+  background: transparent;
+  border: none;
+  color: var(--grey);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.fav-star:hover { color: #e0a800; }
+.fav-star.active { color: #e0a800; }
