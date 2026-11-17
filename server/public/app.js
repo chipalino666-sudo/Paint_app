@@ -708,6 +708,36 @@ const WINDOW_TITLES = {
   users: 'Сотрудники'
 };
 
+/** Часы в шапке: время видно и в полноэкранном режиме. */
+function tickClock() {
+  const host = $('#topClock');
+  if (!host) return;
+
+  const now = new Date();
+  host.textContent = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  host.title = now.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', weekday: 'short' });
+}
+
+function startClock() {
+  tickClock();
+  setInterval(tickClock, 15000);
+}
+
+/** Переключатель режима в шапке: обычный / рабочий стол. */
+function renderModeSwitch() {
+  const buttons = $$('#btnModeSwitch .mode-seg');
+  const mode = uiMode();
+
+  buttons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.mode === mode);
+  });
+}
+
+function setUiMode(mode) {
+  localStorage.setItem(UI_MODE_KEY, mode);
+  applyUiMode();
+}
+
 function uiMode() {
   return localStorage.getItem(UI_MODE_KEY) === 'desk' ? 'desk' : 'classic';
 }
@@ -747,6 +777,7 @@ function applyUiMode() {
   }
 
   uiModeLabel();
+  renderModeSwitch();
 }
 
 function toggleUiMode() {
@@ -5068,6 +5099,11 @@ function renderWarehouse() {
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
 
+    /* Переключатель режима в шапке */
+    $$('#btnModeSwitch .mode-seg').forEach((button) => {
+      button.addEventListener('click', () => setUiMode(button.dataset.mode));
+    });
+
     /* Поиск с рабочего стола */
     const deskInput = $('#deskSearch');
 
@@ -6112,6 +6148,7 @@ function renderWarehouse() {
     pushAppState();
 
     applyUiMode();
+      startClock();
   }
 
   /* ------------------------------------------------------------------------

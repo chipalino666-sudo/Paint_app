@@ -3182,19 +3182,18 @@ body.ui-desk .main { padding-bottom: 84px; }
 
 .desk-windows { position: absolute; inset: 0; pointer-events: none; }
 
+/* Окно занимает всю рабочую область под шапкой */
 .desk-window {
   position: absolute;
-  width: min(880px, 96vw);
-  height: min(620px, calc(100vh - 160px));
+  inset: 0;
   display: flex;
   flex-direction: column;
   pointer-events: auto;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, .45);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
-  resize: both;
 }
 
 .desk-window.minimized { display: none; }
@@ -3233,7 +3232,7 @@ body.ui-desk .main { padding-bottom: 84px; }
 .desk-window-body {
   flex: 1 1 auto;
   overflow: auto;
-  padding: 14px;
+  padding: 14px 14px 78px;
 }
 
 .desk-window-body .view { padding: 0; }
@@ -3242,6 +3241,7 @@ body.ui-desk .main { padding-bottom: 84px; }
   position: fixed;
   left: 50%;
   bottom: 14px;
+  z-index: 500;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -3273,14 +3273,151 @@ body.ui-desk .main { padding-bottom: 84px; }
 
 .desk-taskbar-hint { font-size: 12px; color: var(--ink-soft); padding: 2px 6px; }
 
+.desk-window-body .view { padding: 0 !important; }
+
 @media (max-width: 780px) {
-  .desk-window {
-    width: calc(100vw - 12px);
-    height: calc(100vh - 150px);
-    left: 6px !important;
-    top: 64px !important;
-  }
 
   .desk-taskbar { bottom: 8px; gap: 6px; padding: 6px 8px; }
   .desk-task { padding: 6px 10px; font-size: 12px; }
+}
+/* ---------- Шапка: часы и переключатель режима ---------------------------- */
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.top-clock {
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.mode-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.mode-seg {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s, box-shadow .15s;
+  white-space: nowrap;
+}
+
+.mode-seg:hover { color: var(--ink); }
+
+.mode-seg.active {
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, .35);
+}
+
+/* ---------- Фон приложения: мягкий градиент ------------------------------- */
+
+body {
+  background:
+    radial-gradient(1100px 520px at 8% -8%, rgba(59, 130, 246, .16), transparent 62%),
+    radial-gradient(900px 480px at 102% 2%, rgba(168, 85, 247, .13), transparent 58%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(1200px 560px at 6% -10%, rgba(59, 130, 246, .30), transparent 60%),
+    radial-gradient(1000px 520px at 104% 0%, rgba(139, 92, 246, .26), transparent 58%),
+    radial-gradient(700px 420px at 50% 110%, rgba(14, 165, 233, .12), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* ---------- Плитки рабочего стола: аккуратнее и живее --------------------- */
+
+.desk-tile {
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), var(--surface));
+  box-shadow: var(--shadow-xs);
+}
+
+.desk-tile:hover {
+  box-shadow: 0 10px 26px rgba(37, 99, 235, .16);
+  transform: translateY(-2px);
+}
+
+.desk-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 6px;
+  border-radius: 11px;
+  background: linear-gradient(160deg, rgba(59, 130, 246, .22), rgba(168, 85, 247, .18));
+  font-size: 18px;
+  line-height: 1;
+}
+
+.desk-tile-count {
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  box-shadow: 0 2px 8px rgba(37, 99, 235, .35);
+}
+
+/* ---------- Окна режима «стол»: заголовок и панель задач ------------------ */
+
+.desk-window-head {
+  background: linear-gradient(180deg, var(--surface-2), color-mix(in srgb, var(--surface-2) 80%, var(--surface)));
+  border-bottom: 1px solid var(--border);
+}
+
+.desk-window-title {
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.desk-taskbar {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+.desk-task {
+  border-radius: 999px;
+  transition: background .15s, color .15s;
+}
+
+.desk-task.active {
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  box-shadow: 0 2px 10px rgba(37, 99, 235, .35);
+}
+
+@media (max-width: 780px) {
+  .top-clock { display: none; }
+  .mode-switch { padding: 2px; }
+  .mode-seg { padding: 5px 9px; font-size: 12px; }
 }
