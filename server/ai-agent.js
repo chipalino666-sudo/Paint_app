@@ -23,7 +23,8 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 9. Формулу краски понимай буквально: «110 — 800 грамм, лак 442 — 200» — это коды и граммы. Сразу вызывай propose_recipe, не спрашивай подтверждения.
 10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.
 11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
-12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».`;
+12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
+13. Готовая краска (рецепт) собирается ТОЛЬКО из красок — колер-паст и баз. Лак, отвердитель, разбавитель в рецепт не входят: если их назвали, скажи, что это не краска, и предложи краску по коду.`;
 
 const TOOLS = [
   {
@@ -56,10 +57,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'search_materials',
-      description: 'Найти материал по коду или названию. Возвращает код, название, единицу и остаток.',
+      description: 'Найти материал по коду или названию. Возвращает код, название, единицу и остаток. При сборке готовой краски передавай only_paints: true.',
       parameters: {
         type: 'object',
-        properties: { query: { type: 'string', description: 'код (110, SE305283) или часть названия' } },
+        properties: {
+          query: { type: 'string', description: 'код (110, SE305283) или часть названия' },
+          only_paints: { type: 'boolean', description: 'искать только среди красок (для рецептов)' }
+        },
         required: ['query']
       }
     }
@@ -96,7 +100,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'propose_recipe',
-      description: 'Подготовить новую готовую краску (рецепт) из названия и состава. Ничего не сохраняет — человек подтвердит кнопкой.',
+      description: 'Подготовить новую готовую краску (рецепт) из названия и состава. В состав берутся ТОЛЬКО краски (колер-пасты), лаки и отвердители не подходят. Ничего не сохраняет — человек подтвердит кнопкой.',
       parameters: {
         type: 'object',
         properties: {
@@ -160,26 +164,35 @@ function normalize(...parts) {
 }
 
 /** Находит материал по коду, коду краски (110) или названию. */
-function resolveMaterial(db, query) {
+function resolveMaterial(db, query, options = {}) {
+  const paintOnly = Boolean(options.paintOnly);
   const raw = String(query || '').trim();
   if (!raw) return null;
 
   const exact = db.prepare('SELECT * FROM materials WHERE upper(code) = ?').get(raw.toUpperCase());
-  if (exact) return exact;
+
+  if (exact) {
+    if (paintOnly && exact.category !== 'paint') return null;
+    return exact;
+  }
 
   const needle = normalize(raw);
 
   const { code: digits, pairs } = crossCodes(db, raw);
   const codeList = digits ? [digits, ...pairs].filter(Boolean) : [];
 
+  const categoryFilter = paintOnly ? " AND category = 'paint'" : '';
+
   let rows = codeList.length
-    ? db.prepare(`SELECT * FROM materials WHERE active = 1
-                   AND (paint_code IN (${codeList.map(() => '?').join(',')}) OR search LIKE ?)
-                  LIMIT 30`).all(...codeList, '%' + needle + '%')
-    : db.prepare('SELECT * FROM materials WHERE active = 1 AND search LIKE ? LIMIT 30').all('%' + needle + '%');
+    ? db.prepare('SELECT * FROM materials WHERE active = 1' + categoryFilter
+        + ' AND (paint_code IN (' + codeList.map(() => '?').join(',') + ') OR search LIKE ?) LIMIT 30')
+        .all(...codeList, '%' + needle + '%')
+    : db.prepare('SELECT * FROM materials WHERE active = 1' + categoryFilter + ' AND search LIKE ? LIMIT 30')
+        .all('%' + needle + '%');
 
   if (!rows.length && /^\d{2,4}$/.test(needle)) {
-    rows = db.prepare('SELECT * FROM materials WHERE active = 1 AND paint_code LIKE ? LIMIT 30').all(needle + '%');
+    rows = db.prepare('SELECT * FROM materials WHERE active = 1' + categoryFilter + ' AND paint_code LIKE ? LIMIT 30')
+      .all(needle + '%');
   }
 
   if (!rows.length) return null;
@@ -280,7 +293,7 @@ function makeContext(env) {
       };
     },
 
-    search_materials({ query }) {
+    search_materials({ query, only_paints }) {
       const q = String(query || '').trim();
       if (!q) return { materials: [] };
 
@@ -289,13 +302,15 @@ function makeContext(env) {
 
       const { code: digits, pairs } = crossCodes(db, q);
       const codeList = digits ? [digits, ...pairs].filter(Boolean) : [];
+      const onlyPaints = Boolean(only_paints);
+      const paintFilter = onlyPaints ? " AND category = 'paint'" : '';
 
       const rows = codeList.length
         ? db.prepare(`
             SELECT code, name, unit, category, price, stock, paint_code,
                    COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
               FROM materials
-             WHERE active = 1 AND (search LIKE ? OR paint_code IN (${codeList.map(() => '?').join(',')}))
+             WHERE active = 1${paintFilter} AND (search LIKE ? OR paint_code IN (${codeList.map(() => '?').join(',')}))
              ORDER BY CASE WHEN category = 'paint' THEN 0 ELSE 1 END, name
              LIMIT 8
           `).all(like, ...codeList)
@@ -303,7 +318,7 @@ function makeContext(env) {
             SELECT code, name, unit, category, price, stock, paint_code,
                    COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
               FROM materials
-             WHERE active = 1 AND (search LIKE ? OR lower(code) LIKE ?)
+             WHERE active = 1${paintFilter} AND (search LIKE ? OR lower(code) LIKE ?)
              ORDER BY name
              LIMIT 8
           `).all(like, like);
@@ -406,9 +421,10 @@ function makeContext(env) {
         const code = String(mix.code || '').trim().toUpperCase();
         if (!code) continue;
 
-        const material = resolveMaterial(db, mix.code);
+        // В готовую краску идут только краски: лаки и отвердители не подходят
+        const material = resolveMaterial(db, mix.code, { paintOnly: true });
         if (!material) {
-          questions.push(`Микс с кодом ${mix.code} не найден — уточните код`);
+          questions.push(`«${mix.code}» — не краска или не найдена. В состав готовой краски идут только краски (колер-пасты), без лаков и отвердителей.`);
           continue;
         }
 
