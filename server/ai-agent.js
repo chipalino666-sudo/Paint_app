@@ -24,6 +24,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.
 11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
 12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
+14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
 13. Готовая краска (рецепт) собирается ТОЛЬКО из красок — колер-паст и баз. Лак, отвердитель, разбавитель в рецепт не входят: если их назвали, скажи, что это не краска, и предложи краску по коду.`;
 
 const TOOLS = [
@@ -77,6 +78,24 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_orders',
+      description: 'Показать заказы по статусу и посчитать их: «сколько в работе», «что готово», «что принято». Без status — все открытые.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['accepted', 'in_work', 'ready', 'closed', 'open', 'all'],
+            description: 'accepted — приняты, in_work — в работе, ready — готовы, closed — закрыты, open — все кроме закрытых, all — все'
+          },
+          limit: { type: 'integer', description: 'сколько заказов вернуть в списке, по умолчанию 10' }
+        }
       }
     }
   },
@@ -342,6 +361,48 @@ function makeContext(env) {
       }
 
       return { found: true, docs };
+    },
+
+    list_orders({ status, limit }) {
+      const rows = db.prepare(`
+        SELECT o.id, o.number, o.status, c.plate, c.make, c.model, u.full_name AS master
+          FROM orders o
+          JOIN cars c ON c.id = o.car_id
+          LEFT JOIN users u ON u.id = o.master_id
+         ORDER BY o.id DESC
+      `).all();
+
+      const visible = rows.filter((row) => visibleOrder(row.id));
+
+      const counts = { accepted: 0, in_work: 0, ready: 0, closed: 0 };
+      for (const row of visible) counts[row.status] = (counts[row.status] || 0) + 1;
+
+      const scope = ['accepted', 'in_work', 'ready', 'closed', 'open', 'all'].includes(status) ? status : 'open';
+
+      const filtered = visible.filter((row) => {
+        if (scope === 'all') return true;
+        if (scope === 'open') return row.status !== 'closed';
+        return row.status === scope;
+      });
+
+      const take = Math.min(Math.max(Number(limit) || 10, 1), 30);
+
+      return {
+        counts,
+        scope,
+        count: filtered.length,
+        total_sum: round2(filtered.reduce((sum, row) => {
+          const full = env.orderView(row.id);
+          return sum + (full ? Number(full.total) || 0 : 0);
+        }, 0)),
+        orders: filtered.slice(0, take).map((row) => ({
+          number: row.number,
+          plate: row.plate,
+          car: [row.make, row.model].filter(Boolean).join(' '),
+          status: row.status,
+          master: row.master
+        }))
+      };
     },
 
     apply_norms({ order_id, paint_code, parts }) {
