@@ -64,6 +64,9 @@ class ApiError extends Error {
 const canManage = (user) => user.role === 'admin' || user.role === 'manager';
 const isStaff = (user) => canManage(user) || user.role === 'store';
 
+// ТДС нужны малярам: они и пополняют справочник документов
+const canEditDocs = (user) => isStaff(user) || user.role === 'master';
+
 const STATUS_LABEL = {
   draft: 'Черновик',
   accepted: 'Принят',
@@ -1679,7 +1682,7 @@ route('GET', '/api/tds', async () => {
 
 /** Ссылку на ТДС добавляет кладовщик, приёмщик или админ. */
 route('POST', '/api/tds', async ({ user, body }) => {
-  if (!isStaff(user)) throw new ApiError(403, 'Ссылки на ТДС добавляет кладовщик или приёмщик');
+  if (!canEditDocs(user)) throw new ApiError(403, 'Документы добавляют маляры, приёмщик или админ');
 
   const code = str(body.code, 40);
   const title = str(body.title, 200);
@@ -1699,7 +1702,7 @@ route('POST', '/api/tds', async ({ user, body }) => {
 
 /** Файл ТДС (PDF или картинка) — сохраняем на сервере и отдаём по ссылке. */
 route('POST', '/api/tds/file', async ({ user, body }) => {
-  if (!isStaff(user)) throw new ApiError(403, 'Документы добавляет кладовщик или приёмщик');
+  if (!canEditDocs(user)) throw new ApiError(403, 'Документы добавляют маляры, приёмщик или админ');
 
   const code = str(body.code, 40);
   const title = str(body.title, 200);
@@ -1765,7 +1768,7 @@ route('GET', '/api/tds/file/:name', async ({ params, res }) => {
 });
 
 route('DELETE', '/api/tds/:id', async ({ user, params }) => {
-  if (!isStaff(user)) throw new ApiError(403, 'Удаляет кладовщик или приёмщик');
+  if (!canEditDocs(user)) throw new ApiError(403, 'Удаляют маляры, приёмщик или админ');
 
   db.prepare('DELETE FROM material_docs WHERE id = ?').run(Number(params.id));
   return { ok: true };
