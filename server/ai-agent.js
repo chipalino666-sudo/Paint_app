@@ -21,7 +21,9 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 7. Если материала нет в базе — так и скажи и предложи уточнить код.
 8. Если поиск по коду дал ровно один подходящий материал — сразу используй его, не переспрашивай. Переспрашивай, только когда подходящих несколько и они разные.
 9. Формулу краски понимай буквально: «110 — 800 грамм, лак 442 — 200» — это коды и граммы. Сразу вызывай propose_recipe, не спрашивай подтверждения.
-10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.`;
+10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.
+11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
+12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».`;
 
 const TOOLS = [
   {
@@ -167,7 +169,14 @@ function resolveMaterial(db, query) {
 
   const needle = normalize(raw);
 
-  let rows = db.prepare('SELECT * FROM materials WHERE active = 1 AND search LIKE ? LIMIT 30').all('%' + needle + '%');
+  const { code: digits, pairs } = crossCodes(db, raw);
+  const codeList = digits ? [digits, ...pairs].filter(Boolean) : [];
+
+  let rows = codeList.length
+    ? db.prepare(`SELECT * FROM materials WHERE active = 1
+                   AND (paint_code IN (${codeList.map(() => '?').join(',')}) OR search LIKE ?)
+                  LIMIT 30`).all(...codeList, '%' + needle + '%')
+    : db.prepare('SELECT * FROM materials WHERE active = 1 AND search LIKE ? LIMIT 30').all('%' + needle + '%');
 
   if (!rows.length && /^\d{2,4}$/.test(needle)) {
     rows = db.prepare('SELECT * FROM materials WHERE active = 1 AND paint_code LIKE ? LIMIT 30').all(needle + '%');
@@ -181,6 +190,23 @@ function resolveMaterial(db, query) {
   });
 
   return rows[0];
+}
+
+/** Пары кодов Brulex ↔ Standox: 110 ↔ 570 и т.п. */
+function crossCodes(db, text) {
+  const digits = String(text || '').match(/\d{2,4}/);
+  if (!digits) return { code: null, pairs: [] };
+
+  const code = digits[0];
+  const rows = db.prepare('SELECT code_a, code_b FROM code_pairs WHERE code_a = ? OR code_b = ?').all(code, code);
+
+  const pairs = [];
+  for (const row of rows) {
+    if (row.code_a !== code) pairs.push(row.code_a);
+    if (row.code_b !== code) pairs.push(row.code_b);
+  }
+
+  return { code, pairs: [...new Set(pairs)] };
 }
 
 function normQty(db, orderId, code) {
@@ -261,19 +287,32 @@ function makeContext(env) {
       const needle = normalize(q);
       const like = `%${needle}%`;
 
-      const rows = db.prepare(`
-        SELECT code, name, unit, category, price, stock,
-               COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
-          FROM materials
-         WHERE active = 1 AND (search LIKE ? OR lower(code) LIKE ?)
-         ORDER BY name
-         LIMIT 8
-      `).all(like, like);
+      const { code: digits, pairs } = crossCodes(db, q);
+      const codeList = digits ? [digits, ...pairs].filter(Boolean) : [];
+
+      const rows = codeList.length
+        ? db.prepare(`
+            SELECT code, name, unit, category, price, stock, paint_code,
+                   COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
+              FROM materials
+             WHERE active = 1 AND (search LIKE ? OR paint_code IN (${codeList.map(() => '?').join(',')}))
+             ORDER BY CASE WHEN category = 'paint' THEN 0 ELSE 1 END, name
+             LIMIT 8
+          `).all(like, ...codeList)
+        : db.prepare(`
+            SELECT code, name, unit, category, price, stock, paint_code,
+                   COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
+              FROM materials
+             WHERE active = 1 AND (search LIKE ? OR lower(code) LIKE ?)
+             ORDER BY name
+             LIMIT 8
+          `).all(like, like);
 
       const materials = rows.map((row) => ({
         code: row.code,
         name: row.name,
         unit: row.unit,
+        paint_code: row.paint_code || null,
         left: round2((Number(row.stock) || 0) - (Number(row.used) || 0))
       }));
 
