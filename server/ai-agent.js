@@ -24,6 +24,8 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.
 11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
 12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
+15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
+16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
 14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
 13. Готовая краска (рецепт) собирается ТОЛЬКО из красок — колер-паст и баз. Лак, отвердитель, разбавитель в рецепт не входят: если их назвали, скажи, что это не краска, и предложи краску по коду.`;
 
@@ -77,6 +79,21 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
+        required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'lookup_code',
+      description: 'Точная сверка кода: возвращает материалы с таким кодом, кодом цвета или парой Brulex/Standox. Вызывай ПЕРЕД тем, как назвать материал по коду.',
+      parameters: {
+        type: 'object',
+        properties: {
+          code: { type: 'string', description: 'код: 573, SE313820, 110B' },
+          only_paints: { type: 'boolean', description: 'только краски' }
+        },
         required: ['code']
       }
     }
@@ -361,6 +378,41 @@ function makeContext(env) {
       }
 
       return { found: true, docs };
+    },
+
+    lookup_code({ code, only_paints }) {
+      const raw = String(code || '').trim();
+      if (!raw) return { found: false, materials: [] };
+
+      const paintOnly = Boolean(only_paints);
+      const filter = paintOnly ? " AND category = 'paint'" : '';
+
+      const { code: digits, pairs } = crossCodes(db, raw);
+      const codeList = digits ? [digits, ...pairs].filter(Boolean) : [];
+
+      const rows = db.prepare(`
+        SELECT code, name, paint_code, aliases, unit, category, stock
+          FROM materials
+         WHERE active = 1${filter}
+           AND (upper(code) = ? OR paint_code IN (${(codeList.length ? codeList : ['\u0000']).map(() => '?').join(',')})
+                OR search LIKE ?)
+         ORDER BY CASE WHEN category = 'paint' THEN 0 ELSE 1 END, name
+         LIMIT 10
+      `).all(raw.toUpperCase(), ...(codeList.length ? codeList : ['\u0000']), '%' + normalize(raw) + '%');
+
+      return {
+        found: rows.length > 0,
+        codes: { asked: digits || null, pairs },
+        materials: rows.map((row) => ({
+          code: row.code,
+          name: row.name,
+          paint_code: row.paint_code || null,
+          aliases: row.aliases || null,
+          unit: row.unit,
+          category: row.category,
+          stock: row.stock
+        }))
+      };
     },
 
     list_orders({ status, limit }) {
