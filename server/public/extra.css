@@ -2997,3 +2997,42 @@ html[data-theme="dark"] .chip:not(.active):hover {
   .recipe-photo-row { flex-wrap: wrap; }
   .recipe-photo-hint { flex-basis: 100%; }
 }
+/* Прямоугольник с цветом краски при списании */
+.recipe-thumb-empty {
+  display: inline-block;
+  width: 52px;
+  height: 39px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: var(--surface-3);
+  flex: 0 0 auto;
+}
+
+.quick-picked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.quick-picked .recipe-thumb,
+.quick-picked .recipe-thumb-empty {
+  width: 44px;
+  height: 33px;
+}
+
+/* Подсказки готовых красок: миниатюры крупнее */
+.quick-thumb {
+  width: 34px;
+  height: 26px;
+}
+
+.recipe-results-thumb {
+  width: 34px;
+  height: 26px;
+}

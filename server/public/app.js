@@ -2023,7 +2023,16 @@
           return;
         }
 
+        const chosen = quickRecipes.find((row) => row.name === recipe);
+
         result.innerHTML = `
+          <div class="quick-picked">
+            ${chosen && chosen.photo
+              ? `<img class="recipe-thumb" src="${esc(chosen.photo)}" alt="Цвет краски" loading="lazy">`
+              : '<span class="recipe-thumb recipe-thumb-empty"></span>'}
+            <b>${esc(recipe)}</b>
+            <span class="muted">· ${qty(parts)} дет.</span>
+          </div>
           <div class="quick-list">
             ${data.items.map((item) => `
               <div class="quick-line">
@@ -2586,6 +2595,9 @@
       const row = document.createElement('div');
       row.className = 'row';
       row.innerHTML = `
+        ${recipe.photo
+          ? `<img class="recipe-thumb" src="${esc(recipe.photo)}" alt="" loading="lazy">`
+          : '<span class="recipe-thumb recipe-thumb-empty"></span>'}
         <span class="name"><b>${esc(recipe.name)}</b><br>
           <span class="muted">${esc(recipe.mixes.map((m) => `${m.name} ${qty(m.amount)}`).join(' · '))}</span>
         </span>
