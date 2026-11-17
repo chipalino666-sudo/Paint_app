@@ -4674,6 +4674,10 @@
     voice.addEventListener('end', () => {
       voiceButtonMark(false);
 
+      // Снимаем фокус: иначе на телефоне кнопка остаётся подсвеченной
+      const mic = $('#aiMic');
+      if (mic) mic.blur();
+
       // Распознали — сразу отправляем, как в голосовом помощнике
       if (voiceText) {
         const text = voiceText;
@@ -4686,6 +4690,9 @@
     voice.addEventListener('error', (event) => {
       voiceButtonMark(false);
 
+      const mic = $('#aiMic');
+      if (mic) mic.blur();
+
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         aiBubble('bot', 'Браузер не дал доступ к микрофону. Разрешите его в настройках сайта.');
       } else if (event.error === 'no-speech') {
@@ -4695,11 +4702,18 @@
 
     button.addEventListener('click', () => {
       try {
-        if (voiceButtonMark && $('#aiMic').classList.contains('ai-mic-on')) voice.stop();
-        else { voiceText = ''; voice.start(); }
+        if ($('#aiMic').classList.contains('ai-mic-on')) {
+          voice.stop();
+        } else {
+          voiceText = '';
+          voice.start();
+        }
       } catch (error) {
         voiceButtonMark(false);
       }
+
+      // Убираем фокус: иначе на телефоне кнопка остаётся подсвеченной
+      button.blur();
     });
   }
 

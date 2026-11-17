@@ -2370,22 +2370,36 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
 /* Кнопка микрофона в чате */
 .ai-mic {
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--ink-soft);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.ai-mic.hidden { display: none; }
-.ai-mic:hover { border-color: var(--blue); color: var(--blue); }
+.ai-mic svg { width: 26px; height: 26px; flex: 0 0 26px; display: block; }
 
-.ai-mic-on {
+.ai-mic.hidden { display: none; }
+
+/* Наведение — только там, где есть мышь: на телефоне оно «залипает» */
+@media (hover: hover) {
+  .ai-mic:hover { border-color: var(--blue); color: var(--blue); }
+}
+
+/* Фокус после нажатия не должен окрашивать кнопку в синий */
+.ai-mic:focus { outline: none; }
+.ai-mic:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.ai-mic-on,
+.ai-mic-on:hover,
+.ai-mic-on:focus {
   background: #e74c3c;
   border-color: #e74c3c;
   color: #fff;
