@@ -2539,3 +2539,129 @@ body.focus-mode .chips-row { margin-bottom: 10px; }
   .refs-tabs { gap: 5px; }
   .refs-tab { padding: 8px 12px; font-size: 12.5px; }
 }
+/* ---------- Списание на телефоне: компактные строки ----------------------- */
+
+@media (max-width: 780px) {
+  .material-workspace table.lines tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "code code code"
+      "name qty del";
+    gap: 2px 8px;
+    align-items: center;
+    padding: 9px 0;
+  }
+
+  .material-workspace table.lines td {
+    padding: 0;
+    border: none;
+    text-align: left;
+    display: block;
+  }
+
+  .material-workspace table.lines td::before { content: none; }
+
+  .material-workspace table.lines td:nth-child(1) {
+    grid-area: code;
+    font-size: 10.5px;
+    letter-spacing: .04em;
+    color: var(--grey);
+  }
+
+  .material-workspace table.lines td:nth-child(2) {
+    grid-area: name;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .material-workspace table.lines td:nth-child(3) {
+    grid-area: qty;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  /* Сумму в списании на телефоне не показываем — место дороже */
+  .material-workspace table.lines td:nth-child(4) { display: none; }
+
+  .material-workspace table.lines td:nth-child(5) { grid-area: del; }
+
+  .material-workspace table.lines input[type=number] {
+    width: 74px;
+    padding: 6px 8px;
+    font-size: 13.5px;
+  }
+
+  .material-workspace .material-layout { min-height: auto; }
+}
+/* Телефон: шапка списания компактнее */
+@media (max-width: 780px) {
+  .material-workspace .card-head {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+  }
+
+  .material-workspace .card-head h2 { font-size: 16px; margin: 0; }
+  .material-workspace .card-head .muted { font-size: 11.5px; }
+
+  .focus-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+    margin-left: 0;
+  }
+
+  .material-entry .mode-tabs button {
+    padding: 8px 10px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  .material-entry .add-box input[type=text],
+  .material-entry #matSearch,
+  .material-entry #recipeSearch {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .material-hint {
+    margin-top: 8px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+
+  .material-entry .search-results .row { padding: 10px 10px; gap: 8px; }
+  .material-entry .search-results .row .name { font-size: 13px; }
+  .material-entry .search-results .btn { min-height: 32px; font-size: 12.5px; }
+  .material-entry .search-results .stock-badge { font-size: 11.5px; }
+}
+/* Телефон: убираем дубли заголовка и кнопку разворота (экран и так полный) */
+@media (max-width: 780px) {
+  body .material-workspace .card-head { display: none; }
+  body .focus-btn { display: none; }
+  body .material-hint {
+    font-size: 11.5px;
+    line-height: 1.4;
+    padding: 8px 10px;
+  }
+  body .material-entry { padding: 10px; }
+  body .material-entry .mode-tabs { margin-bottom: 8px; }
+  body .material-workspace { padding: 12px 10px 16px; }
+}
+/* Телефон: сама шапка заказа тоже компактнее */
+@media (max-width: 780px) {
+  .order-bar { padding: 7px 10px; gap: 6px; }
+  .order-bar-num { font-size: 14px; }
+  .order-bar-sub { font-size: 12px; }
+  .order-bar-actions { gap: 6px; }
+  .order-bar-actions .btn { padding: 7px 8px; font-size: 12.5px; min-height: 34px; }
+
+  .order-tabs { gap: 6px; padding-bottom: 6px; }
+  .order-tab { padding: 7px 11px; font-size: 13px; }
+
+  /* Подсказка нужна один раз — на телефоне место дороже */
+  .material-hint { display: none; }
+}
