@@ -265,6 +265,73 @@ function phonetic(text) {
     .replace(/(.)\1+/g, '$1');
 }
 
+/* ---- Опечатки: «Рапит» → «Rapid», «Граннта» → «Granta» ------------------- */
+
+/** Расстояние Левенштейна с ограничением: больше limit не считаем. */
+function distance(a, b, limit = 2) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+
+  const prev = new Array(b.length + 1);
+  const curr = new Array(b.length + 1);
+
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    let rowMin = curr[0];
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+
+    if (rowMin > limit) return limit + 1;
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+
+  return prev[b.length];
+}
+
+/** Слова в латинице: «Шкода Рапит» → [shkoda, rapit]. */
+function words(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/[^a-zа-яё0-9]+/i)
+    .filter(Boolean)
+    .map((word) => translit(word))
+    .filter((word) => word.length > 0);
+}
+
+/** Совпадает ли текст с запросом с учётом опечаток (по большинству слов). */
+function fuzzyMatch(value, query) {
+  const valueWords = words(value);
+  const queryWords = words(query);
+
+  if (!queryWords.length || !valueWords.length) return false;
+
+  let hits = 0;
+  let checked = 0;
+
+  for (const q of queryWords) {
+    // Опечатки ищем только в словах от 4 букв, чтобы не путать коды и числа
+    if (q.length < 4 || /^\d+$/.test(q)) continue;
+    checked++;
+
+    const limit = q.length <= 5 ? 1 : 2;
+
+    const ok = valueWords.some((w) =>
+      w === q || (Math.abs(w.length - q.length) <= limit && distance(w, q, limit) <= limit));
+
+    if (ok) hits++;
+  }
+
+  if (!checked) return false;
+
+  return hits / checked >= 0.6;
+}
+
 function makeNeedle(text) {
   return { plain: normalize(text), sound: phonetic(text) };
 }
@@ -275,7 +342,8 @@ function matchesText(value, needle) {
   const sound = phonetic(value);
 
   return plain.includes(needle.plain)
-    || (needle.sound.length > 1 && sound.includes(needle.sound));
+    || (needle.sound.length > 1 && sound.includes(needle.sound))
+    || fuzzyMatch(value, needle.plain);
 }
 
 /** Находит материал по коду, коду краски (110) или названию. */
