@@ -74,7 +74,8 @@
   <div class="brand">Лонжерон</div>
 
   <nav class="nav" id="nav">
-    <button class="nav-btn active" data-view="orders">Заказы<span class="nav-badge hidden" id="ordersBadge">0</span></button>
+    <button class="nav-btn active" data-view="home">Стол</button>
+      <button class="nav-btn" data-view="orders">Заказы<span class="nav-badge hidden" id="ordersBadge">0</span></button>
     <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
     <div class="nav-more">
       <button class="nav-btn nav-more-btn" id="btnMore" aria-haspopup="true">
@@ -139,6 +140,21 @@
 
 <main class="main">
 
+  <!-- ======================= РАБОЧИЙ СТОЛ ======================= -->
+  <section class="view" id="view-home">
+    <div class="desk-head">
+      <h1 class="desk-title" id="deskHello">Рабочий стол</h1>
+      <div class="desk-clock" id="deskClock"></div>
+    </div>
+
+    <div class="desk-search-wrap">
+      <input type="search" id="deskSearch" data-noshield="1" placeholder="Найти: номер заказа, госномер, модель, материал…" autocomplete="off">
+      <div class="desk-search-results hidden" id="deskSearchResults"></div>
+    </div>
+
+    <div class="desk-grid" id="deskGrid"></div>
+  </section>
+
   <!-- ======================= СПИСОК ЗАКАЗОВ ======================= -->
   <section class="view" id="view-orders">
     <div class="toolbar">
@@ -168,6 +184,7 @@
 
   <!-- ======================= КАРТОЧКА ЗАКАЗА ======================= -->
   <section class="view hidden" id="view-order">
+    <div class="order-tabs-bar hidden" id="orderTabs"></div>
     <div id="orderBody"></div>
   </section>
 

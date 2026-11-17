@@ -301,6 +301,7 @@
   }
 
   function showView(name) {
+    if (name === 'home' && typeof loadDesk === 'function') loadDesk();
     state.view = name;
     shieldInputs();
 
@@ -472,10 +473,217 @@
      Карточка заказа
      ------------------------------------------------------------------------ */
 
-  async function openOrder(id) {
+  /* --------------------------------------------------------------------------
+   Рабочий стол: плитки и быстрый поиск
+   -------------------------------------------------------------------------- */
+
+function deskTile(options) {
+  const count = options.count === null || options.count === undefined
+    ? ''
+    : `<span class="desk-tile-count">${esc(String(options.count))}</span>`;
+
+  const note = options.note ? `<span class="desk-tile-note">${esc(options.note)}</span>` : '';
+
+  return `<button class="desk-tile" data-desk="${esc(options.desk || '')}">
+    <span class="desk-tile-icon">${options.icon || ''}</span>
+    <span class="desk-tile-title">${esc(options.title)}</span>
+    ${note}
+    ${count}
+  </button>`;
+}
+
+async function loadDesk() {
+  const grid = $('#deskGrid');
+  if (!grid) return;
+
+  const user = state.user || {};
+  const hello = $('#deskHello');
+
+  if (hello) {
+    const hour = new Date().getHours();
+    const part = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+    const name = String(user.full_name || '').split(' ')[0];
+    hello.textContent = name ? `${part}, ${name}` : 'Рабочий стол';
+  }
+
+  const clock = $('#deskClock');
+  if (clock) {
+    const now = new Date();
+    clock.textContent = now.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long' })
+      + ', ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  grid.innerHTML = deskTile({ title: 'Заказы', icon: '📋', note: 'считаю…', desk: 'orders' });
+
+  let orders = [];
+  let lowStock = 0;
+  let docs = 0;
+
+  try { orders = (await api('/api/orders')).orders || []; } catch (error) { /* пусто */ }
+  try { lowStock = ((await api('/api/stock/low')).items || []).length; } catch (error) { /* нет доступа */ }
+  try { docs = ((await api('/api/tds')).docs || []).length; } catch (error) { /* нет доступа */ }
+
+  const byStatus = (status) => orders.filter((row) => row.status === status).length;
+  const open = byStatus('accepted') + byStatus('in_work');
+
+  grid.innerHTML = [
+    deskTile({ title: 'Заказы', count: open, note: 'в работе и приняты', icon: '📋', desk: 'orders' }),
+    deskTile({ title: 'Приняты', count: byStatus('accepted'), note: 'ждут мастера', icon: '🕓', desk: 'accepted' }),
+    deskTile({ title: 'В работе', count: byStatus('in_work'), note: 'красятся', icon: '🔧', desk: 'in_work' }),
+    deskTile({ title: 'Готовы', count: byStatus('ready'), note: 'к выдаче', icon: '✅', desk: 'ready' }),
+    deskTile({ title: 'Пора заказать', count: lowStock, note: 'склад на минимуме', icon: '🛒', desk: 'stock' }),
+    deskTile({ title: 'ТДС и паспорта', count: docs, note: 'документов', icon: '📄', desk: 'tds' }),
+    deskTile({ title: 'Нормы списания', note: 'что списывается', icon: '⚖️', desk: 'norms' }),
+    deskTile({ title: 'Справочники', note: 'краски и материалы', icon: '📚', desk: 'refs' }),
+    deskTile({ title: 'Помощник', note: 'спросите голосом', icon: '🤖', desk: 'ai' }),
+    deskTile({ title: 'Новый заказ', note: 'машина приехала', icon: '➕', desk: 'new' })
+  ].join('');
+
+  grid.querySelectorAll('[data-desk]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.desk;
+
+      if (target === 'ai') { aiOpen(); return; }
+      if (target === 'new') { showView('new'); return; }
+      if (target === 'stock') { showView('stock'); return; }
+      if (target === 'tds') { showView('tds'); return; }
+      if (target === 'norms') { showView('norms'); return; }
+      if (target === 'refs') { showView('refs'); return; }
+
+      state.orderFilter.status = target === 'orders' ? '' : target;
+      showView('orders');
+      renderStatusChips();
+      loadOrders();
+    });
+  });
+}
+
+/** Поиск с рабочего стола: заказы и материалы. */
+async function deskSearchRun(term) {
+  const panel = $('#deskSearchResults');
+  if (!panel) return;
+
+  const q = String(term || '').trim();
+
+  if (q.length < 2) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const [foundOrders, foundMaterials] = await Promise.all([
+      api('/api/orders?q=' + encodeURIComponent(q)).catch(() => ({ orders: [] })),
+      api('/api/materials?q=' + encodeURIComponent(q)).catch(() => ({ materials: [] }))
+    ]);
+
+    const orders = (foundOrders.orders || []).slice(0, 5);
+    const materials = (foundMaterials.materials || []).slice(0, 5);
+
+    if (!orders.length && !materials.length) {
+      panel.innerHTML = '<div class="row" style="cursor:default">Ничего не найдено</div>';
+      panel.classList.remove('hidden');
+      return;
+    }
+
+    panel.innerHTML = orders.map((order) => `
+      <div class="row" data-desk-order="${esc(order.id)}">
+        <span class="code">${esc(order.number)}</span>
+        <span class="name">${esc(order.plate)} · ${esc([order.make, order.model].filter(Boolean).join(' '))}</span>
+      </div>`).join('')
+      + materials.map((item) => `
+      <div class="row" data-desk-material="${esc(item.code)}">
+        <span class="code">${esc(item.code)}</span>
+        <span class="name">${esc(item.name)} · ${qty(item.stock_left || 0)} ${esc(item.unit)}</span>
+      </div>`).join('');
+
+    panel.classList.remove('hidden');
+
+    panel.querySelectorAll('[data-desk-order]').forEach((row) => {
+      row.addEventListener('click', () => {
+        panel.classList.add('hidden');
+        openOrder(row.dataset.deskOrder);
+      });
+    });
+
+    panel.querySelectorAll('[data-desk-material]').forEach((row) => {
+      row.addEventListener('click', () => {
+        panel.classList.add('hidden');
+        showView('stock');
+      });
+    });
+  } catch (error) {
+    panel.classList.add('hidden');
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Вкладки открытых заказов
+   -------------------------------------------------------------------------- */
+
+function renderOrderTabs() {
+  const bar = $('#orderTabs');
+  if (!bar) return;
+
+  const list = state.openOrders || [];
+
+  if (!list.length) {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    return;
+  }
+
+  bar.classList.remove('hidden');
+
+  bar.innerHTML = list.map((item) => `
+    <button class="order-tab-chip ${Number(item.id) === Number(state.order && state.order.id) ? 'active' : ''}" data-order-tab="${esc(item.id)}">
+      <span>${esc(item.number)}</span>
+      <span class="order-tab-plate">${esc(item.plate)}</span>
+      <span class="order-tab-x" data-order-tab-close="${esc(item.id)}">×</span>
+    </button>`).join('');
+
+  bar.querySelectorAll('[data-order-tab]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      if (event.target.dataset.orderTabClose) return;
+      openOrder(button.dataset.orderTab);
+    });
+  });
+
+  bar.querySelectorAll('[data-order-tab-close]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+
+      const id = button.dataset.orderTabClose;
+      state.openOrders = (state.openOrders || []).filter((item) => String(item.id) !== String(id));
+
+      if (state.order && String(state.order.id) === String(id)) {
+        const next = (state.openOrders || [])[0];
+        if (next) openOrder(next.id); else showView('orders');
+      } else {
+        renderOrderTabs();
+      }
+    });
+  });
+}
+
+function rememberOrder(order) {
+  if (!order || !order.id) return;
+
+  state.openOrders = state.openOrders || [];
+
+  if (!state.openOrders.some((item) => String(item.id) === String(order.id))) {
+    state.openOrders.push({ id: order.id, number: order.number, plate: order.plate });
+  }
+
+  // Больше пяти вкладок не держим
+  while (state.openOrders.length > 5) state.openOrders.shift();
+}
+
+async function openOrder(id) {
     try {
       const data = await api('/api/orders/' + id);
       state.order = data.order;
+      rememberOrder(data.order);
+      renderOrderTabs();
       showView('order');
       renderOrder();
     } catch (error) {
@@ -4568,6 +4776,25 @@ function renderWarehouse() {
 
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
+    /* Поиск с рабочего стола */
+    const deskInput = $('#deskSearch');
+
+    if (deskInput) {
+      let deskTimer = null;
+
+      deskInput.addEventListener('input', () => {
+        clearTimeout(deskTimer);
+        deskTimer = setTimeout(() => deskSearchRun(deskInput.value), 200);
+      });
+
+      deskInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          const panel = $('#deskSearchResults');
+          if (panel) panel.classList.add('hidden');
+        }, 200);
+      });
+    }
+
     /* Фото готовой краски: камера и выбор файла — отдельные кнопки */
     if ($('#btnRecipeCamera')) {
       $('#btnRecipeCamera').addEventListener('click', () => $('#recipeCameraInput').click());
@@ -5592,7 +5819,8 @@ function renderWarehouse() {
 
     pushAppState();
 
-    showView('orders');
+    showView('home');
+      loadDesk();
   }
 
   /* ------------------------------------------------------------------------
