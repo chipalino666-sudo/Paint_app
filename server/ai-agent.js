@@ -24,6 +24,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 10. Когда просят списать «по нормам» или называют только краску и количество деталей — вызывай apply_norms: он сам подставит лак, отвердитель, разбавитель и расходники на машину.
 11. У красок два взаимозаменяемых кода: Brulex и Standox (570 = 110B, 562 = 101, 563 = 103 и так далее). Если назвали любой из них — это один и тот же цвет, не переспрашивай и не говори «это не Standox». Просто скажи: «570 — это Brulex MIX 110B».
 12. Цифры остатков бери только из инструментов. Если материал в граммах, так и говори — «66 840 г», а не «66,84 шт».
+17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
 16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
 14. На вопросы «сколько машин в работе», «что готово», «что принято» вызывай list_orders и отвечай числом и коротким списком. Не говори «не нашёл», если человек спрашивает про количество.
@@ -120,12 +121,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'apply_norms',
-      description: 'Подготовить списание по нормам цеха: на N деталей и на машину. Возвращает карточку для подтверждения.',
+      description: 'Подготовить списание по нормам цеха: на N деталей и на машину. Для готовой краски передавай её название в recipe — состав возьмётся из рецепта и пересчитается на нужное количество.',
       parameters: {
         type: 'object',
         properties: {
           order_id: { type: 'integer', description: 'id заказа' },
           paint_code: { type: 'string', description: 'код краски (цвета), которую красят' },
+          recipe: { type: 'string', description: 'название готовой краски, если красят ею (Lada 221)' },
           parts: { type: 'number', description: 'количество деталей; по умолчанию 1' }
         },
         required: ['order_id']
@@ -457,29 +459,60 @@ function makeContext(env) {
       };
     },
 
-    apply_norms({ order_id, paint_code, parts }) {
+    apply_norms({ order_id, paint_code, recipe, parts }) {
       const order = visibleOrder(Number(order_id));
       if (!order) return { error: 'Заказ не найден или недоступен' };
 
       const count = Number(parts) > 0 ? Number(parts) : 1;
       const paint = String(paint_code || '').trim();
+      const recipeName = String(recipe || '').trim();
 
       const mine = db.prepare('SELECT * FROM norm_items WHERE owner_id = ? ORDER BY sort, id').all(Number(user.id));
       const common = db.prepare('SELECT * FROM norm_items WHERE owner_id IS NULL ORDER BY sort, id').all();
       const set = mine.length ? mine : common;
 
+      // Готовая краска: берём её состав и пересчитываем на нужное количество краски
+      let chosenRecipe = null;
+
+      if (recipeName) {
+        const all = db.prepare('SELECT * FROM recipes ORDER BY name').all().map((row) => {
+          let mixes = [];
+          try { mixes = JSON.parse(row.mixes) || []; } catch (error) { mixes = []; }
+          return { id: row.id, name: row.name, base: Number(row.base) || 0, unit: row.unit, mixes };
+        });
+
+        const needle = normalize(recipeName);
+
+        chosenRecipe = all.find((r) => normalize(r.name) === needle)
+          || all.find((r) => normalize(r.name).includes(needle))
+          || all.find((r) => needle.includes(normalize(r.name)));
+
+        if (!chosenRecipe) {
+          return {
+            error: `Готовая краска «${recipeName}» не найдена`,
+            recipes: all.slice(0, 10).map((r) => r.name)
+          };
+        }
+      }
+
       const items = [];
       const questions = [];
 
+      const paintNorm = set.find((norm) => norm.role === 'paint');
+      const paintQty = paintNorm ? round2(Number(paintNorm.qty) * count) : null;
+
       for (const norm of set) {
         const factor = norm.per === 'order' ? 1 : count;
+
+        // Строку «краска» заменяет готовый рецепт
+        if (norm.role === 'paint' && chosenRecipe) continue;
 
         let code = norm.code;
         let name = '';
 
         if (norm.role === 'paint') {
           if (!paint) {
-            questions.push('Какую краску списываем? Назовите код или название.');
+            questions.push('Какую краску списываем? Назовите код или название готовой краски.');
             continue;
           }
 
@@ -511,12 +544,41 @@ function makeContext(env) {
         });
       }
 
+      // Добавляем микс-компоненты готовой краски, пересчитанные на количество краски
+      if (chosenRecipe) {
+        const need = paintQty || round2(chosenRecipe.base * count) || chosenRecipe.base;
+        const k = chosenRecipe.base > 0 ? need / chosenRecipe.base : 1;
+
+        for (const mix of chosenRecipe.mixes) {
+          const material = resolveMaterial(db, mix.code || mix.name, { paintOnly: true });
+          if (!material) {
+            questions.push(`Микс «${mix.name}» из рецепта «${chosenRecipe.name}» не найден в базе`);
+            continue;
+          }
+
+          const qty = round2(Number(mix.amount) * k);
+          if (!(qty > 0)) continue;
+
+          const used = db.prepare('SELECT COALESCE(SUM(qty), 0) AS n FROM order_materials WHERE code = ?').get(material.code).n;
+
+          items.unshift({
+            code: material.code,
+            name: material.name,
+            unit: 'г',
+            qty,
+            kind: 'paint',
+            left_after: round2((Number(material.stock) || 0) - (Number(used) || 0) - qty)
+          });
+        }
+      }
+
       return {
         proposal: {
           order_id: order.id,
           number: order.number,
           plate: order.plate,
           parts: count,
+          recipe: chosenRecipe ? chosenRecipe.name : null,
           items
         },
         questions
