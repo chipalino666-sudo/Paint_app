@@ -5003,6 +5003,26 @@ function renderWarehouse() {
     button.title = active ? 'Остановить' : 'Говорить';
   }
 
+  let voiceStarted = false;
+  let voiceBroken = false;
+  let voiceWatchdog = null;
+  let voiceHintShown = false;
+
+  /** Opera отдаёт кнопку, но сервис распознавания в неё не встроен. */
+  function voiceExplain() {
+    if (voiceHintShown) return;
+    voiceHintShown = true;
+
+    aiBubble('bot', [
+      'В этом браузере распознавание речи не работает. Так устроена Opera: кнопка есть, а сервис распознавания в неё не встроен.',
+      '',
+      'Что делать:',
+      '• нажмите Win+H — это голосовой ввод Windows, он печатает в любое поле, включая это;',
+      '• или откройте сайт в Chrome либо Edge — там микрофон работает;',
+      '• или диктуйте с телефона.'
+    ].join('\n'));
+  }
+
   function initVoice() {
     const button = $('#aiMic');
     if (!button) return;
@@ -5022,7 +5042,11 @@ function renderWarehouse() {
     voice.continuous = false;
     voice.maxAlternatives = 1;
 
-    voice.addEventListener('start', () => voiceButtonMark(true));
+    voice.addEventListener('start', () => {
+      voiceStarted = true;
+      if (voiceWatchdog) { clearTimeout(voiceWatchdog); voiceWatchdog = null; }
+      voiceButtonMark(true);
+    });
 
     voice.addEventListener('result', (event) => {
       let text = '';
@@ -5039,6 +5063,8 @@ function renderWarehouse() {
 
     voice.addEventListener('end', () => {
       voiceButtonMark(false);
+      if (voiceWatchdog) { clearTimeout(voiceWatchdog); voiceWatchdog = null; }
+      voiceStarted = false;
 
       // Снимаем фокус: иначе на телефоне кнопка остаётся подсвеченной
       const mic = $('#aiMic');
@@ -5067,15 +5093,40 @@ function renderWarehouse() {
     });
 
     button.addEventListener('click', () => {
-      try {
-        if ($('#aiMic').classList.contains('ai-mic-on')) {
-          voice.stop();
-        } else {
-          voiceText = '';
+      if (voiceBroken) {
+        voiceExplain();
+        button.blur();
+        return;
+      }
+
+      if ($('#aiMic').classList.contains('ai-mic-on')) {
+        voice.stop();
+      } else {
+        voiceText = '';
+        voiceStarted = false;
+
+        try {
           voice.start();
+        } catch (error) {
+          voiceBroken = true;
+          voiceButtonMark(false);
+          voiceExplain();
+          button.blur();
+          return;
         }
-      } catch (error) {
-        voiceButtonMark(false);
+
+        // Opera молчит: не началось за 2,5 секунды — значит не работает
+        if (voiceWatchdog) clearTimeout(voiceWatchdog);
+        voiceWatchdog = setTimeout(() => {
+          if (voiceStarted) return;
+
+          voiceBroken = true;
+          voiceButtonMark(false);
+
+          try { voice.abort(); } catch (error) { /* уже остановлено */ }
+
+          voiceExplain();
+        }, 2500);
       }
 
       // Убираем фокус: иначе на телефоне кнопка остаётся подсвеченной
