@@ -27,6 +27,7 @@ const SYSTEM = `Ты — ИИ-помощник малярного цеха «Л�
 17. Если просят списать готовую краску («Lada 221», «Серебро 570») — это рецепт, а не материал: вызывай apply_norms с полем recipe. Не ищи её по коду среди материалов.
 18. Заказ можно указывать словами («Skoda Rapid», госномер, номер) — передавай это в поле order, а не выдумывай id. Если заказ уже называли в диалоге, подставь его сам, не переспрашивай.
 19. Если инструмент вернул несколько подходящих заказов (ambiguity), покажи их списком — номер, госномер, статус — и спроси, какой именно. Никогда не выбирай за человека.
+21. Понимаешь и русский, и латиницу: «Skoda Rapid» = «Шкода Рапид», «Lada» = «Лада», «Fetisov» = «Фетисов». Если инструмент не нашёл по одному написанию — попробуй другое, не сдавайся сразу.
 20. Если просят открыть заказ или раздел («открой списание по Шкоде», «покажи склад») — вызывай open_in_app. После вызова коротко подтверди: «Открываю заказ 2026-0025, вкладка «Списание материала»».
 15. Название и код материала бери ТОЛЬКО из ответа инструмента в этом же сообщении. Если инструмент такой код не вернул — так и скажи: «такого материала нет». Не подставляй похожие буквы и цифры: в базе «Brulex MIX 112», а не «113В».
 16. Перед тем как назвать краску по коду — вызывай lookup_code. Если сомневаешься в предыдущем ответе, перепроверь инструментом, а не памятью диалога.
@@ -229,6 +230,54 @@ function normalize(...parts) {
     .trim();
 }
 
+/* ---- Транслитерация: «Шкода» = «Skoda», «Лада» = «Lada» ------------------ */
+
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch',
+  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'
+};
+
+/** Кириллица → латиница, только буквы и цифры. */
+function translit(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split('')
+    .map((ch) => (TRANSLIT[ch] !== undefined ? TRANSLIT[ch] : ch))
+    .join('')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/** Грубый «звуковой» ключ: sh→s, kh→h, x→ks — чтобы Шкода сошлась со Skoda. */
+function phonetic(text) {
+  return translit(text)
+    .replace(/sch/g, 's')
+    .replace(/sh/g, 's')
+    .replace(/ch/g, 'c')
+    .replace(/zh/g, 'z')
+    .replace(/kh/g, 'h')
+    .replace(/j/g, 'i')
+    .replace(/x/g, 'ks')
+    .replace(/ya/g, 'a')
+    .replace(/yu/g, 'u')
+    .replace(/yo/g, 'e')
+    .replace(/(.)\1+/g, '$1');
+}
+
+function makeNeedle(text) {
+  return { plain: normalize(text), sound: phonetic(text) };
+}
+
+/** Совпадает ли значение с запросом — по обычному ключу или по звуковому. */
+function matchesText(value, needle) {
+  const plain = normalize(value);
+  const sound = phonetic(value);
+
+  return plain.includes(needle.plain)
+    || (needle.sound.length > 1 && sound.includes(needle.sound));
+}
+
 /** Находит материал по коду, коду краски (110) или названию. */
 function resolveMaterial(db, query, options = {}) {
   const paintOnly = Boolean(options.paintOnly);
@@ -326,14 +375,20 @@ function makeContext(env) {
     `).all();
 
     const visible = rows.filter((row) => visibleOrder(row.id));
-    const needle = normalize(text);
+    const needle = makeNeedle(text);
 
     // Точные совпадения: номер заказа или госномер — они уникальны
-    const exact = visible.filter((row) => normalize(row.number) === needle || normalize(row.plate) === needle);
+    const exact = visible.filter((row) =>
+      matchesText(row.number, needle) && normalize(row.number) === needle.plain
+      || normalize(row.plate) === needle.plain);
     if (exact.length === 1) return { order: visibleOrder(exact[0].id) };
 
     const partial = visible.filter((row) =>
-      normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle));
+      matchesText(row.number, needle)
+      || matchesText(row.plate, needle)
+      || matchesText([row.make, row.model].join(' '), needle)
+      || matchesText(row.master, needle)
+      || matchesText(row.number + ' ' + row.plate + ' ' + row.make + ' ' + row.model + ' ' + (row.master || ''), needle));
 
     // Машины с одинаковым названием: не угадываем, показываем варианты
     if (partial.length > 1) {
@@ -398,10 +453,11 @@ function makeContext(env) {
          LIMIT 300
       `).all();
 
-      const needle = normalize(q);
+      const needle = makeNeedle(q);
 
       const orders = rows
-        .filter((row) => normalize(row.number, row.plate, row.make, row.model, row.master).includes(needle))
+        .filter((row) => matchesText(
+          [row.number, row.plate, row.make, row.model, row.master].filter(Boolean).join(' '), needle))
         .filter((row) => visibleOrder(row.id))
         .slice(0, 8)
         .map((row) => ({
@@ -468,7 +524,23 @@ function makeContext(env) {
              LIMIT 8
           `).all(like, like);
 
-      const materials = rows.map((row) => ({
+      // Ничего не нашли запросом — пробуем по транслиту («lada» ↔ «Лада», «skoda» ↔ «Шкода»)
+      let finalRows = rows;
+
+      if (!finalRows.length) {
+        const needle = makeNeedle(q);
+
+        finalRows = db.prepare(`
+          SELECT code, name, unit, category, price, stock, paint_code,
+                 COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
+            FROM materials
+           WHERE active = 1${paintFilter}
+        `).all()
+          .filter((row) => matchesText(row.name, needle) || matchesText(row.code, needle) || matchesText(row.paint_code || '', needle))
+          .slice(0, 8);
+      }
+
+      const materials = finalRows.map((row) => ({
         code: row.code,
         name: row.name,
         unit: row.unit,
@@ -625,11 +697,10 @@ function makeContext(env) {
           return { id: row.id, name: row.name, base: Number(row.base) || 0, unit: row.unit, mixes };
         });
 
-        const needle = normalize(recipeName);
+        const needle = makeNeedle(recipeName);
 
-        chosenRecipe = all.find((r) => normalize(r.name) === needle)
-          || all.find((r) => normalize(r.name).includes(needle))
-          || all.find((r) => needle.includes(normalize(r.name)));
+        chosenRecipe = all.find((r) => normalize(r.name) === needle.plain)
+          || all.find((r) => matchesText(r.name, needle));
 
         if (!chosenRecipe) {
           return {
