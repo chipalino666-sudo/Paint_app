@@ -174,6 +174,14 @@
     host.querySelectorAll('input[type="text"], input[type="search"], input:not([type])').forEach(shieldInput);
   }
 
+  const STATUS_HINT = {
+    accepted: 'Машина принята. «В работе» станет сама, как только добавят работу или спишут материал',
+    in_work: 'Работа идёт: работы и списание открыты',
+    ready: 'Работа закончена, списание закрыто. Мастер или приёмщик могут вернуть в работу',
+    closed: 'Машина выдана, менять ничего нельзя',
+    cancelled: 'Заказ отменён'
+  };
+
   const STATUS = {
     accepted: 'Принят',
     in_work: 'В работе',
@@ -447,7 +455,7 @@
         card.innerHTML = `
           <div class="oc-top">
             <span class="order-number">${esc(order.number)}</span>
-            <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
+            <span class="status-pill status-${esc(order.status)}" title="${esc(STATUS_HINT[order.status] || '')}">${esc(STATUS[order.status] || order.status)}</span>
           </div>
           ${orderNotice(order)}
           <div class="oc-car">${esc(order.plate)}<span class="muted"> ${esc([order.make, order.model].filter(Boolean).join(' '))}</span></div>
@@ -479,7 +487,7 @@
         </td>
         <td>${esc(order.master_name || '—')}${order.bodyworker_name
           ? `<div class="muted">кузовщик: ${esc(order.bodyworker_name)}</div>` : ''}</td>
-        <td><span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span></td>
+        <td><span class="status-pill status-${esc(order.status)}" title="${esc(STATUS_HINT[order.status] || '')}">${esc(STATUS[order.status] || order.status)}</span></td>
         <td class="muted">${dateText(order.created_at)}</td>
         <td class="num mono">${money(order.total)}</td>
       </tr>`;
@@ -566,7 +574,7 @@
       <div class="order-bar">
         <div class="order-bar-main">
           <span class="order-bar-num">Заказ № ${esc(order.number)}</span>
-          <span class="status-pill status-${esc(order.status)}">${esc(STATUS[order.status] || order.status)}</span>
+          <span class="status-pill status-${esc(order.status)}" title="${esc(STATUS_HINT[order.status] || '')}">${esc(STATUS[order.status] || order.status)}</span>
           <span class="order-bar-sub">
             ${esc(order.plate)} · ${esc([order.make, order.model].filter(Boolean).join(' ') || 'марка не указана')}${order.color ? ' · ' + esc(order.color) : ''}
           </span>
