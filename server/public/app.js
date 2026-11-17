@@ -4598,18 +4598,25 @@ function renderWarehouse() {
 
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
-    /* Фото готовой краски */
-    if ($('#btnRecipePhoto')) {
-      $('#btnRecipePhoto').addEventListener('click', () => $('#recipePhotoInput').click());
+    /* Фото готовой краски: камера и выбор файла — отдельные кнопки */
+    if ($('#btnRecipeCamera')) {
+      $('#btnRecipeCamera').addEventListener('click', () => $('#recipeCameraInput').click());
     }
 
-    if ($('#recipePhotoInput')) {
-      $('#recipePhotoInput').addEventListener('change', async (event) => {
+    if ($('#btnRecipeFile')) {
+      $('#btnRecipeFile').addEventListener('click', () => $('#recipePhotoInput').click());
+    }
+
+    ['#recipeCameraInput', '#recipePhotoInput'].forEach((selector) => {
+      const input = $(selector);
+      if (!input) return;
+
+      input.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
         event.target.value = '';
         if (file) await uploadRecipePhoto(file);
       });
-    }
+    });
 
     if ($('#btnRecipePhotoDel')) {
       $('#btnRecipePhotoDel').addEventListener('click', removeRecipePhoto);
@@ -5078,6 +5085,45 @@ function renderWarehouse() {
     if (panel) panel.classList.add('hidden');
   }
 
+  /** После сохранения краски из чата предлагаем сфотографировать выкрас. */
+  function aiOfferPhoto(name) {
+    const box = $('#aiProposal');
+    const recipe = (state.recipes || []).find((row) => row.name === name);
+
+    if (!box || !recipe) return;
+
+    box.innerHTML = `
+      <div class="ai-prop-head">Сфотографировать выкрас?</div>
+      <div class="ai-prop-row muted">Фото поможет узнать цвет при списании.</div>
+      <div class="ai-prop-actions">
+        <button class="btn btn-primary btn-sm" id="aiPhotoCamera">📷 Камера</button>
+        <button class="btn btn-outline btn-sm" id="aiPhotoFile">🖼 Файл</button>
+        <button class="btn btn-outline btn-sm" id="aiPhotoLater">Позже</button>
+      </div>
+    `;
+
+    box.classList.remove('hidden');
+
+    const openWith = (inputSelector) => {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      aiClose();
+
+      openRecipeEditor(recipe);
+
+      const input = $(inputSelector);
+      if (input) input.click();
+    };
+
+    $('#aiPhotoCamera').addEventListener('click', () => openWith('#recipeCameraInput'));
+    $('#aiPhotoFile').addEventListener('click', () => openWith('#recipePhotoInput'));
+
+    $('#aiPhotoLater').addEventListener('click', () => {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+    });
+  }
+
   function aiRenderProposal(proposal) {
     const box = $('#aiProposal');
     if (!box) return;
@@ -5124,6 +5170,9 @@ function renderWarehouse() {
           box.classList.add('hidden');
           box.innerHTML = '';
           aiBubble('bot', `Готовая краска «${proposal.name}» сохранена.`);
+
+          // Сразу предлагаем сфотографировать выкрас
+          aiOfferPhoto(proposal.name);
         } catch (error) {
           aiBubble('bot', 'Не получилось: ' + error.message);
           button.disabled = false;
