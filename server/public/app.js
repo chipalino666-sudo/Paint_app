@@ -142,6 +142,63 @@
   function shieldInputs(root) {
     const host = root || document;
     host.querySelectorAll('input[type="text"], input[type="search"], input:not([type])').forEach(shieldInput);
+
+    // Поисковые поля: браузер любит подставлять в них сохранённый логин
+    host.querySelectorAll('input[type="search"], [data-noshield="1"]').forEach(guardSearchInput);
+  }
+
+  /**
+   * Не даём браузеру подставлять логин в поиск.
+   * Чистим поле, только если в нём оказался логин текущего пользователя.
+   */
+  function guardSearchInput(input) {
+    if (!input || input.dataset.autofillGuard === '1') return;
+
+    input.dataset.autofillGuard = '1';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocapitalize', 'none');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('data-form-type', 'other');
+    input.setAttribute('data-lpignore', 'true');
+
+    const clearLogin = () => {
+      const login = String((state.user && state.user.login) || '').toLowerCase();
+      if (!login) return;
+
+      const value = String(input.value || '').trim().toLowerCase();
+
+      if (value && value === login) {
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    };
+
+    input.addEventListener('focus', clearLogin);
+    input.addEventListener('pointerdown', clearLogin);
+
+    // Браузер может вставить логин уже после фокуса — ловим и это
+    input.addEventListener('input', clearLogin);
+    input.addEventListener('change', clearLogin);
+
+    startAutofillWatch();
+  }
+
+  /** Общая проверка: во всех поисковых полях не должно быть логина. */
+  function startAutofillWatch() {
+    if (window.__autofillWatch) return;
+    window.__autofillWatch = true;
+
+    setInterval(() => {
+      const login = String((state.user && state.user.login) || '').trim().toLowerCase();
+      if (!login) return;
+
+      document.querySelectorAll('input[data-autofill-guard="1"]').forEach((input) => {
+        if (String(input.value || '').trim().toLowerCase() === login) {
+          input.value = '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }, 700);
   }
 
   const STATUS_HINT = {
