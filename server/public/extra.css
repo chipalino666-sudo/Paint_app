@@ -3187,6 +3187,7 @@ body.ui-desk .main { padding-bottom: 84px; }
   gap: 8px;
   padding: 8px;
   height: 100%;
+  overflow: auto;
   box-sizing: border-box;
 }
 
@@ -3195,6 +3196,8 @@ body.ui-desk .main { padding-bottom: 84px; }
 .desk-windows.count-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .desk-windows.count-3 .desk-window:first-child { grid-row: span 2; }
 .desk-windows.count-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.desk-windows.count-5,
+.desk-windows.count-6 { grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; }
 
 .desk-window {
   position: relative;
@@ -3311,6 +3314,11 @@ body.ui-desk .main { padding-bottom: 84px; }
   align-items: center;
   gap: 10px;
   margin-left: auto;
+  flex: 0 0 auto;
+  padding-left: 8px;
+  background: inherit;
+  position: relative;
+  z-index: 2;
 }
 
 .top-clock {
@@ -3706,11 +3714,15 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1 1 200px;
-  min-width: 0;
-  min-height: 32px;
+  flex: 1 1 45%;
+  min-width: 160px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 2px 6px;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
+  border-radius: 999px;
 }
 
 .win-switcher::-webkit-scrollbar { display: none; }
@@ -3719,7 +3731,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 220px;
+  flex: 0 0 auto;
+  max-width: 200px;
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3763,12 +3776,20 @@ body {
   .win-switcher { order: 5; flex-basis: 100%; }
   .win-chip { font-size: 12px; padding: 5px 9px; }
 }
-/* Шапка в режиме стола: одна строка — навигация, окна, справа время */
+/* Шапка в режиме стола: сверху навигация, ниже — открытые окна */
 body.ui-desk .topbar {
-  flex-wrap: nowrap;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 10px 14px;
   padding-top: 10px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
+}
+
+body.ui-desk .win-switcher {
+  order: 10;
+  flex: 1 0 100%;
+  min-width: 0;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 6px;
 }
 
 body.ui-desk .nav {

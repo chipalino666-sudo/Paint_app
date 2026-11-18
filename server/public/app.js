@@ -609,6 +609,7 @@ async function loadDesk() {
       if (target === 'ai') { aiOpen(); return; }
       if (target === 'new') { deskOpen('new'); return; }
       if (target === 'stock') { deskOpen('stock'); return; }
+        if (target === 'tasks') { deskOpen('tasks'); return; }
       if (target === 'tds') { deskOpen('tds'); return; }
       if (target === 'norms') { deskOpen('norms'); return; }
       if (target === 'refs') { deskOpen('refs'); return; }
@@ -750,6 +751,7 @@ const UI_MODE_KEY = 'paintShopUiMode';
 
 const WINDOW_TITLES = {
   orders: 'Заказы',
+  tasks: 'Задачи',
   order: 'Заказ',
   new: 'Новый заказ',
   chat: 'Обсуждения',
@@ -1151,10 +1153,10 @@ function applyDeskLayout() {
   const visible = [...host.querySelectorAll('.desk-window')].filter((win) => !win.classList.contains('minimized'));
   const maximized = visible.some((win) => win.classList.contains('is-max'));
 
-  host.classList.remove('count-0', 'count-1', 'count-2', 'count-3', 'count-4');
+  host.classList.remove('count-0', 'count-1', 'count-2', 'count-3', 'count-4', 'count-5', 'count-6');
   host.classList.toggle('has-max', maximized);
 
-  const many = Math.min(4, Math.max(1, visible.length));
+  const many = Math.min(6, Math.max(1, visible.length));
   host.classList.add('count-' + (visible.length ? many : 0));
 
   sizeDeskLayer();
