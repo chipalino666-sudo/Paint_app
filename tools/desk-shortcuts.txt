@@ -1,0 +1,161 @@
+/* --------------------------------------------------------------------------
+   Ярлыки рабочего стола: пользователь сам собирает набор плиток
+   -------------------------------------------------------------------------- */
+
+const DESK_SHORTCUTS = [
+  { key: 'orders', title: 'Заказы', icon: '📋', count: 'orders' },
+  { key: 'accepted', title: 'Приняты', icon: '🕓', count: 'accepted', filter: 'accepted' },
+  { key: 'in_work', title: 'В работе', icon: '🔧', count: 'in_work', filter: 'in_work' },
+  { key: 'ready', title: 'Готовы', icon: '✅', count: 'ready', filter: 'ready' },
+  { key: 'tasks', title: 'Задачи', icon: '🗒️', count: 'tasks' },
+  { key: 'lowstock', title: 'Пора заказать', icon: '🛒', count: 'stock', target: 'stock' },
+  { key: 'stock', title: 'Склад', icon: '📦' },
+  { key: 'tds', title: 'ТДС и паспорта', icon: '📄', count: 'tds' },
+  { key: 'norms', title: 'Нормы списания', icon: '⚖️' },
+  { key: 'refs', title: 'Справочники', icon: '📚' },
+  { key: 'report', title: 'Отчёт', icon: '📈' },
+  { key: 'clients', title: 'Клиенты', icon: '👥' },
+  { key: 'chat', title: 'Обсуждения', icon: '💬' },
+  { key: 'ai', title: 'Помощник', icon: '🤖' },
+  { key: 'new', title: 'Новый заказ', icon: '➕' },
+  { key: 'users', title: 'Сотрудники', icon: '🧑‍🔧' }
+];
+
+const DEFAULT_DESK = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'tds', 'norms', 'refs', 'ai', 'new'];
+
+function currentDeskItems() {
+  const saved = state.user && state.user.desk_items;
+
+  if (Array.isArray(saved) && saved.length) return saved;
+
+  return DEFAULT_DESK.filter((key) => key !== 'users' || (state.user && state.user.role === 'admin'));
+}
+
+/** Считаем цифры для плиток. */
+async function deskCounts() {
+  const counts = {};
+  let orders = [];
+
+  try {
+    orders = (await api('/api/orders')).orders || [];
+  } catch (error) { /* без заказов */ }
+
+  const byStatus = (status) => orders.filter((row) => row.status === status).length;
+
+  counts.orders = byStatus('accepted') + byStatus('in_work');
+  counts.accepted = byStatus('accepted');
+  counts.in_work = byStatus('in_work');
+  counts.ready = byStatus('ready');
+
+  try {
+    counts.tasks = ((await api('/api/tasks?status=open')).counts || {}).today || 0;
+    const low = await api('/api/tasks?status=open');
+    counts.tasks = (low.counts.overdue || 0) + (low.counts.today || 0);
+  } catch (error) { /* нет доступа */ }
+
+  try {
+    counts.stock = ((await api('/api/stock/low')).items || []).length;
+  } catch (error) { /* нет доступа */ }
+
+  try {
+    counts.tds = ((await api('/api/tds')).docs || []).length;
+  } catch (error) { /* нет доступа */ }
+
+  return counts;
+}
+
+/** Отрисовка стола по сохранённому набору ярлыков. */
+async function renderDeskShortcuts() {
+  const grid = $('#deskGrid');
+  if (!grid) return;
+
+  const items = currentDeskItems();
+  const counts = await deskCounts();
+
+  const tiles = items.map((key) => {
+    const item = DESK_SHORTCUTS.find((row) => row.key === key);
+    if (!item) return '';
+
+    const count = item.count && counts[item.count] !== undefined ? counts[item.count] : null;
+
+    return `<button class="desk-tile" data-desk="${esc(item.key)}">
+      <span class="desk-tile-icon">${item.icon}</span>
+      <span class="desk-tile-title">${esc(item.title)}</span>
+      ${count !== null ? `<span class="desk-tile-count">${esc(String(count))}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  grid.innerHTML = tiles + `<button class="desk-tile desk-tile-add" data-desk-add="1" title="Добавить ярлык">
+      <span class="desk-tile-icon">＋</span>
+      <span class="desk-tile-title">Добавить ярлык</span>
+    </button>`;
+
+  grid.querySelectorAll('[data-desk-add]').forEach((button) => {
+    button.addEventListener('click', () => openDeskPrefs());
+  });
+
+  grid.querySelectorAll('[data-desk]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = DESK_SHORTCUTS.find((row) => row.key === button.dataset.desk);
+      if (!item) return;
+
+      if (item.key === 'ai') { aiOpen(); return; }
+      if (item.key === 'new') { deskOpen('new'); return; }
+      if (item.target) { deskOpen(item.target); return; }
+
+      if (item.filter) {
+        state.orderFilter.status = item.filter;
+        deskOpen('orders');
+        renderStatusChips();
+        loadOrders();
+        return;
+      }
+
+      if (item.key === 'orders') {
+        state.orderFilter.status = '';
+        deskOpen('orders');
+        renderStatusChips();
+        loadOrders();
+        return;
+      }
+
+      deskOpen(item.key);
+    });
+  });
+}
+
+/** Окно выбора ярлыков. */
+function openDeskPrefs() {
+  const host = $('#deskPrefsList');
+  const list = currentDeskItems();
+
+  if (!host) return;
+
+  host.innerHTML = DESK_SHORTCUTS.map((item) => {
+    const disabled = item.key === 'users' && state.user && state.user.role !== 'admin';
+
+    return `<label class="nav-pref ${disabled ? 'is-disabled' : ''}">
+      <input type="checkbox" value="${esc(item.key)}" ${list.includes(item.key) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+      <span>${item.icon} ${esc(item.title)}</span>
+    </label>`;
+  }).join('');
+
+  $('#deskPrefsModal').classList.add('open');
+}
+
+async function saveDeskPrefs() {
+  const items = $$('#deskPrefsList input:checked').map((input) => input.value);
+
+  try {
+    await api('/api/me/desk', { method: 'PUT', body: { items } });
+
+    if (state.user) state.user.desk_items = items;
+
+    $('#deskPrefsModal').classList.remove('open');
+
+    await renderDeskShortcuts();
+    toast('Ярлыки обновлены');
+  } catch (error) {
+    toast(error.message);
+  }
+}

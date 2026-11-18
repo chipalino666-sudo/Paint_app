@@ -364,10 +364,28 @@ route('POST', '/api/logout', async ({ req, res, user }) => {
 
 /** Личные пункты шапки из базы. */
 /** Дополняем пользователя его пунктами шапки из базы. */
-function withNavItems(user) {
-  const row = db.prepare('SELECT nav_items FROM users WHERE id = ?').get(user.id);
+function parseModeItems(value) {
+  try {
+    const saved = JSON.parse(value || 'null');
+    return Array.isArray(saved) ? saved : null;
+  } catch (error) {
+    return null;
+  }
+}
 
-  return { ...user, nav_items: parseNavItems(row) };
+function parseModeItems(value) {
+  try {
+    const saved = JSON.parse(value || 'null');
+    return Array.isArray(saved) ? saved : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function withNavItems(user) {
+  const row = db.prepare('SELECT nav_items, desk_items FROM users WHERE id = ?').get(user.id);
+
+  return { ...user, nav_items: parseNavItems(row), desk_items: parseModeItems(row ? row.desk_items : null) };
 }
 function parseNavItems(user) {
   if (!user) return null;
@@ -381,6 +399,21 @@ function parseNavItems(user) {
 }
 
 /** Личные пункты шапки: каждый мастер выбирает своё. */
+/** Ярлыки на рабочем столе: свой набор у каждого. */
+route('PUT', '/api/me/desk', async ({ user, body }) => {
+  const allowed = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'stock', 'tds',
+    'norms', 'refs', 'report', 'clients', 'chat', 'ai', 'new', 'users'];
+
+  const items = (Array.isArray(body.items) ? body.items : [])
+    .map((item) => String(item))
+    .filter((item) => allowed.includes(item))
+    .slice(0, 16);
+
+  db.prepare('UPDATE users SET desk_items = ? WHERE id = ?').run(JSON.stringify(items), user.id);
+
+  return { ok: true, items };
+});
+
 route('PUT', '/api/me/nav', async ({ user, body }) => {
   const allowed = ['orders', 'chat', 'tasks', 'stock', 'tds', 'norms', 'report', 'clients', 'refs', 'users'];
 

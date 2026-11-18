@@ -3825,3 +3825,18 @@ body.ui-desk .top-right {
 
 .nav-pref input { width: 17px; height: 17px; accent-color: var(--blue); }
 .nav-pref.is-disabled { opacity: .5; cursor: default; }
+
+/* Плитка «добавить ярлык» */
+.desk-tile-add {
+  border: 1px dashed var(--border);
+  background: transparent;
+  opacity: .7;
+}
+
+.desk-tile-add:hover {
+  opacity: 1;
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
+}
+
+.desk-tile-add .desk-tile-icon { opacity: .8; }

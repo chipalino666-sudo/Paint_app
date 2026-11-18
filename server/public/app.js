@@ -482,6 +482,168 @@
      ------------------------------------------------------------------------ */
 
   /* --------------------------------------------------------------------------
+   Ярлыки рабочего стола: пользователь сам собирает набор плиток
+   -------------------------------------------------------------------------- */
+
+const DESK_SHORTCUTS = [
+  { key: 'orders', title: 'Заказы', icon: '📋', count: 'orders' },
+  { key: 'accepted', title: 'Приняты', icon: '🕓', count: 'accepted', filter: 'accepted' },
+  { key: 'in_work', title: 'В работе', icon: '🔧', count: 'in_work', filter: 'in_work' },
+  { key: 'ready', title: 'Готовы', icon: '✅', count: 'ready', filter: 'ready' },
+  { key: 'tasks', title: 'Задачи', icon: '🗒️', count: 'tasks' },
+  { key: 'lowstock', title: 'Пора заказать', icon: '🛒', count: 'stock', target: 'stock' },
+  { key: 'stock', title: 'Склад', icon: '📦' },
+  { key: 'tds', title: 'ТДС и паспорта', icon: '📄', count: 'tds' },
+  { key: 'norms', title: 'Нормы списания', icon: '⚖️' },
+  { key: 'refs', title: 'Справочники', icon: '📚' },
+  { key: 'report', title: 'Отчёт', icon: '📈' },
+  { key: 'clients', title: 'Клиенты', icon: '👥' },
+  { key: 'chat', title: 'Обсуждения', icon: '💬' },
+  { key: 'ai', title: 'Помощник', icon: '🤖' },
+  { key: 'new', title: 'Новый заказ', icon: '➕' },
+  { key: 'users', title: 'Сотрудники', icon: '🧑‍🔧' }
+];
+
+const DEFAULT_DESK = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'tds', 'norms', 'refs', 'ai', 'new'];
+
+function currentDeskItems() {
+  const saved = state.user && state.user.desk_items;
+
+  if (Array.isArray(saved) && saved.length) return saved;
+
+  return DEFAULT_DESK.filter((key) => key !== 'users' || (state.user && state.user.role === 'admin'));
+}
+
+/** Считаем цифры для плиток. */
+async function deskCounts() {
+  const counts = {};
+  let orders = [];
+
+  try {
+    orders = (await api('/api/orders')).orders || [];
+  } catch (error) { /* без заказов */ }
+
+  const byStatus = (status) => orders.filter((row) => row.status === status).length;
+
+  counts.orders = byStatus('accepted') + byStatus('in_work');
+  counts.accepted = byStatus('accepted');
+  counts.in_work = byStatus('in_work');
+  counts.ready = byStatus('ready');
+
+  try {
+    counts.tasks = ((await api('/api/tasks?status=open')).counts || {}).today || 0;
+    const low = await api('/api/tasks?status=open');
+    counts.tasks = (low.counts.overdue || 0) + (low.counts.today || 0);
+  } catch (error) { /* нет доступа */ }
+
+  try {
+    counts.stock = ((await api('/api/stock/low')).items || []).length;
+  } catch (error) { /* нет доступа */ }
+
+  try {
+    counts.tds = ((await api('/api/tds')).docs || []).length;
+  } catch (error) { /* нет доступа */ }
+
+  return counts;
+}
+
+/** Отрисовка стола по сохранённому набору ярлыков. */
+async function renderDeskShortcuts() {
+  const grid = $('#deskGrid');
+  if (!grid) return;
+
+  const items = currentDeskItems();
+  const counts = await deskCounts();
+
+  const tiles = items.map((key) => {
+    const item = DESK_SHORTCUTS.find((row) => row.key === key);
+    if (!item) return '';
+
+    const count = item.count && counts[item.count] !== undefined ? counts[item.count] : null;
+
+    return `<button class="desk-tile" data-desk="${esc(item.key)}">
+      <span class="desk-tile-icon">${item.icon}</span>
+      <span class="desk-tile-title">${esc(item.title)}</span>
+      ${count !== null ? `<span class="desk-tile-count">${esc(String(count))}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  grid.innerHTML = tiles + `<button class="desk-tile desk-tile-add" data-desk-add="1" title="Добавить ярлык">
+      <span class="desk-tile-icon">＋</span>
+      <span class="desk-tile-title">Добавить ярлык</span>
+    </button>`;
+
+  grid.querySelectorAll('[data-desk-add]').forEach((button) => {
+    button.addEventListener('click', () => openDeskPrefs());
+  });
+
+  grid.querySelectorAll('[data-desk]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = DESK_SHORTCUTS.find((row) => row.key === button.dataset.desk);
+      if (!item) return;
+
+      if (item.key === 'ai') { aiOpen(); return; }
+      if (item.key === 'new') { deskOpen('new'); return; }
+      if (item.target) { deskOpen(item.target); return; }
+
+      if (item.filter) {
+        state.orderFilter.status = item.filter;
+        deskOpen('orders');
+        renderStatusChips();
+        loadOrders();
+        return;
+      }
+
+      if (item.key === 'orders') {
+        state.orderFilter.status = '';
+        deskOpen('orders');
+        renderStatusChips();
+        loadOrders();
+        return;
+      }
+
+      deskOpen(item.key);
+    });
+  });
+}
+
+/** Окно выбора ярлыков. */
+function openDeskPrefs() {
+  const host = $('#deskPrefsList');
+  const list = currentDeskItems();
+
+  if (!host) return;
+
+  host.innerHTML = DESK_SHORTCUTS.map((item) => {
+    const disabled = item.key === 'users' && state.user && state.user.role !== 'admin';
+
+    return `<label class="nav-pref ${disabled ? 'is-disabled' : ''}">
+      <input type="checkbox" value="${esc(item.key)}" ${list.includes(item.key) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+      <span>${item.icon} ${esc(item.title)}</span>
+    </label>`;
+  }).join('');
+
+  $('#deskPrefsModal').classList.add('open');
+}
+
+async function saveDeskPrefs() {
+  const items = $$('#deskPrefsList input:checked').map((input) => input.value);
+
+  try {
+    await api('/api/me/desk', { method: 'PUT', body: { items } });
+
+    if (state.user) state.user.desk_items = items;
+
+    $('#deskPrefsModal').classList.remove('open');
+
+    await renderDeskShortcuts();
+    toast('Ярлыки обновлены');
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* --------------------------------------------------------------------------
    Рабочий стол: плитки и быстрый поиск
    -------------------------------------------------------------------------- */
 
@@ -571,55 +733,9 @@ async function loadDesk() {
       + ', ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   }
 
-  grid.innerHTML = deskTile({ title: 'Заказы', icon: '📋', note: 'считаю…', desk: 'orders' });
-
-  let orders = [];
-  let lowStock = 0;
-  let docs = 0;
-  let taskCount = 0;
-
-  try { orders = (await api('/api/orders')).orders || []; } catch (error) { /* пусто */ }
-  try { lowStock = ((await api('/api/stock/low')).items || []).length; } catch (error) { /* нет доступа */ }
-  try { docs = ((await api('/api/tds')).docs || []).length; } catch (error) { /* нет доступа */ }
-  try { const t = await api('/api/tasks?status=open'); taskCount = (t.counts && (t.counts.overdue + t.counts.today)) || t.tasks.length; } catch (error) { /* нет доступа */ }
-
-  const byStatus = (status) => orders.filter((row) => row.status === status).length;
-  const open = byStatus('accepted') + byStatus('in_work');
 
   renderDeskDock();
-
-  grid.innerHTML = [
-    deskTile({ title: 'Заказы', count: open, note: 'в работе и приняты', icon: '📋', desk: 'orders' }),
-    deskTile({ title: 'Приняты', count: byStatus('accepted'), note: 'ждут мастера', icon: '🕓', desk: 'accepted' }),
-    deskTile({ title: 'В работе', count: byStatus('in_work'), note: 'красятся', icon: '🔧', desk: 'in_work' }),
-    deskTile({ title: 'Готовы', count: byStatus('ready'), note: 'к выдаче', icon: '✅', desk: 'ready' }),
-    deskTile({ title: 'Задачи', count: taskCount, note: 'дела цеха', icon: '🗒️', desk: 'tasks' }),
-    deskTile({ title: 'Пора заказать', count: lowStock, note: 'склад на минимуме', icon: '🛒', desk: 'stock' }),
-    deskTile({ title: 'ТДС и паспорта', count: docs, note: 'документов', icon: '📄', desk: 'tds' }),
-    deskTile({ title: 'Нормы списания', note: 'что списывается', icon: '⚖️', desk: 'norms' }),
-    deskTile({ title: 'Справочники', note: 'краски и материалы', icon: '📚', desk: 'refs' }),
-    deskTile({ title: 'Помощник', note: 'спросите голосом', icon: '🤖', desk: 'ai' }),
-    deskTile({ title: 'Новый заказ', note: 'машина приехала', icon: '➕', desk: 'new' })
-  ].join('');
-
-  grid.querySelectorAll('[data-desk]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const target = button.dataset.desk;
-
-      if (target === 'ai') { aiOpen(); return; }
-      if (target === 'new') { deskOpen('new'); return; }
-      if (target === 'stock') { deskOpen('stock'); return; }
-        if (target === 'tasks') { deskOpen('tasks'); return; }
-      if (target === 'tds') { deskOpen('tds'); return; }
-      if (target === 'norms') { deskOpen('norms'); return; }
-      if (target === 'refs') { deskOpen('refs'); return; }
-
-      state.orderFilter.status = target === 'orders' ? '' : target;
-      deskOpen('orders');
-      renderStatusChips();
-      loadOrders();
-    });
-  });
+  await renderDeskShortcuts();
 }
 
 /** Поиск с рабочего стола: заказы и материалы. */
@@ -5607,6 +5723,15 @@ function renderWarehouse() {
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
     if ($('#btnNavPrefs')) $('#btnNavPrefs').addEventListener('click', openNavPrefs);
+
+    if ($('#btnDeskPrefsSave')) $('#btnDeskPrefsSave').addEventListener('click', saveDeskPrefs);
+    if ($('#btnDeskPrefsCancel')) $('#btnDeskPrefsCancel').addEventListener('click', () => $('#deskPrefsModal').classList.remove('open'));
+    if ($('#btnCloseDeskPrefs')) $('#btnCloseDeskPrefs').addEventListener('click', () => $('#deskPrefsModal').classList.remove('open'));
+    if ($('#btnDeskPrefsReset')) $('#btnDeskPrefsReset').addEventListener('click', () => {
+      $('#deskPrefsList input').forEach((input) => {
+        input.checked = DEFAULT_DESK.includes(input.value) && (!input.disabled);
+      });
+    });
     if ($('#btnNavPrefsSave')) $('#btnNavPrefsSave').addEventListener('click', saveNavPrefs);
     if ($('#btnNavPrefsCancel')) $('#btnNavPrefsCancel').addEventListener('click', () => $('#navPrefsModal').classList.remove('open'));
     if ($('#btnCloseNavPrefs')) $('#btnCloseNavPrefs').addEventListener('click', () => $('#navPrefsModal').classList.remove('open'));
