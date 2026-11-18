@@ -3929,3 +3929,47 @@ body.ui-desk .top-right {
   .rail-item { width: auto; white-space: nowrap; }
   .rail-label { max-width: 130px; }
 }
+/* ---------- Телефон: окна друг под другом, по ширине экрана ---------------- */
+
+@media (max-width: 900px) {
+  .desk-layer {
+    overflow-x: hidden;
+  }
+
+  .desk-windows {
+    padding: 6px !important;
+    grid-template-columns: 1fr !important;
+    grid-auto-rows: minmax(200px, 1fr);
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .desk-windows.count-2,
+  .desk-windows.count-3,
+  .desk-windows.count-4,
+  .desk-windows.count-5,
+  .desk-windows.count-6 {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: none;
+  }
+
+  .desk-windows.count-3 .desk-window:first-child { grid-row: auto; }
+
+  .desk-window {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .desk-window-body {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .desk-windows.has-max .desk-window.is-max {
+    inset: 6px;
+  }
+}
