@@ -303,9 +303,9 @@
   function showView(name) {
     // В режиме рабочего стола разделы открываются окнами, а не подменяют экран
     if (typeof uiMode === 'function' && uiMode() === 'desk') {
-      if (name === 'home') { showDeskHome(); return; }
+      if (name === 'home') { minimizeAllDeskWindows(); return; }
 
-      openDeskWindow(name);
+      deskNavigate(name);
       return;
     }
     if (name === 'home' && typeof loadDesk === 'function') loadDesk();
@@ -528,7 +528,7 @@ function renderDeskDock() {
         return;
       }
 
-      showView(target);
+      deskOpen(target);
     });
   });
 }
@@ -721,8 +721,8 @@ function renderOrderTabs() {
       if (state.order && String(state.order.id) === String(id)) {
         const next = (state.openOrders || [])[0];
         if (next) openOrder(next.id); else showView('orders');
-      } else {
-        renderOrderTabs();
+        } else {
+
       }
     });
   });
@@ -841,7 +841,12 @@ function toggleUiMode() {
 
 /** Стол как фон: показываем только домашнюю вьюху. */
 function showDeskHome() {
-  $$('.view').forEach((view) => view.classList.add('hidden'));
+  const main = document.querySelector('main.main');
+
+  // Скрываем только то, что лежит на странице, — содержимое окон не трогаем
+  $$('.view').forEach((view) => {
+    if (main && view.parentElement === main) view.classList.add('hidden');
+  });
 
   const home = $('#view-home');
   if (home) home.classList.remove('hidden');
@@ -915,6 +920,99 @@ function openDeskWindow(name) {
   if (name === 'users') loadUsers();
 }
 
+/** Какое окно сейчас активно. */
+function activeDeskWindow() {
+  const host = $('#deskWindows');
+  if (!host) return null;
+
+  return host.querySelector('.desk-window.active') || null;
+}
+
+/** Вернуть раздел на страницу, если он лежит в каком-то окне. */
+function detachViewFromWindows(view) {
+  if (!view) return;
+
+  const main = document.querySelector('main.main');
+  if (!main) return;
+
+  if (view.parentElement && view.parentElement !== main) {
+    main.appendChild(view);
+    view.classList.add('hidden');
+  }
+}
+
+/**
+ * Переход внутри активного окна: заказ, карточка, ТДС — всё остаётся
+ * в том же окне. Новые окна открывает только рабочий стол.
+ */
+function deskNavigate(name) {
+  const win = activeDeskWindow();
+
+  if (!win) {
+    openDeskWindow(name);
+    return;
+  }
+
+  const view = document.getElementById('view-' + name);
+  if (!view) return;
+
+  const body = win.querySelector('.desk-window-body');
+  if (!body) return;
+
+  // Убираем прежнее содержимое окна на страницу
+  [...body.querySelectorAll('.view')].forEach((old) => {
+    if (old !== view) detachViewFromWindows(old);
+  });
+
+  // Если раздел уже открыт в другом окне — забираем его сюда
+  const other = win.parentElement.querySelector('[data-window]');
+  win.parentElement.querySelectorAll('.desk-window').forEach((item) => {
+    if (item === win) return;
+    if (item.querySelector('#view-' + name)) {
+      detachViewFromWindows(view);
+    }
+  });
+
+  body.appendChild(view);
+  view.classList.remove('hidden');
+
+  win.dataset.view = name;
+  win.dataset.title = windowTitle(name);
+
+  focusDeskWindow(win.dataset.window);
+  refreshWindowTitles();
+  state.view = name;
+
+  if (name === 'orders') loadOrders();
+  if (name === 'chat') openGeneralChat();
+  if (name === 'report') loadReport();
+  if (name === 'refs') loadRefs();
+  if (name === 'clients') loadClients();
+  if (name === 'stock') loadWarehouse();
+  if (name === 'tds') loadTdsView();
+  if (name === 'norms') loadNormsView();
+  if (name === 'users') loadUsers();
+  if (name === 'tasks') loadTasks();
+}
+
+/** Открыть раздел отдельным окном (или обычным экраном вне режима стола). */
+function deskOpen(name) {
+  if (uiMode() === 'desk') {
+    openDeskWindow(name);
+    return;
+  }
+
+  showView(name);
+}
+/** «Стол»: сворачиваем окна, содержимое остаётся на месте. */
+function minimizeAllDeskWindows() {
+  const host = $('#deskWindows');
+  if (host) host.querySelectorAll('.desk-window').forEach((win) => win.classList.add('minimized'));
+
+  showDeskHome();
+  renderDeskTaskbar();
+}
+
 function focusDeskWindow(name) {
   const host = $('#deskWindows');
   if (!host) return;
@@ -964,12 +1062,13 @@ function closeDeskWindow(name) {
 
   const win = host.querySelector('[data-window="' + name + '"]');
 
-  detachWindowView(name);
-
-  if (win) win.remove();
+  if (win) {
+    win.querySelectorAll('.view').forEach((view) => detachViewFromWindows(view));
+    win.remove();
+  }
 
   renderDeskTaskbar();
-
+  showDeskHome();
 }
 
 function closeAllWindows() {
@@ -990,7 +1089,7 @@ function refreshWindowTitles() {
 
   host.querySelectorAll('.desk-window').forEach((win) => {
     const title = win.querySelector('.desk-window-title');
-    if (title) title.textContent = windowTitle(win.dataset.window);
+    if (title) title.textContent = win.dataset.title || windowTitle(win.dataset.window);
   });
 
   renderDeskTaskbar();
@@ -1014,7 +1113,9 @@ function renderDeskTaskbar() {
     const name = win.dataset.window;
     const active = win.classList.contains('active') && !win.classList.contains('minimized');
 
-    return `<button class="desk-task ${active ? 'active' : ''}" data-task="${esc(name)}">${esc(windowTitle(name))}</button>`;
+    const label = win.dataset.title || windowTitle(name);
+
+    return `<button class="desk-task ${active ? 'active' : ''}" data-task="${esc(name)}">${esc(label)}</button>`;
   }).join('');
 
   bar.querySelectorAll('[data-task]').forEach((button) => {
@@ -1191,8 +1292,7 @@ async function openOrder(id) {
     try {
       const data = await api('/api/orders/' + id);
       state.order = data.order;
-      rememberOrder(data.order);
-      renderOrderTabs();
+
       showView('order');
       refreshWindowTitles();
       renderOrder();
@@ -5208,7 +5308,18 @@ function renderWarehouse() {
 
   function bindEvents() {
     $$('.nav-btn').forEach((button) => {
-      button.addEventListener('click', () => showView(button.dataset.view));
+      button.addEventListener('click', () => {
+        const target = button.dataset.view;
+
+        if (typeof uiMode === 'function' && uiMode() === 'desk') {
+          if (target === 'home') { minimizeAllDeskWindows(); return; }
+
+          openDeskWindow(target);
+          return;
+        }
+
+        deskOpen(target);
+      });
     });
 
     /* Меню в шапке: «Ещё» и меню пользователя */
