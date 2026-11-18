@@ -3421,3 +3421,153 @@ body {
   .mode-switch { padding: 2px; }
   .mode-seg { padding: 5px 9px; font-size: 12px; }
 }
+
+/* ---------- Стол как сетка приложений ------------------------------------- */
+
+.desk-body {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.desk-main { min-width: 0; }
+
+.desk-main-top { max-width: 680px; margin: 0 auto 20px; }
+
+.desk-search-wrap { margin-bottom: 18px; }
+
+.desk-dock {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-sm);
+}
+
+.dock-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+
+.dock-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.dock-btn.is-open { background: color-mix(in srgb, var(--blue) 16%, transparent); }
+
+.dock-dot {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.dock-sep {
+  width: 22px;
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+/* Плитки — как в сетке приложений: иконка сверху, подпись снизу */
+.desk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 4px;
+}
+
+.desk-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 8px 10px;
+  min-height: 0;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.desk-tile:hover {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+
+.desk-tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  border-radius: 15px;
+  background: linear-gradient(160deg, rgba(96, 165, 250, .32), rgba(168, 85, 247, .26));
+  border: 1px solid rgba(148, 163, 184, .22);
+  font-size: 27px;
+  line-height: 1;
+}
+
+.desk-tile-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+  max-width: 108px;
+}
+
+.desk-tile-note { display: none; }
+
+.desk-tile-count {
+  position: absolute;
+  top: 8px;
+  right: calc(50% - 40px);
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .desk-body { grid-template-columns: 1fr; }
+  .desk-dock {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px;
+  }
+  .dock-sep { width: 1px; height: 22px; margin: 0 2px; }
+  .desk-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+  .desk-tile-icon { width: 48px; height: 48px; font-size: 23px; }
+  .desk-tile-title { font-size: 11.5px; }
+}

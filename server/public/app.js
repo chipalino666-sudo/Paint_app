@@ -484,6 +484,54 @@
    Рабочий стол: плитки и быстрый поиск
    -------------------------------------------------------------------------- */
 
+/* Закреплённые разделы слева — как док в системе */
+const DESK_DOCK = [
+  { name: 'orders', icon: '📋', title: 'Заказы' },
+  { name: 'stock', icon: '📦', title: 'Склад' },
+  { name: 'tds', icon: '📄', title: 'ТДС' },
+  { name: 'norms', icon: '⚖️', title: 'Нормы' },
+  { name: 'refs', icon: '📚', title: 'Справочники' },
+  { name: 'chat', icon: '💬', title: 'Обсуждения' }
+];
+
+function renderDeskDock() {
+  const dock = $('#deskDock');
+  if (!dock) return;
+
+  const host = $('#deskWindows');
+
+  dock.innerHTML = DESK_DOCK.map((item) => {
+    const open = host && host.querySelector('[data-window="' + item.name + '"]');
+
+    return `<button class="dock-btn ${open ? 'is-open' : ''}" data-dock="${esc(item.name)}" title="${esc(item.title)}">
+      <span class="dock-icon">${item.icon}</span>
+      ${open ? '<span class="dock-dot"></span>' : ''}
+    </button>`;
+  }).join('') + `
+    <span class="dock-sep"></span>
+    <button class="dock-btn" data-dock="new" title="Новый заказ">➕</button>
+    <button class="dock-btn" data-dock="ai" title="Помощник">🤖</button>
+    <button class="dock-btn" data-dock="desk" title="Свернуть всё">🗗</button>
+  `;
+
+  dock.querySelectorAll('[data-dock]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.dock;
+
+      if (target === 'ai') { aiOpen(); return; }
+      if (target === 'new') { showView('new'); return; }
+
+      if (target === 'desk') {
+        const list = $$('#deskWindows .desk-window');
+        list.forEach((win) => minimizeDeskWindow(win.dataset.window));
+        return;
+      }
+
+      showView(target);
+    });
+  });
+}
+
 function deskTile(options) {
   const count = options.count === null || options.count === undefined
     ? ''
@@ -534,6 +582,8 @@ async function loadDesk() {
 
   const byStatus = (status) => orders.filter((row) => row.status === status).length;
   const open = byStatus('accepted') + byStatus('in_work');
+
+  renderDeskDock();
 
   grid.innerHTML = [
     deskTile({ title: 'Заказы', count: open, note: 'в работе и приняты', icon: '📋', desk: 'orders' }),
@@ -870,9 +920,14 @@ function focusDeskWindow(name) {
 
   windowZ += 1;
   win.style.zIndex = String(windowZ);
-  win.classList.remove('minimized');
 
-  host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('active'));
+  // Окна занимают всю область: показываем только активное
+  host.querySelectorAll('.desk-window').forEach((item) => {
+    item.classList.remove('active');
+    item.classList.toggle('minimized', item !== win);
+  });
+
+  win.classList.remove('minimized');
   win.classList.add('active');
 
   renderDeskTaskbar();
@@ -911,8 +966,6 @@ function closeDeskWindow(name) {
 
   renderDeskTaskbar();
 
-  // Закрыли заказы — закрываем и карточку заказа
-  if (name === 'orders') closeDeskWindow('order');
 }
 
 function closeAllWindows() {
@@ -940,6 +993,8 @@ function refreshWindowTitles() {
 }
 
 function renderDeskTaskbar() {
+  renderDeskDock();
+
   const bar = $('#deskTaskbar');
   if (!bar) return;
 
