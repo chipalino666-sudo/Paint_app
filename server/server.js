@@ -362,6 +362,38 @@ route('POST', '/api/logout', async ({ req, res, user }) => {
   return { ok: true };
 });
 
+/** Личные пункты шапки из базы. */
+/** Дополняем пользователя его пунктами шапки из базы. */
+function withNavItems(user) {
+  const row = db.prepare('SELECT nav_items FROM users WHERE id = ?').get(user.id);
+
+  return { ...user, nav_items: parseNavItems(row) };
+}
+function parseNavItems(user) {
+  if (!user) return null;
+
+  try {
+    const saved = JSON.parse(user.nav_items || 'null');
+    return Array.isArray(saved) ? saved : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/** Личные пункты шапки: каждый мастер выбирает своё. */
+route('PUT', '/api/me/nav', async ({ user, body }) => {
+  const allowed = ['orders', 'chat', 'tasks', 'stock', 'tds', 'norms', 'report', 'clients', 'refs', 'users'];
+
+  const items = (Array.isArray(body.items) ? body.items : [])
+    .map((item) => String(item))
+    .filter((item) => allowed.includes(item))
+    .slice(0, 8);
+
+  db.prepare('UPDATE users SET nav_items = ? WHERE id = ?').run(JSON.stringify(items), user.id);
+
+  return { ok: true, items };
+});
+
 route('GET', '/api/me', async ({ user, sessionData }) => {
   if (!sessionData) return { user: null, locked: true };
 
@@ -375,7 +407,7 @@ route('GET', '/api/me', async ({ user, sessionData }) => {
     };
   }
 
-  return { user };
+    return { user: user ? withNavItems(user) : null };
 });
 
 /* --------------------------------------------------------------------------

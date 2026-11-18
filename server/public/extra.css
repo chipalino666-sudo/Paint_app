@@ -3783,3 +3783,24 @@ body.ui-desk .top-right {
 @media (max-width: 780px) {
   body.ui-desk .topbar { flex-wrap: wrap; }
 }
+/* ---------- Пункты шапки -------------------------------------------------- */
+
+.nav-extra { display: contents; }
+
+.nav-prefs { display: grid; gap: 6px; margin-top: 8px; }
+
+.nav-pref {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-pref input { width: 17px; height: 17px; accent-color: var(--blue); }
+.nav-pref.is-disabled { opacity: .5; cursor: default; }

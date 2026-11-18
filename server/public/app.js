@@ -792,6 +792,101 @@ function setUiMode(mode) {
   applyUiMode();
 }
 
+/* --------------------------------------------------------------------------
+   Пункты шапки: у каждого пользователя свои
+   -------------------------------------------------------------------------- */
+
+const NAV_ITEMS = [
+  { view: 'orders', title: 'Заказы' },
+  { view: 'chat', title: 'Обсуждения' },
+  { view: 'tasks', title: 'Задачи' },
+  { view: 'stock', title: 'Склад' },
+  { view: 'tds', title: 'ТДС и паспорта' },
+  { view: 'norms', title: 'Нормы списания' },
+  { view: 'report', title: 'Отчёт' },
+  { view: 'clients', title: 'Клиенты' },
+  { view: 'refs', title: 'Справочники' },
+  { view: 'users', title: 'Сотрудники' }
+];
+
+/** Набор по умолчанию зависит от роли. */
+function defaultNavItems() {
+  const role = (state.user && state.user.role) || 'painter';
+
+  if (role === 'admin' || role === 'manager') return ['orders', 'chat', 'tasks', 'stock'];
+  if (role === 'storekeeper' || role === 'store') return ['stock', 'tasks', 'chat', 'tds'];
+  if (role === 'master') return ['orders', 'chat', 'tds', 'tasks'];
+
+  return ['orders', 'chat', 'tds'];
+}
+
+function currentNavItems() {
+  const saved = state.user && state.user.nav_items;
+  if (Array.isArray(saved) && saved.length) return saved;
+
+  return defaultNavItems();
+}
+
+/** Выбранные пункты — в шапку, остальные — в меню «Ещё». */
+function applyNavPrefs(items) {
+  const list = Array.isArray(items) && items.length ? items : currentNavItems();
+  const extra = $('#navExtra');
+  const menu = $('#moreMenu');
+
+  if (!extra || !menu) return;
+
+  NAV_ITEMS.forEach((item) => {
+    const button = document.querySelector('.nav-btn[data-view="' + item.view + '"]');
+    if (!button) return;
+
+    if (list.includes(item.view)) {
+      button.classList.add('nav-btn-header');
+      button.classList.remove('menu-item');
+      extra.appendChild(button);
+    } else {
+      button.classList.remove('nav-btn-header');
+      button.classList.add('menu-item');
+      menu.appendChild(button);
+    }
+  });
+
+  const more = $('.nav-more');
+  if (more) more.classList.toggle('hidden', !menu.children.length);
+}
+
+function openNavPrefs() {
+  const host = $('#navPrefsList');
+  const list = currentNavItems();
+
+  if (!host) return;
+
+  host.innerHTML = NAV_ITEMS.map((item) => {
+    const disabled = item.view === 'users' && state.user && state.user.role !== 'admin';
+
+    return `<label class="nav-pref ${disabled ? 'is-disabled' : ''}">
+      <input type="checkbox" value="${esc(item.view)}" ${list.includes(item.view) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+      <span>${esc(item.title)}</span>
+    </label>`;
+  }).join('');
+
+  $('#navPrefsModal').classList.add('open');
+}
+
+async function saveNavPrefs() {
+  const items = $$('#navPrefsList input:checked').map((input) => input.value);
+
+  try {
+    await api('/api/me/nav', { method: 'PUT', body: { items } });
+
+    if (state.user) state.user.nav_items = items;
+
+    applyNavPrefs(items);
+    $('#navPrefsModal').classList.remove('open');
+    toast('Шапка настроена');
+  } catch (error) {
+    toast(error.message);
+  }
+}
 function uiMode() {
   return localStorage.getItem(UI_MODE_KEY) === 'desk' ? 'desk' : 'classic';
 }
@@ -5509,6 +5604,10 @@ function renderWarehouse() {
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
+    if ($('#btnNavPrefs')) $('#btnNavPrefs').addEventListener('click', openNavPrefs);
+    if ($('#btnNavPrefsSave')) $('#btnNavPrefsSave').addEventListener('click', saveNavPrefs);
+    if ($('#btnNavPrefsCancel')) $('#btnNavPrefsCancel').addEventListener('click', () => $('#navPrefsModal').classList.remove('open'));
+    if ($('#btnCloseNavPrefs')) $('#btnCloseNavPrefs').addEventListener('click', () => $('#navPrefsModal').classList.remove('open'));
 
     window.addEventListener('resize', () => { if (typeof sizeDeskLayer === 'function') sizeDeskLayer(); });
 
@@ -6578,6 +6677,7 @@ function renderWarehouse() {
     pushAppState();
 
     applyUiMode();
+      applyNavPrefs(currentNavItems());
       startClock();
   }
 

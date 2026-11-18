@@ -77,6 +77,7 @@
     <button class="nav-btn active" data-view="home">Стол</button>
       <button class="nav-btn" data-view="orders">Заказы<span class="nav-badge hidden" id="ordersBadge">0</span></button>
     <button class="nav-btn" data-view="chat" id="navChat">Обсуждения<span class="nav-badge hidden" id="chatBadge">0</span></button>
+      <span class="nav-extra" id="navExtra"></span>
     <div class="nav-more">
       <button class="nav-btn nav-more-btn" id="btnMore" aria-haspopup="true">
         Ещё
@@ -120,6 +121,7 @@
       </button>
 
       <div class="menu menu-right hidden" id="userDropdown">
+      <button class="menu-item" id="btnNavPrefs">Пункты в шапке</button>
       <button class="menu-item" id="btnUiMode">Режим: обычный</button>
         <button class="menu-item" id="navInstall">Установить приложение</button>
         <button class="menu-item" id="btnPassword">Сменить пароль</button>
@@ -925,6 +927,28 @@
     </div>
   </div>
 </div>
+
+  <!-- ======================= НАСТРОЙКА ШАПКИ ======================= -->
+  <div class="modal" id="navPrefsModal">
+    <div class="modal-box" style="max-width:460px">
+      <div class="modal-head">
+        <h3>Пункты в шапке</h3>
+        <button class="modal-close" id="btnCloseNavPrefs">×</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="muted" style="margin-top:0;font-size:12.5px">
+          Выберите, что показывать в шапке. Остальное всегда доступно в меню «Ещё».
+        </p>
+        <div class="nav-prefs" id="navPrefsList"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="btnNavPrefsCancel">Отмена</button>
+        <button class="btn btn-primary" id="btnNavPrefsSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
 <!-- ======================= РЕДАКТОР КРАСКИ ======================= -->
 <div class="modal" id="recipeModal">

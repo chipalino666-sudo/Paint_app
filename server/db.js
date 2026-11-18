@@ -313,6 +313,7 @@ addColumn('cars', 'search', 'TEXT');
 
 // Рабочее место мастеров: общий вход на компьютере + личный ПИН-код у каждого
 addColumn('users', 'is_workstation', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'nav_items', 'TEXT');
 addColumn('users', 'pin_hash', 'TEXT');
 addColumn('users', 'pin_updated_at', 'TEXT');
 
