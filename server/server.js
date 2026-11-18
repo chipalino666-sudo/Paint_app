@@ -2919,10 +2919,33 @@ function serveStatic(req, res, pathname) {
       return;
     }
 
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(target).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-cache'
-    });
+    const type = MIME[path.extname(target).toLowerCase()] || 'application/octet-stream';
+
+    // Для HTML подставляем метку времени в ссылки на скрипты,
+    // чтобы браузер никогда не работал со старой версией
+    if (type.includes('text/html')) {
+      const stampOf = (file) => {
+        try {
+          return Math.round(fs.statSync(path.join(PUBLIC_DIR, file)).mtimeMs).toString(36);
+        } catch (error) {
+          return '1';
+        }
+      };
+
+      const text = data.toString('utf8')
+        .replace('"/app.js"', `"/app.js?v=${stampOf('app.js')}"`)
+        .replace('"/extra.css"', `"/extra.css?v=${stampOf('extra.css')}"`);
+
+      res.writeHead(200, {
+        'Content-Type': type,
+        'Cache-Control': 'no-cache',
+        'Content-Length': Buffer.byteLength(text)
+      });
+      res.end(text);
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 }

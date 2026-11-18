@@ -1022,8 +1022,12 @@ function focusDeskWindow(name) {
   windowZ += 1;
   win.style.zIndex = String(windowZ);
 
-  // Окна не мешают друг другу: все остаются на столе
-  host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('active'));
+  // Окна не мешают друг другу: все остаются на столе.
+  // Развёрнутое окно снимаем с разворота, иначе новые окна будут скрыты.
+  host.querySelectorAll('.desk-window').forEach((item) => {
+    item.classList.remove('active');
+    if (item !== win) item.classList.remove('is-max');
+  });
 
   win.classList.remove('minimized');
   win.classList.add('active');
