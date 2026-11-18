@@ -818,8 +818,9 @@ function applyUiMode() {
 
   if (desk) {
     if (layer) layer.classList.remove('hidden');
-    if (taskbar) taskbar.classList.remove('hidden');
+    if (taskbar) taskbar.classList.add('hidden');
 
+    sizeDeskLayer();
     showDeskHome();
   } else {
     closeAllWindows();
@@ -1033,6 +1034,17 @@ function focusDeskWindow(name) {
 }
 
 /** Раскладываем окна мозаикой: 1 — на всё, 2 — колонками, до 4 — сеткой. */
+/** Слой окон строго под шапкой: шапка — панель задач. */
+function sizeDeskLayer() {
+  const layer = $('#deskLayer');
+  if (!layer) return;
+
+  const topbar = document.querySelector('.topbar');
+  const height = topbar ? Math.round(topbar.getBoundingClientRect().height) : 56;
+
+  layer.style.top = height + 'px';
+}
+
 function applyDeskLayout() {
   const host = $('#deskWindows');
   if (!host) return;
@@ -1045,6 +1057,8 @@ function applyDeskLayout() {
 
   const many = Math.min(4, Math.max(1, visible.length));
   host.classList.add('count-' + (visible.length ? many : 0));
+
+  sizeDeskLayer();
 }
 
 /** Развернуть окно на всю область или вернуть в мозаику. */
@@ -1131,8 +1145,61 @@ function refreshWindowTitles() {
   renderDeskTaskbar();
 }
 
+/** Диспетчер окон в шапке: список открытых разделов. */
+function renderWinSwitcher() {
+  const bar = $('#winSwitcher');
+  if (!bar) return;
+
+  const host = $('#deskWindows');
+  const wins = host ? [...host.querySelectorAll('.desk-window')] : [];
+
+  if (!wins.length || uiMode() !== 'desk') {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    return;
+  }
+
+  bar.classList.remove('hidden');
+
+  bar.innerHTML = wins.map((win) => {
+    const active = win.classList.contains('active') && !win.classList.contains('minimized');
+    const label = win.dataset.title || windowTitle(win.dataset.window);
+
+    return `<button class="win-chip ${active ? 'active' : ''}" data-win-chip="${esc(win.dataset.window)}" title="${esc(label)}">
+      <span class="win-chip-label">${esc(label)}</span>
+      <span class="win-chip-x" data-win-chip-close="${esc(win.dataset.window)}">×</span>
+    </button>`;
+  }).join('');
+
+  bar.querySelectorAll('[data-win-chip]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      if (event.target.dataset.winChipClose) return;
+
+      const name = button.dataset.winChip;
+      const win = host.querySelector('[data-window="' + name + '"]');
+      if (!win) return;
+
+      if (win.classList.contains('active') && !win.classList.contains('minimized')) {
+        minimizeDeskWindow(name);
+        showDeskHome();
+      } else {
+        focusDeskWindow(name);
+        applyDeskLayout();
+      }
+    });
+  });
+
+  bar.querySelectorAll('[data-win-chip-close]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeDeskWindow(button.dataset.winChipClose);
+    });
+  });
+}
+
 function renderDeskTaskbar() {
   renderDeskDock();
+  renderWinSwitcher();
 
   const bar = $('#deskTaskbar');
   if (!bar) return;
@@ -5438,6 +5505,8 @@ function renderWarehouse() {
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
+
+    window.addEventListener('resize', () => { if (typeof sizeDeskLayer === 'function') sizeDeskLayer(); });
 
     /* Задачи */
     if ($('#btnAddTask')) $('#btnAddTask').addEventListener('click', addTask);

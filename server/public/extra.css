@@ -3184,9 +3184,10 @@ body.ui-desk .main { padding-bottom: 84px; }
 /* Окна на столе: плитки мозаики */
 .desk-windows {
   display: grid;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px;
   height: 100%;
+  box-sizing: border-box;
 }
 
 .desk-windows.count-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
@@ -3690,4 +3691,95 @@ body {
 @media (max-width: 780px) {
   .task-add input[type="text"] { flex: 1 1 100%; }
   .task-due { width: 116px; }
+}
+
+
+/* ---------- Диспетчер окон в шапке ---------------------------------------- */
+
+.topbar {
+  z-index: 900;
+  position: sticky;
+  top: 0;
+}
+
+.win-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 32px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.win-switcher::-webkit-scrollbar { display: none; }
+
+.win-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.win-chip:hover { color: var(--ink); border-color: var(--blue); }
+
+.win-chip.active {
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.win-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.win-chip-x {
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: .65;
+}
+
+.win-chip-x:hover { opacity: 1; }
+
+/* Нижняя панель задач больше не показывается */
+.desk-taskbar { display: none !important; }
+
+@media (max-width: 780px) {
+  .win-switcher { order: 5; flex-basis: 100%; }
+  .win-chip { font-size: 12px; padding: 5px 9px; }
+}
+/* Шапка в режиме стола: одна строка — навигация, окна, справа время */
+body.ui-desk .topbar {
+  flex-wrap: nowrap;
+  gap: 14px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+body.ui-desk .nav {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+body.ui-desk .top-right {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 780px) {
+  body.ui-desk .topbar { flex-wrap: wrap; }
 }
