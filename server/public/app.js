@@ -607,14 +607,14 @@ async function loadDesk() {
       const target = button.dataset.desk;
 
       if (target === 'ai') { aiOpen(); return; }
-      if (target === 'new') { showView('new'); return; }
-      if (target === 'stock') { showView('stock'); return; }
-      if (target === 'tds') { showView('tds'); return; }
-      if (target === 'norms') { showView('norms'); return; }
-      if (target === 'refs') { showView('refs'); return; }
+      if (target === 'new') { deskOpen('new'); return; }
+      if (target === 'stock') { deskOpen('stock'); return; }
+      if (target === 'tds') { deskOpen('tds'); return; }
+      if (target === 'norms') { deskOpen('norms'); return; }
+      if (target === 'refs') { deskOpen('refs'); return; }
 
       state.orderFilter.status = target === 'orders' ? '' : target;
-      showView('orders');
+      deskOpen('orders');
       renderStatusChips();
       loadOrders();
     });
@@ -880,6 +880,7 @@ function openDeskWindow(name) {
       <div class="desk-window-head">
         <span class="desk-window-title"></span>
         <span class="desk-window-btns">
+          <button class="desk-win-btn" data-win-max title="Развернуть">⤢</button>
           <button class="desk-win-btn" data-win-min title="Свернуть">–</button>
           <button class="desk-win-btn" data-win-close title="Закрыть">×</button>
         </span>
@@ -887,16 +888,11 @@ function openDeskWindow(name) {
       <div class="desk-window-body"></div>
     `;
 
-    const count = host.querySelectorAll('.desk-window').length;
-    const offset = (count % 5) * 26;
-
-    win.style.left = Math.max(10, 40 + offset) + 'px';
-    win.style.top = Math.max(10, 90 + offset) + 'px';
-
     win.querySelector('.desk-window-body').appendChild(view);
     view.classList.remove('hidden');
 
     win.querySelector('[data-win-close]').addEventListener('click', () => closeDeskWindow(name));
+    win.querySelector('[data-win-max]').addEventListener('click', () => toggleDeskMaximize(name));
     win.querySelector('[data-win-min]').addEventListener('click', () => minimizeDeskWindow(name));
     win.querySelector('.desk-window-head').addEventListener('pointerdown', (event) => startWindowDrag(event, win));
 
@@ -907,6 +903,7 @@ function openDeskWindow(name) {
   }
 
   focusDeskWindow(name);
+  applyDeskLayout();
   refreshWindowTitles();
 
   if (name === 'orders') loadOrders();
@@ -1008,6 +1005,7 @@ function deskOpen(name) {
 function minimizeAllDeskWindows() {
   const host = $('#deskWindows');
   if (host) host.querySelectorAll('.desk-window').forEach((win) => win.classList.add('minimized'));
+  applyDeskLayout();
 
   showDeskHome();
   renderDeskTaskbar();
@@ -1023,15 +1021,52 @@ function focusDeskWindow(name) {
   windowZ += 1;
   win.style.zIndex = String(windowZ);
 
-  // Окна занимают всю область: показываем только активное
-  host.querySelectorAll('.desk-window').forEach((item) => {
-    item.classList.remove('active');
-    item.classList.toggle('minimized', item !== win);
-  });
+  // Окна не мешают друг другу: все остаются на столе
+  host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('active'));
 
   win.classList.remove('minimized');
   win.classList.add('active');
 
+  applyDeskLayout();
+
+  renderDeskTaskbar();
+}
+
+/** Раскладываем окна мозаикой: 1 — на всё, 2 — колонками, до 4 — сеткой. */
+function applyDeskLayout() {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const visible = [...host.querySelectorAll('.desk-window')].filter((win) => !win.classList.contains('minimized'));
+  const maximized = visible.some((win) => win.classList.contains('is-max'));
+
+  host.classList.remove('count-0', 'count-1', 'count-2', 'count-3', 'count-4');
+  host.classList.toggle('has-max', maximized);
+
+  const many = Math.min(4, Math.max(1, visible.length));
+  host.classList.add('count-' + (visible.length ? many : 0));
+}
+
+/** Развернуть окно на всю область или вернуть в мозаику. */
+function toggleDeskMaximize(name) {
+  const host = $('#deskWindows');
+  if (!host) return;
+
+  const win = host.querySelector('[data-window="' + name + '"]');
+  if (!win) return;
+
+  const wasMax = win.classList.contains('is-max');
+
+  host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('is-max'));
+
+  if (!wasMax) {
+    win.classList.add('is-max');
+    win.classList.remove('minimized');
+    host.querySelectorAll('.desk-window').forEach((item) => item.classList.remove('active'));
+    win.classList.add('active');
+  }
+
+  applyDeskLayout();
   renderDeskTaskbar();
 }
 
@@ -1068,6 +1103,7 @@ function closeDeskWindow(name) {
   }
 
   renderDeskTaskbar();
+  applyDeskLayout();
   showDeskHome();
 }
 
