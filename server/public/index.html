@@ -928,6 +928,40 @@
   </div>
 </div>
 
+  <!-- ======================= ПРОГРАММЫ КОМПЬЮТЕРА ======================= -->
+  <div class="modal" id="appsModal">
+    <div class="modal-box" style="max-width:520px">
+      <div class="modal-head">
+        <h3>Программы на компьютере</h3>
+        <button class="modal-close" id="btnCloseApps">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="appsList"></div>
+        <div class="apps-help hidden" id="appsHelp">
+          <p class="muted" style="margin-top:0;font-size:12.5px">
+            Чтобы открывать программы с рабочего стола, запустите на этом компьютере
+            маленького помощника. Он работает только на вашем компьютере и запускает
+            лишь те программы, что в нём перечислены.
+          </p>
+          <a class="btn btn-outline btn-sm" href="/downloads/lonjeron-agent.cmd" download>Скачать помощника (.cmd)</a>
+          <a class="btn btn-outline btn-sm" href="/downloads/lonjeron-agent.ps1" download>Скачать скрипт (.ps1)</a>
+          <p class="muted" style="margin-bottom:0;font-size:12.5px">
+            1. Скачайте оба файла в одну папку.<br>
+            2. Запустите <b>lonjeron-agent.cmd</b> — откроется чёрное окно, его можно свернуть, но не закрывать.<br>
+            3. Нажмите «Обновить» — список программ появится здесь.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="btnAppsRefresh">Обновить</button>
+        <span class="spacer"></span>
+        <button class="btn btn-primary" id="btnAppsClose">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ======================= ЯРЛЫКИ СТОЛА ======================= -->
   <div class="modal" id="deskPrefsModal">
     <div class="modal-box" style="max-width:480px">

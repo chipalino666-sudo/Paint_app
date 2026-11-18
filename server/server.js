@@ -402,7 +402,7 @@ function parseNavItems(user) {
 /** Ярлыки на рабочем столе: свой набор у каждого. */
 route('PUT', '/api/me/desk', async ({ user, body }) => {
   const allowed = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'stock', 'tds',
-    'norms', 'refs', 'report', 'clients', 'chat', 'ai', 'new', 'users'];
+    'norms', 'refs', 'report', 'clients', 'chat', 'ai', 'new', 'users', 'apps'];
 
   const items = (Array.isArray(body.items) ? body.items : [])
     .map((item) => String(item))

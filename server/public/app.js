@@ -501,8 +501,10 @@ const DESK_SHORTCUTS = [
   { key: 'chat', title: 'Обсуждения', icon: '💬' },
   { key: 'ai', title: 'Помощник', icon: '🤖' },
   { key: 'new', title: 'Новый заказ', icon: '➕' },
-  { key: 'users', title: 'Сотрудники', icon: '🧑‍🔧' }
+  { key: 'users', title: 'Сотрудники', icon: '🧑‍🔧' },
+  { key: 'apps', title: 'Программы', icon: '🖥️' }
 ];
+
 
 const DEFAULT_DESK = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'tds', 'norms', 'refs', 'ai', 'new'];
 
@@ -583,7 +585,7 @@ async function renderDeskShortcuts() {
       if (!item) return;
 
       if (item.key === 'ai') { aiOpen(); return; }
-      if (item.key === 'new') { deskOpen('new'); return; }
+      if (item.key === 'apps') { openAppsPanel(); return; }
       if (item.target) { deskOpen(item.target); return; }
 
       if (item.filter) {
@@ -607,6 +609,82 @@ async function renderDeskShortcuts() {
   });
 }
 
+/* --------------------------------------------------------------------------
+   Программы компьютера: через локального помощника
+   -------------------------------------------------------------------------- */
+
+const LOCAL_AGENT = 'http://127.0.0.1:8787';
+
+async function agentRequest(path, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+
+  try {
+    const response = await fetch(LOCAL_AGENT + path, {
+      ...options,
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function openAppsPanel() {
+  const modal = $('#appsModal');
+  if (!modal) return;
+
+  modal.classList.add('open');
+  await renderAppsList();
+}
+
+async function renderAppsList() {
+  const host = $('#appsList');
+  const help = $('#appsHelp');
+  if (!host) return;
+
+  host.innerHTML = '<div class="spinner">Смотрю программы…</div>';
+
+  try {
+    const data = await agentRequest('/apps');
+    const apps = data.apps || [];
+
+    if (!apps.length) {
+      host.innerHTML = '<div class="empty-line">Помощник запущен, но список программ пуст</div>';
+      if (help) help.classList.add('hidden');
+      return;
+    }
+
+    if (help) help.classList.add('hidden');
+
+    host.innerHTML = `<div class="apps-grid">${apps.map((app) => `
+      <button class="apps-item" data-app="${esc(app.id)}">
+        <span class="apps-icon">${esc(app.icon || '▶️')}</span>
+        <span>${esc(app.title)}</span>
+      </button>`).join('')}</div>`;
+
+    host.querySelectorAll('[data-app]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          const result = await agentRequest('/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: button.dataset.app })
+          });
+
+          toast(result.title ? 'Открываю: ' + result.title : 'Готово');
+        } catch (error) {
+          toast('Не получилось запустить');
+        }
+      });
+    });
+  } catch (error) {
+    host.innerHTML = '<div class="empty-line">Помощник не запущен на этом компьютере</div>';
+    if (help) help.classList.remove('hidden');
+  }
+}
 /** Окно выбора ярлыков. */
 function openDeskPrefs() {
   const host = $('#deskPrefsList');

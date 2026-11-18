@@ -3973,3 +3973,44 @@ body.ui-desk .top-right {
     inset: 6px;
   }
 }
+/* ---------- Программы компьютера ------------------------------------------ */
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.apps-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s;
+}
+
+.apps-item:hover {
+  border-color: var(--blue);
+  transform: translateY(-1px);
+}
+
+.apps-icon { font-size: 17px; line-height: 1; }
+
+.apps-help {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.apps-help .btn { margin-right: 6px; margin-bottom: 8px; }
