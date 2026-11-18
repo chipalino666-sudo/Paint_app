@@ -1207,6 +1207,9 @@ async function loadTasks() {
       return;
     }
 
+    const me = state.user || {};
+    const canRemove = (task) => me.role === 'admin' || Number(task.owner_id) === Number(me.id);
+
     host.innerHTML = tasks.map((task) => {
       const label = taskDateLabel(task.due_date);
 
@@ -1219,11 +1222,11 @@ async function loadTasks() {
               <span class="task-date ${label.cls}">${esc(label.text)}</span>
               ${task.priority === 2 ? '<span class="task-prio">важная</span>' : ''}
               ${task.order_id ? `<button class="task-link" data-task-order="${task.order_id}">к заказу</button>` : ''}
-              ${task.assignee ? `<span class="muted">${esc(task.assignee)}</span>` : ''}
+              ${task.owner ? `<span class="muted">поставил: ${esc(task.owner.split(' ')[0])}</span>` : ''}
             </div>
           </div>
           <input type="date" class="task-due" value="${task.due_date || ''}" data-task-due="${task.id}" title="Срок">
-          <button class="row-del" data-task-del="${task.id}" title="Удалить">×</button>
+          ${canRemove(task) ? `<button class="row-del" data-task-del="${task.id}" title="Снять задачу">×</button>` : ''}
         </div>`;
     }).join('');
 

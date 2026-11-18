@@ -1490,7 +1490,7 @@ const taskOut = (row) => ({
   assignee_id: row.assignee_id || null,
   assignee: row.assignee || null,
   owner_id: row.owner_id || null,
-  created_at: row.created_at,
+  owner: row.owner || null,
   done_at: row.done_at || null
 });
 
@@ -1499,8 +1499,8 @@ route('GET', '/api/tasks', async ({ url }) => {
   const where = status === 'done' ? 'WHERE t.done = 1' : 'WHERE t.done = 0';
 
   const rows = db.prepare(
-    'SELECT t.*, COALESCE(u.full_name, \'\') AS assignee'
-    + ' FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id'
+    'SELECT t.*, COALESCE(u.full_name, \'\') AS assignee, COALESCE(o.full_name, \'\') AS owner'
+    + ' FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id LEFT JOIN users o ON o.id = t.owner_id'
     + ' ' + where
     + ' ORDER BY CASE WHEN t.due_date IS NULL OR t.due_date = \'\' THEN 1 ELSE 0 END,'
     + ' t.due_date, t.priority DESC, t.id DESC LIMIT 300'
@@ -1608,8 +1608,16 @@ route('PATCH', '/api/tasks/:id', async ({ user, params, body }) => {
 
 route('DELETE', '/api/tasks/:id', async ({ user, params }) => {
   const id = Number(params.id);
-  const task = db.prepare('SELECT id, title FROM tasks WHERE id = ?').get(id);
+  const task = db.prepare('SELECT id, title, owner_id FROM tasks WHERE id = ?').get(id);
   if (!task) throw new ApiError(404, 'Задача не найдена');
+
+  // Снять задачу может только автор или администратор
+  const isAdmin = user.role === 'admin';
+  const isOwner = Number(task.owner_id) === Number(user.id);
+
+  if (!isAdmin && !isOwner) {
+    throw new ApiError(403, 'Снять задачу может её автор или администратор');
+  }
 
   db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   audit(user.id, 'delete', 'task', id, { text: 'Удалена задача: ' + task.title });
