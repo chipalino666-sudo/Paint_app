@@ -331,6 +331,7 @@
     if (name === 'tds') loadTdsView();
     if (name === 'norms') loadNormsView();
     if (name === 'users') loadUsers();
+    if (name === 'tasks') loadTasks();
     if (name === 'new') resetNewOrder();
   }
 
@@ -575,10 +576,12 @@ async function loadDesk() {
   let orders = [];
   let lowStock = 0;
   let docs = 0;
+  let taskCount = 0;
 
   try { orders = (await api('/api/orders')).orders || []; } catch (error) { /* пусто */ }
   try { lowStock = ((await api('/api/stock/low')).items || []).length; } catch (error) { /* нет доступа */ }
   try { docs = ((await api('/api/tds')).docs || []).length; } catch (error) { /* нет доступа */ }
+  try { const t = await api('/api/tasks?status=open'); taskCount = (t.counts && (t.counts.overdue + t.counts.today)) || t.tasks.length; } catch (error) { /* нет доступа */ }
 
   const byStatus = (status) => orders.filter((row) => row.status === status).length;
   const open = byStatus('accepted') + byStatus('in_work');
@@ -590,6 +593,7 @@ async function loadDesk() {
     deskTile({ title: 'Приняты', count: byStatus('accepted'), note: 'ждут мастера', icon: '🕓', desk: 'accepted' }),
     deskTile({ title: 'В работе', count: byStatus('in_work'), note: 'красятся', icon: '🔧', desk: 'in_work' }),
     deskTile({ title: 'Готовы', count: byStatus('ready'), note: 'к выдаче', icon: '✅', desk: 'ready' }),
+    deskTile({ title: 'Задачи', count: taskCount, note: 'дела цеха', icon: '🗒️', desk: 'tasks' }),
     deskTile({ title: 'Пора заказать', count: lowStock, note: 'склад на минимуме', icon: '🛒', desk: 'stock' }),
     deskTile({ title: 'ТДС и паспорта', count: docs, note: 'документов', icon: '📄', desk: 'tds' }),
     deskTile({ title: 'Нормы списания', note: 'что списывается', icon: '⚖️', desk: 'norms' }),
@@ -1050,6 +1054,137 @@ function startWindowDrag(event, win) {
 
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);
+}
+
+/* --------------------------------------------------------------------------
+   Задачи: общая доска цеха — дела с датами и напоминаниями
+   -------------------------------------------------------------------------- */
+
+let tasksFilter = 'open';
+
+/** Подпись срока: «сегодня», «завтра», дата или «просрочено». */
+function taskDateLabel(date) {
+  if (!date) return { text: 'без срока', cls: '' };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const due = new Date(date + 'T00:00:00');
+  const diff = Math.round((due - today) / 86400000);
+  const pretty = due.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+
+  if (diff < 0) return { text: pretty + ' · просрочено', cls: 'late' };
+  if (diff === 0) return { text: 'сегодня', cls: 'today' };
+  if (diff === 1) return { text: 'завтра', cls: 'soon' };
+  if (diff <= 7) return { text: pretty, cls: 'soon' };
+
+  return { text: pretty, cls: '' };
+}
+
+async function loadTasks() {
+  const host = $('#taskList');
+  if (!host) return;
+
+  host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+  try {
+    const data = await api('/api/tasks?status=' + encodeURIComponent(tasksFilter));
+    const tasks = data.tasks || [];
+
+    const badge = $('#tasksBadge');
+
+    if (badge) {
+      const urgent = (data.counts.overdue || 0) + (data.counts.today || 0);
+      badge.textContent = urgent ? String(urgent) : '';
+      badge.classList.toggle('hidden', !urgent);
+    }
+
+    if (!tasks.length) {
+      host.innerHTML = '<div class="empty-line">'
+        + (tasksFilter === 'done' ? 'Выполненных задач нет' : 'Задач пока нет — добавьте первую сверху')
+        + '</div>';
+      return;
+    }
+
+    host.innerHTML = tasks.map((task) => {
+      const label = taskDateLabel(task.due_date);
+
+      return `
+        <div class="task-row ${task.done ? 'is-done' : ''}" data-task="${task.id}">
+          <button class="task-check ${task.done ? 'checked' : ''}" data-task-toggle="${task.id}" title="Готово">✓</button>
+          <div class="task-main">
+            <div class="task-title">${esc(task.title)}</div>
+            <div class="task-meta">
+              <span class="task-date ${label.cls}">${esc(label.text)}</span>
+              ${task.priority === 2 ? '<span class="task-prio">важная</span>' : ''}
+              ${task.order_id ? `<button class="task-link" data-task-order="${task.order_id}">к заказу</button>` : ''}
+              ${task.assignee ? `<span class="muted">${esc(task.assignee)}</span>` : ''}
+            </div>
+          </div>
+          <input type="date" class="task-due" value="${task.due_date || ''}" data-task-due="${task.id}" title="Срок">
+          <button class="row-del" data-task-del="${task.id}" title="Удалить">×</button>
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('[data-task-toggle]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const row = button.closest('.task-row');
+        const isDone = row.classList.contains('is-done');
+
+        await api('/api/tasks/' + button.dataset.taskToggle, { method: 'PATCH', body: { done: !isDone } });
+        loadTasks();
+        loadDesk();
+      });
+    });
+
+    host.querySelectorAll('[data-task-due]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        await api('/api/tasks/' + input.dataset.taskDue, {
+          method: 'PATCH',
+          body: { due_date: input.value || null }
+        });
+
+        loadTasks();
+        loadDesk();
+      });
+    });
+
+    host.querySelectorAll('[data-task-order]').forEach((button) => {
+      button.addEventListener('click', () => openOrder(button.dataset.taskOrder));
+    });
+
+    host.querySelectorAll('[data-task-del]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!confirm('Удалить задачу?')) return;
+
+        await api('/api/tasks/' + button.dataset.taskDel, { method: 'DELETE' });
+        loadTasks();
+        loadDesk();
+      });
+    });
+  } catch (error) {
+    host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+  }
+}
+
+async function addTask() {
+  const title = $('#taskTitle').value.trim();
+  const due = $('#taskDue').value;
+  const priority = Number($('#taskPriority').value) || 1;
+
+  if (!title) return;
+
+  try {
+    await api('/api/tasks', { method: 'POST', body: { title, due_date: due || null, priority } });
+
+    $('#taskTitle').value = '';
+    $('#taskDue').value = '';
+
+    await loadTasks();
+    await loadDesk();
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function openOrder(id) {
@@ -5153,6 +5288,23 @@ function renderWarehouse() {
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
+
+    /* Задачи */
+    if ($('#btnAddTask')) $('#btnAddTask').addEventListener('click', addTask);
+
+    if ($('#taskTitle')) {
+      $('#taskTitle').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') addTask();
+      });
+    }
+
+    $$('[data-task-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        tasksFilter = button.dataset.taskFilter;
+        $$('[data-task-filter]').forEach((item) => item.classList.toggle('active', item === button));
+        loadTasks();
+      });
+    });
 
     /* Переключатель режима в шапке */
     $$('#btnModeSwitch .mode-seg').forEach((button) => {

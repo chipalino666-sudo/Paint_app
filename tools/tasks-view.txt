@@ -1,0 +1,30 @@
+    <!-- ======================= ЗАДАЧИ ======================= -->
+    <section class="view hidden" id="view-tasks">
+      <h1 class="page-title">Задачи</h1>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Что нужно сделать</h2>
+          <span class="muted">общая доска цеха — с датами и напоминаниями</span>
+        </div>
+
+        <div class="task-add">
+          <input type="text" id="taskTitle" data-noshield="1" placeholder="Например: заказать лак 455" autocomplete="off">
+          <input type="date" id="taskDue" title="Срок">
+          <select id="taskPriority" title="Важность">
+            <option value="1">обычная</option>
+            <option value="2">важная</option>
+            <option value="0">мелочь</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="btnAddTask">Добавить</button>
+        </div>
+
+        <div class="task-filters">
+          <button class="chip active" data-task-filter="open">Активные</button>
+          <button class="chip" data-task-filter="done">Выполненные</button>
+        </div>
+
+        <div id="taskList"></div>
+      </div>
+    </section>
+

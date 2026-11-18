@@ -3571,3 +3571,100 @@ body {
   .desk-tile-icon { width: 48px; height: 48px; font-size: 23px; }
   .desk-tile-title { font-size: 11.5px; }
 }
+
+/* ---------- Задачи -------------------------------------------------------- */
+
+.task-add {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 12px;
+}
+
+.task-add input[type="text"] { flex: 1 1 260px; min-width: 0; }
+.task-add input[type="date"] { flex: 0 0 auto; width: 150px; }
+.task-add select { flex: 0 0 auto; width: auto; min-width: 130px; }
+
+.task-filters { display: flex; gap: 6px; margin-bottom: 10px; }
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.task-row:last-child { border-bottom: none; }
+.task-row.is-done .task-title { text-decoration: line-through; color: var(--ink-soft); }
+
+.task-check {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.task-check.checked {
+  background: linear-gradient(180deg, #34d399, #16a34a);
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.task-main { flex: 1 1 auto; min-width: 0; }
+.task-title { font-size: 14px; font-weight: 600; }
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.task-date.late { color: var(--red); font-weight: 700; }
+.task-date.today { color: var(--amber); font-weight: 700; }
+.task-date.soon { color: var(--ink-soft); }
+
+.task-prio {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, .12);
+  color: var(--red);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.task-link {
+  border: none;
+  background: none;
+  color: var(--blue);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.task-due {
+  flex: 0 0 auto;
+  width: 130px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+@media (max-width: 780px) {
+  .task-add input[type="text"] { flex: 1 1 100%; }
+  .task-due { width: 116px; }
+}

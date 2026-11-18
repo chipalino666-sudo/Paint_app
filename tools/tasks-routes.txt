@@ -1,0 +1,140 @@
+/* ---- Доска задач -------------------------------------------------------- */
+
+const taskOut = (row) => ({
+  id: row.id,
+  title: row.title,
+  note: row.note || null,
+  due_date: row.due_date || null,
+  priority: Number(row.priority) || 1,
+  done: Boolean(row.done),
+  order_id: row.order_id || null,
+  assignee_id: row.assignee_id || null,
+  assignee: row.assignee || null,
+  owner_id: row.owner_id || null,
+  created_at: row.created_at,
+  done_at: row.done_at || null
+});
+
+route('GET', '/api/tasks', async ({ url }) => {
+  const status = str(url.searchParams.get('status'), 20) || 'open';
+  const where = status === 'done' ? 'WHERE t.done = 1' : 'WHERE t.done = 0';
+
+  const rows = db.prepare(
+    'SELECT t.*, COALESCE(u.full_name, \'\') AS assignee'
+    + ' FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id'
+    + ' ' + where
+    + ' ORDER BY CASE WHEN t.due_date IS NULL OR t.due_date = \'\' THEN 1 ELSE 0 END,'
+    + ' t.due_date, t.priority DESC, t.id DESC LIMIT 300'
+  ).all();
+
+  const counts = db.prepare(
+    'SELECT'
+    + ' SUM(CASE WHEN done = 0 THEN 1 ELSE 0 END) AS open,'
+    + ' SUM(CASE WHEN done = 0 AND due_date IS NOT NULL AND due_date <> \'\' AND due_date < date(\'now\') THEN 1 ELSE 0 END) AS overdue,'
+    + ' SUM(CASE WHEN done = 0 AND due_date = date(\'now\') THEN 1 ELSE 0 END) AS today'
+    + ' FROM tasks'
+  ).get();
+
+  return {
+    tasks: rows.map(taskOut),
+    counts: {
+      open: Number(counts.open) || 0,
+      overdue: Number(counts.overdue) || 0,
+      today: Number(counts.today) || 0
+    }
+  };
+});
+
+route('POST', '/api/tasks', async ({ user, body }) => {
+  const title = str(body.title, 300);
+  if (!title) throw new ApiError(400, 'Напишите, что нужно сделать');
+
+  const due = str(body.due_date, 20);
+  const note = str(body.note, 2000);
+  const priority = Math.min(3, Math.max(0, Math.round(toNum(body.priority, 1))));
+  const orderId = body.order_id ? Number(body.order_id) : null;
+  const assigneeId = body.assignee_id ? Number(body.assignee_id) : null;
+  const now = nowISO();
+
+  const info = db.prepare(
+    'INSERT INTO tasks (title, note, due_date, priority, order_id, owner_id, assignee_id, created_at, updated_at)'
+    + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(title, note || null, due || null, priority, orderId, user.id, assigneeId, now, now);
+
+  audit(user.id, 'create', 'task', null, { text: 'Задача: ' + title });
+
+  return { id: Number(info.lastInsertRowid) };
+});
+
+route('PATCH', '/api/tasks/:id', async ({ user, params, body }) => {
+  const id = Number(params.id);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!task) throw new ApiError(404, 'Задача не найдена');
+
+  const sets = [];
+  const values = [];
+
+  if (body.title !== undefined) {
+    const title = str(body.title, 300);
+    if (!title) throw new ApiError(400, 'Название не может быть пустым');
+    sets.push('title = ?');
+    values.push(title);
+  }
+
+  if (body.note !== undefined) {
+    sets.push('note = ?');
+    values.push(str(body.note, 2000) || null);
+  }
+
+  if (body.due_date !== undefined) {
+    sets.push('due_date = ?');
+    values.push(str(body.due_date, 20) || null);
+  }
+
+  if (body.priority !== undefined) {
+    sets.push('priority = ?');
+    values.push(Math.min(3, Math.max(0, Math.round(toNum(body.priority, 1)))));
+  }
+
+  if (body.assignee_id !== undefined) {
+    sets.push('assignee_id = ?');
+    values.push(body.assignee_id ? Number(body.assignee_id) : null);
+  }
+
+  if (body.order_id !== undefined) {
+    sets.push('order_id = ?');
+    values.push(body.order_id ? Number(body.order_id) : null);
+  }
+
+  if (body.done !== undefined) {
+    const done = body.done ? 1 : 0;
+    sets.push('done = ?');
+    values.push(done);
+    sets.push('done_at = ?');
+    values.push(done ? nowISO() : null);
+  }
+
+  if (!sets.length) throw new ApiError(400, 'Ничего не изменилось');
+
+  sets.push('updated_at = ?');
+  values.push(nowISO());
+  values.push(id);
+
+  db.prepare('UPDATE tasks SET ' + sets.join(', ') + ' WHERE id = ?').run(...values);
+
+  audit(user.id, 'change', 'task', id, { text: 'Задача: ' + task.title });
+
+  return { ok: true };
+});
+
+route('DELETE', '/api/tasks/:id', async ({ user, params }) => {
+  const id = Number(params.id);
+  const task = db.prepare('SELECT id, title FROM tasks WHERE id = ?').get(id);
+  if (!task) throw new ApiError(404, 'Задача не найдена');
+
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+  audit(user.id, 'delete', 'task', id, { text: 'Удалена задача: ' + task.title });
+
+  return { ok: true };
+});
+

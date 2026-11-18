@@ -1,0 +1,131 @@
+/* --------------------------------------------------------------------------
+   Задачи: общая доска цеха — дела с датами и напоминаниями
+   -------------------------------------------------------------------------- */
+
+let tasksFilter = 'open';
+
+/** Подпись срока: «сегодня», «завтра», дата или «просрочено». */
+function taskDateLabel(date) {
+  if (!date) return { text: 'без срока', cls: '' };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const due = new Date(date + 'T00:00:00');
+  const diff = Math.round((due - today) / 86400000);
+  const pretty = due.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+
+  if (diff < 0) return { text: pretty + ' · просрочено', cls: 'late' };
+  if (diff === 0) return { text: 'сегодня', cls: 'today' };
+  if (diff === 1) return { text: 'завтра', cls: 'soon' };
+  if (diff <= 7) return { text: pretty, cls: 'soon' };
+
+  return { text: pretty, cls: '' };
+}
+
+async function loadTasks() {
+  const host = $('#taskList');
+  if (!host) return;
+
+  host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+  try {
+    const data = await api('/api/tasks?status=' + encodeURIComponent(tasksFilter));
+    const tasks = data.tasks || [];
+
+    const badge = $('#tasksBadge');
+
+    if (badge) {
+      const urgent = (data.counts.overdue || 0) + (data.counts.today || 0);
+      badge.textContent = urgent ? String(urgent) : '';
+      badge.classList.toggle('hidden', !urgent);
+    }
+
+    if (!tasks.length) {
+      host.innerHTML = '<div class="empty-line">'
+        + (tasksFilter === 'done' ? 'Выполненных задач нет' : 'Задач пока нет — добавьте первую сверху')
+        + '</div>';
+      return;
+    }
+
+    host.innerHTML = tasks.map((task) => {
+      const label = taskDateLabel(task.due_date);
+
+      return `
+        <div class="task-row ${task.done ? 'is-done' : ''}" data-task="${task.id}">
+          <button class="task-check ${task.done ? 'checked' : ''}" data-task-toggle="${task.id}" title="Готово">✓</button>
+          <div class="task-main">
+            <div class="task-title">${esc(task.title)}</div>
+            <div class="task-meta">
+              <span class="task-date ${label.cls}">${esc(label.text)}</span>
+              ${task.priority === 2 ? '<span class="task-prio">важная</span>' : ''}
+              ${task.order_id ? `<button class="task-link" data-task-order="${task.order_id}">к заказу</button>` : ''}
+              ${task.assignee ? `<span class="muted">${esc(task.assignee)}</span>` : ''}
+            </div>
+          </div>
+          <input type="date" class="task-due" value="${task.due_date || ''}" data-task-due="${task.id}" title="Срок">
+          <button class="row-del" data-task-del="${task.id}" title="Удалить">×</button>
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('[data-task-toggle]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const row = button.closest('.task-row');
+        const isDone = row.classList.contains('is-done');
+
+        await api('/api/tasks/' + button.dataset.taskToggle, { method: 'PATCH', body: { done: !isDone } });
+        loadTasks();
+        loadDesk();
+      });
+    });
+
+    host.querySelectorAll('[data-task-due]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        await api('/api/tasks/' + input.dataset.taskDue, {
+          method: 'PATCH',
+          body: { due_date: input.value || null }
+        });
+
+        loadTasks();
+        loadDesk();
+      });
+    });
+
+    host.querySelectorAll('[data-task-order]').forEach((button) => {
+      button.addEventListener('click', () => openOrder(button.dataset.taskOrder));
+    });
+
+    host.querySelectorAll('[data-task-del]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!confirm('Удалить задачу?')) return;
+
+        await api('/api/tasks/' + button.dataset.taskDel, { method: 'DELETE' });
+        loadTasks();
+        loadDesk();
+      });
+    });
+  } catch (error) {
+    host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+  }
+}
+
+async function addTask() {
+  const title = $('#taskTitle').value.trim();
+  const due = $('#taskDue').value;
+  const priority = Number($('#taskPriority').value) || 1;
+
+  if (!title) return;
+
+  try {
+    await api('/api/tasks', { method: 'POST', body: { title, due_date: due || null, priority } });
+
+    $('#taskTitle').value = '';
+    $('#taskDue').value = '';
+
+    await loadTasks();
+    await loadDesk();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+

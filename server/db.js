@@ -156,6 +156,24 @@ CREATE TABLE IF NOT EXISTS material_docs (
 
 CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
 
+/* Доска задач: общие дела цеха, с датами и напоминаниями */
+CREATE TABLE IF NOT EXISTS tasks (
+  id          INTEGER PRIMARY KEY,
+  title       TEXT NOT NULL,
+  note        TEXT,
+  due_date    TEXT,
+  priority    INTEGER NOT NULL DEFAULT 1,
+  done        INTEGER NOT NULL DEFAULT 0,
+  order_id    INTEGER,
+  owner_id    INTEGER,
+  assignee_id INTEGER,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  done_at     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_date, done);
+
 /* Движения склада: приход, ручная правка остатка, списание */
 CREATE TABLE IF NOT EXISTS stock_moves (
   id         INTEGER PRIMARY KEY,
