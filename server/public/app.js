@@ -865,6 +865,23 @@ function rememberOrder(order) {
 
 const UI_MODE_KEY = 'paintShopUiMode';
 
+/** Пиктограммы разделов — для колонки открытых вкладок. */
+const WINDOW_ICONS = {
+  orders: '📋',
+  order: '🧾',
+  new: '➕',
+  chat: '💬',
+  report: '📈',
+  clients: '👥',
+  stock: '📦',
+  tds: '📄',
+  norms: '⚖️',
+  refs: '📚',
+  users: '🧑‍🔧',
+  tasks: '🗒️',
+  home: '🏠'
+};
+
 const WINDOW_TITLES = {
   orders: 'Заказы',
   tasks: 'Задачи',
@@ -1092,6 +1109,7 @@ function openDeskWindow(name) {
 
     win.innerHTML = `
       <div class="desk-window-head">
+        <span class="desk-window-icon"></span>
         <span class="desk-window-title"></span>
         <span class="desk-window-btns">
           <button class="desk-win-btn" data-win-max title="Развернуть">⤢</button>
@@ -1356,7 +1374,10 @@ function refreshWindowTitles() {
 
   host.querySelectorAll('.desk-window').forEach((win) => {
     const title = win.querySelector('.desk-window-title');
+    const icon = win.querySelector('.desk-window-icon');
+
     if (title) title.textContent = win.dataset.title || windowTitle(win.dataset.window);
+    if (icon) icon.textContent = WINDOW_ICONS[win.dataset.view || win.dataset.window] || '▫️';
   });
 
   renderDeskTaskbar();
@@ -1364,35 +1385,46 @@ function refreshWindowTitles() {
 
 /** Диспетчер окон в шапке: список открытых разделов. */
 function renderWinSwitcher() {
-  const bar = $('#winSwitcher');
-  if (!bar) return;
+  const rail = $('#winRail');
+  if (!rail) return;
 
   const host = $('#deskWindows');
   const wins = host ? [...host.querySelectorAll('.desk-window')] : [];
 
   if (!wins.length || uiMode() !== 'desk') {
-    bar.classList.add('hidden');
-    bar.innerHTML = '';
+    rail.classList.add('hidden');
+    rail.innerHTML = '';
     return;
   }
 
-  bar.classList.remove('hidden');
+  rail.classList.remove('hidden');
 
-  bar.innerHTML = wins.map((win) => {
+  const items = wins.map((win) => {
     const active = win.classList.contains('active') && !win.classList.contains('minimized');
     const label = win.dataset.title || windowTitle(win.dataset.window);
+    const icon = WINDOW_ICONS[win.dataset.view || win.dataset.window] || '▫️';
 
-    return `<button class="win-chip ${active ? 'active' : ''}" data-win-chip="${esc(win.dataset.window)}" title="${esc(label)}">
-      <span class="win-chip-label">${esc(label)}</span>
-      <span class="win-chip-x" data-win-chip-close="${esc(win.dataset.window)}">×</span>
+    return `<button class="rail-item ${active ? 'active' : ''}" data-rail="${esc(win.dataset.window)}" title="${esc(label)}">
+      <span class="rail-icon">${icon}</span>
+      <span class="rail-label">${esc(label)}</span>
+      <span class="rail-x" data-rail-close="${esc(win.dataset.window)}">×</span>
     </button>`;
   }).join('');
 
-  bar.querySelectorAll('[data-win-chip]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      if (event.target.dataset.winChipClose) return;
+  rail.innerHTML = `<button class="rail-item rail-home" data-rail-home="1" title="Свернуть всё и вернуться к столу">
+    <span class="rail-icon">🏠</span>
+    <span class="rail-label">Стол</span>
+  </button>` + items;
 
-      const name = button.dataset.winChip;
+  rail.querySelectorAll('[data-rail-home]').forEach((button) => {
+    button.addEventListener('click', () => minimizeAllDeskWindows());
+  });
+
+  rail.querySelectorAll('[data-rail]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      if (event.target.dataset.railClose) return;
+
+      const name = button.dataset.rail;
       const win = host.querySelector('[data-window="' + name + '"]');
       if (!win) return;
 
@@ -1406,14 +1438,13 @@ function renderWinSwitcher() {
     });
   });
 
-  bar.querySelectorAll('[data-win-chip-close]').forEach((button) => {
+  rail.querySelectorAll('[data-rail-close]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.stopPropagation();
-      closeDeskWindow(button.dataset.winChipClose);
+      closeDeskWindow(button.dataset.railClose);
     });
   });
 }
-
 function renderDeskTaskbar() {
   renderDeskDock();
   renderWinSwitcher();

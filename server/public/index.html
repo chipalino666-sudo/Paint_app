@@ -99,8 +99,6 @@
     </div>
   </nav>
 
-  <div class="win-switcher hidden" id="winSwitcher"></div>
-
   <div class="top-right">
     <button class="mode-switch" id="btnModeSwitch" title="Переключить режим интерфейса">
       <span class="mode-seg" data-mode="classic">Обычный</span>
@@ -713,6 +711,8 @@
 
   <!-- Слой окон режима «рабочий стол» -->
   <div class="desk-layer hidden" id="deskLayer">
+    <aside class="win-rail hidden" id="winRail"></aside>
+
     <div class="desk-windows" id="deskWindows"></div>
     <div class="desk-taskbar hidden" id="deskTaskbar"></div>
   </div>

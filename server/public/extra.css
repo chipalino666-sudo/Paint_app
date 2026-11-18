@@ -3840,3 +3840,92 @@ body.ui-desk .top-right {
 }
 
 .desk-tile-add .desk-tile-icon { opacity: .8; }
+
+
+/* ---------- Колонка открытых вкладок -------------------------------------- */
+
+.win-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+
+.win-rail.hidden { display: none; }
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.rail-item:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border); }
+
+.rail-item.active {
+  background: linear-gradient(180deg, #5b9bff, var(--blue));
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.rail-home { color: var(--ink); border-color: var(--border); background: var(--surface-2); }
+
+.rail-icon { flex: 0 0 auto; font-size: 16px; line-height: 1; }
+
+.rail-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-x { flex: 0 0 auto; font-size: 14px; opacity: .6; }
+.rail-x:hover { opacity: 1; }
+
+/* Окна сдвигаются вправо, чтобы колонка не перекрывала их */
+.desk-windows { padding-left: 218px; }
+
+/* Иконка в заголовке окна */
+.desk-window-head { justify-content: flex-start; }
+.desk-window-icon { font-size: 15px; line-height: 1; }
+.desk-window-btns { margin-left: auto; }
+
+@media (max-width: 900px) {
+  .win-rail {
+    position: static;
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .desk-windows { padding-left: 8px; }
+
+  .rail-item { width: auto; white-space: nowrap; }
+  .rail-label { max-width: 130px; }
+}
