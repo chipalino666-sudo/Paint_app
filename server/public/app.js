@@ -388,6 +388,7 @@
     if (name === 'tds') loadTdsView();
     if (name === 'norms') loadNormsView();
     if (name === 'users') loadUsers();
+  if (name === 'logins') loadLogins();
     if (name === 'tasks') loadTasks();
     if (name === 'new') resetNewOrder();
   }
@@ -5191,7 +5192,69 @@ function renderWarehouse() {
      Сотрудники
      ------------------------------------------------------------------------ */
 
-  async function loadUsers() {
+  /** Журнал входов (видит только администратор). */
+async function loadLogins() {
+  const host = $('#loginsList');
+  if (!host) return;
+
+  host.innerHTML = '<div class="spinner">Загрузка…</div>';
+
+  try {
+    const data = await api('/api/logins?limit=200');
+    const list = data.logins || [];
+
+    const counter = $('#loginsCount');
+    if (counter) counter.textContent = list.length ? `записей: ${list.length}` : '';
+
+    if (!list.length) {
+      host.innerHTML = '<div class="empty-line">Пока никто не заходил</div>';
+      return;
+    }
+
+    host.innerHTML = `
+      <table class="grid">
+        <thead><tr><th>Когда</th><th>Кто</th><th>Логин</th><th>Итог</th><th>IP</th><th>Устройство</th></tr></thead>
+        <tbody>
+          ${list.map((row) => `
+            <tr>
+              <td class="mono">${esc(new Date(row.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }))}</td>
+              <td>${esc(row.name || '—')}</td>
+              <td class="code-cell">${esc(row.login || '—')}</td>
+              <td>${row.result === 'ok' ? '<span class="login-ok">вошёл</span>' : '<span class="login-fail">отказ</span>'}</td>
+              <td class="mono muted">${esc(row.ip || '—')}</td>
+              <td class="muted login-agent">${esc(shortAgent(row.agent))}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    host.innerHTML = `<div class="empty-line">${esc(error.message)}</div>`;
+  }
+}
+
+/** Короткое описание браузера и системы. */
+function shortAgent(agent) {
+  const text = String(agent || '');
+  if (!text) return '—';
+
+  const browser = /Edg\//.test(text) ? 'Edge'
+    : /OPR\//.test(text) ? 'Opera'
+    : /Chrome\//.test(text) ? 'Chrome'
+    : /Firefox\//.test(text) ? 'Firefox'
+    : /Safari\//.test(text) ? 'Safari'
+    : 'браузер';
+
+  const system = /Android/.test(text) ? 'Android'
+    : /iPhone|iPad/.test(text) ? 'iOS'
+    : /Windows/.test(text) ? 'Windows'
+    : /Mac OS/.test(text) ? 'macOS'
+    : /Linux/.test(text) ? 'Linux'
+    : '';
+
+  return system ? `${browser} · ${system}` : browser;
+}
+
+async function loadUsers() {
     const host = $('#usersTable');
     host.innerHTML = '<div class="spinner">Загрузка…</div>';
 
@@ -5777,6 +5840,7 @@ function renderWarehouse() {
 
     $('#btnNewOrder').classList.toggle('hidden', !isManager());
     $('#navUsers').classList.toggle('hidden', user.role !== 'admin');
+    if ($('#navLogins')) $('#navLogins').classList.toggle('hidden', user.role !== 'admin');
 
     if ($('#navClients')) $('#navClients').classList.toggle('hidden', user.role === 'master');
 
@@ -5888,6 +5952,8 @@ function renderWarehouse() {
     $('#btnPassword').addEventListener('click', openPasswordModal);
 
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
+
+    if ($('#btnLoginsRefresh')) $('#btnLoginsRefresh').addEventListener('click', loadLogins);
     if ($('#btnNavPrefs')) $('#btnNavPrefs').addEventListener('click', openNavPrefs);
 
     if ($('#btnDeskPrefsSave')) $('#btnDeskPrefsSave').addEventListener('click', saveDeskPrefs);

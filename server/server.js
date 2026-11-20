@@ -328,6 +328,29 @@ function isSecureRequest(req) {
   return proto === 'https';
 }
 
+/** Пишем вход в журнал: даже неудачный. */
+function logLogin(req, { user, login, result, method }) {
+  try {
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || (req.socket && req.socket.remoteAddress) || '';
+
+    db.prepare('INSERT INTO logins (user_id, login, full_name, result, method, ip, agent, created_at)'
+      + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(
+        user ? user.id : null,
+        login || (user ? user.login : null),
+        user ? user.full_name : null,
+        result,
+        method,
+        ip,
+        str(req.headers['user-agent'], 300),
+        nowISO()
+      );
+  } catch (error) {
+    // Журнал не должен ломать вход
+  }
+}
+
 route('POST', '/api/login', async ({ body, res, req }) => {
   const login = str(body.login, 100).toLowerCase();
   const password = String(body.password ?? '');
@@ -335,6 +358,8 @@ route('POST', '/api/login', async ({ body, res, req }) => {
   const user = db.prepare('SELECT * FROM users WHERE lower(login) = ?').get(login);
 
   if (!user || !user.active || !verifyPassword(password, user.pass_hash)) {
+    logLogin(req, { user: user || null, login, result: 'fail', method: 'password' });
+
     // Одинаковый ответ: не подсказываем, существует ли такой логин
     throw new ApiError(401, 'Неверный логин или пароль');
   }
@@ -343,6 +368,7 @@ route('POST', '/api/login', async ({ body, res, req }) => {
   auth.setSessionCookie(res, session.token, session.expires, isSecureRequest(req));
 
   audit(user.id, 'login', 'user', user.id, null);
+  logLogin(req, { user, login, result: 'ok', method: 'password' });
 
   return {
     user: {
@@ -400,6 +426,31 @@ function parseNavItems(user) {
 
 /** Личные пункты шапки: каждый мастер выбирает своё. */
 /** Ярлыки на рабочем столе: свой набор у каждого. */
+/** Журнал входов: только администратор, временная функция. */
+route('GET', '/api/logins', async ({ user, url }) => {
+  if (user.role !== 'admin') throw new ApiError(403, 'Журнал входов видит только администратор');
+
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 100, 1), 500);
+
+  const rows = db.prepare(
+    'SELECT id, login, full_name, result, method, ip, agent, created_at'
+    + ' FROM logins ORDER BY id DESC LIMIT ?'
+  ).all(limit);
+
+  return {
+    logins: rows.map((row) => ({
+      id: row.id,
+      login: row.login,
+      name: row.full_name,
+      result: row.result,
+      method: row.method,
+      ip: row.ip,
+      agent: row.agent,
+      at: row.created_at
+    }))
+  };
+});
+
 route('PUT', '/api/me/desk', async ({ user, body }) => {
   const allowed = ['orders', 'accepted', 'in_work', 'ready', 'tasks', 'lowstock', 'stock', 'tds',
     'norms', 'refs', 'report', 'clients', 'chat', 'ai', 'new', 'users', 'apps'];

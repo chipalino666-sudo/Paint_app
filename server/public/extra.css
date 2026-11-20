@@ -4014,3 +4014,9 @@ body.ui-desk .top-right {
 }
 
 .apps-help .btn { margin-right: 6px; margin-bottom: 8px; }
+
+/* ---------- Журнал входов -------------------------------------------------- */
+
+.login-ok { color: var(--green); font-weight: 700; }
+.login-fail { color: var(--red); font-weight: 700; }
+.login-agent { font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -156,6 +156,21 @@ CREATE TABLE IF NOT EXISTS material_docs (
 
 CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
 
+/* Входы в программу: временный журнал для администратора */
+CREATE TABLE IF NOT EXISTS logins (
+  id        INTEGER PRIMARY KEY,
+  user_id   INTEGER,
+  login     TEXT,
+  full_name TEXT,
+  result    TEXT NOT NULL DEFAULT 'ok',
+  method    TEXT NOT NULL DEFAULT 'password',
+  ip        TEXT,
+  agent     TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS logins_at_idx ON logins(created_at);
+
 /* Доска задач: общие дела цеха, с датами и напоминаниями */
 CREATE TABLE IF NOT EXISTS tasks (
   id          INTEGER PRIMARY KEY,

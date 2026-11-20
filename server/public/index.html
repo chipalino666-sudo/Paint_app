@@ -94,6 +94,7 @@
         <button class="nav-btn menu-item" data-view="norms" id="navNorms">Нормы списания</button>
         <button class="nav-btn menu-item" data-view="clients" id="navClients">Клиенты</button>
         <button class="nav-btn menu-item" data-view="refs">Справочники</button>
+          <button class="nav-btn menu-item hidden" data-view="logins" id="navLogins">Входы</button>
         <button class="nav-btn menu-item hidden" data-view="users" id="navUsers">Сотрудники</button>
       </div>
     </div>
@@ -358,6 +359,26 @@
 
     <div id="reportBody"></div>
   </section>
+
+  <!-- ======================= ВХОДЫ ======================= -->
+  <section class="view hidden" id="view-logins">
+    <h1 class="page-title">Входы в программу</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Кто и когда заходил</h2>
+        <span class="muted">временный журнал, видят только администраторы</span>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" id="btnLoginsRefresh">Обновить</button>
+        <span class="muted" id="loginsCount"></span>
+      </div>
+
+      <div id="loginsList"></div>
+    </div>
+  </section>
+
 
   <!-- ======================= КЛИЕНТЫ ======================= -->
   <section class="view hidden" id="view-clients">
