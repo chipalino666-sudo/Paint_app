@@ -1633,43 +1633,47 @@ td.empty-line,
 .inspect-svg.editable { cursor: crosshair; }
 
 /* Чертёжный стиль: светлый кузов, тонкие тёмные линии */
+/* Бланковый стиль: тонкие линии, без заливок */
 .car-body {
   fill: var(--surface);
-  stroke: #4a5568;
-  stroke-width: 1.8;
+  stroke: #5a6472;
+  stroke-width: 1.5;
   stroke-linejoin: round;
 }
 
 .car-glass {
-  fill: var(--surface-3);
-  stroke: #4a5568;
-  stroke-width: 1.3;
+  fill: color-mix(in srgb, #5a6472 8%, var(--surface));
+  stroke: #5a6472;
+  stroke-width: 1.1;
   stroke-linejoin: round;
 }
 
 .car-seam {
   fill: none;
-  stroke: #4a5568;
-  stroke-width: 1.2;
-  opacity: .75;
+  stroke: #5a6472;
+  stroke-width: 1;
+  opacity: .8;
   stroke-linecap: round;
 }
 
 .car-mirror {
   fill: var(--surface);
-  stroke: #4a5568;
-  stroke-width: 1.3;
+  stroke: #5a6472;
+  stroke-width: 1.1;
   stroke-linejoin: round;
 }
 
-.car-handle { fill: #4a5568; opacity: .55; }
+.car-lamp {
+  fill: var(--surface);
+  stroke: #5a6472;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
 
-.car-lamp { fill: #f3c343; stroke: #b98a10; stroke-width: 1; }
-.car-lamp-rear { fill: #e8746a; stroke: #b03f36; stroke-width: 1; }
-
-.car-tire { fill: var(--surface); stroke: #4a5568; stroke-width: 1.8; }
-.car-rim { fill: var(--surface); stroke: #4a5568; stroke-width: 1.4; }
-.car-arch { fill: none; stroke: #4a5568; stroke-width: 1.4; }
+.car-tire { fill: none; stroke: #5a6472; stroke-width: 5; }
+.car-rim { fill: var(--surface); stroke: #5a6472; stroke-width: 1.2; }
+.car-spoke { fill: none; stroke: #5a6472; stroke-width: 1; opacity: .8; }
+.car-arch { fill: none; stroke: #5a6472; stroke-width: 1.2; }
 .car-arch-bg { fill: var(--surface); }
 
 .car-wheel-inner { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .4; }
