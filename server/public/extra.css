@@ -4305,3 +4305,25 @@ body.ui-desk .top-right {
     -webkit-overflow-scrolling: touch;
   }
 }
+/* ---------- Схема машины из присланного чертежа ------------------------- */
+
+.car-copy path {
+  fill: #8b98ad;
+  stroke: none;
+}
+
+.inspect-scheme .inspect-svg {
+  max-width: 560px;
+}
+
+[data-theme="dark"] .car-copy path {
+  fill: #9aa9c2;
+}
+
+.inspect-svg .zone {
+  fill: transparent;
+}
+
+.inspect-svg.editable .zone:hover {
+  fill: rgba(37, 99, 235, .16);
+}
