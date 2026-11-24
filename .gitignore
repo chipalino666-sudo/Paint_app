@@ -11,3 +11,6 @@ __pycache__/
 server/shots/
 server/.env
 .env
+
+tools/build-tools/
+tools/jre/
