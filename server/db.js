@@ -156,6 +156,21 @@ CREATE TABLE IF NOT EXISTS material_docs (
 
 CREATE INDEX IF NOT EXISTS material_docs_code_idx ON material_docs(code);
 
+/* События для уведомлений на телефоне */
+CREATE TABLE IF NOT EXISTS push_events (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER,
+  role       TEXT,
+  except_id  INTEGER,
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  order_id   INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS push_events_id_idx ON push_events(id);
+
 /* Входы в программу: временный журнал для администратора */
 CREATE TABLE IF NOT EXISTS logins (
   id        INTEGER PRIMARY KEY,

@@ -27,12 +27,19 @@ const BROWSERS = [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const login = await fetch(BASE + '/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login: 'admin', password: 'admin12345' })
-  });
-  const cookie = /psid=[^;]+/.exec(login.headers.getSetCookie().join(';'))[0];
+  const online = /^https?:/i.test(BASE);
+
+  const login = online
+    ? await fetch(BASE + '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: 'admin', password: 'admin12345' })
+    })
+    : null;
+
+  const cookie = login && login.ok
+    ? (/psid=[^;]+/.exec(login.headers.getSetCookie().join(';')) || [null])[0]
+    : null;
 
   const browser = BROWSERS.find((p) => fs.existsSync(p));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'view-'));
@@ -95,7 +102,9 @@ async function main() {
       deviceScaleFactor: MOBILE ? 2 : 1,
       mobile: MOBILE
     });
-    await send('Network.setCookie', { name: 'psid', value: /psid=([^;]+)/.exec(cookie)[1], domain: '127.0.0.1', path: '/' });
+    if (BASE.includes('127.0.0.1')) {
+      await send('Network.setCookie', { name: 'psid', value: /psid=([^;]+)/.exec(cookie)[1], domain: '127.0.0.1', path: '/' });
+    }
     await send('Page.navigate', { url: BASE + (process.env.PAINT_PATH || '/') });
     await sleep(2600);
 
@@ -111,6 +120,19 @@ async function main() {
       await sleep(1200);
     }
 
+    if (process.env.PAINT_TYPE) {
+      await evaluate(`(() => {
+        const input = document.getElementById('search');
+        if (!input) return false;
+        input.value = '` + process.env.PAINT_TYPE + `';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })()`);
+      await sleep(800);
+
+      const found = await evaluate('document.querySelectorAll("#results li").length');
+      console.log('найдено позиций:', found);
+    }
     if (process.env.PAINT_SCROLL) {
       await evaluate(`window.scrollTo(0, ${Number(process.env.PAINT_SCROLL)})`);
       await sleep(500);

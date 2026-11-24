@@ -85,5 +85,27 @@ if ($LASTEXITCODE -ne 0) { throw 'подпись не прошла провер�
 
 $apk = Get-Item (Join-Path $OUT 'lonjeron.apk')
 Write-Host ''
+
+# Файл версии: по нему приложение узнаёт про обновление
+$manifestText = Get-Content $MANIFEST -Raw -Encoding UTF8
+$versionCode = [regex]::Match($manifestText, 'versionCode="(\d+)"').Groups[1].Value
+$versionName = [regex]::Match($manifestText, 'versionName="([^"]+)"').Groups[1].Value
+
+$versionFile = Join-Path $OUT 'lonjeron-version.json'
+
+$versionData = [ordered]@{
+  versionCode = [int]$versionCode
+  versionName = $versionName
+  apk         = '/downloads/lonjeron.apk'
+  size        = $apk.Length
+  date        = (Get-Date -Format 'yyyy-MM-dd HH:mm')
+}
+
+$json = $versionData | ConvertTo-Json
+[System.IO.File]::WriteAllText($versionFile, $json, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host ''
 Write-Host "  ГОТОВО: $($apk.FullName)" -ForegroundColor Green
 Write-Host "  Размер: $([math]::Round($apk.Length / 1KB)) КБ" -ForegroundColor Green
+Write-Host "  Версия: $versionName ($versionCode)" -ForegroundColor Green
+Write-Host "  Файл версии: $versionFile" -ForegroundColor Green

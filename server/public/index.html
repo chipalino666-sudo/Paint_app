@@ -103,7 +103,7 @@
   <div class="top-right">
     <button class="mode-switch" id="btnModeSwitch" title="Переключить режим интерфейса">
       <span class="mode-seg" data-mode="classic">Обычный</span>
-      <span class="mode-seg" data-mode="desk">Стол</span>
+      <span class="mode-seg" data-mode="desk">Стол<span class="mode-tag"><span class="mode-tag-full">эксперимент</span><span class="mode-tag-short">эксп.</span></span></span>
     </button>
 
     <div class="top-clock" id="topClock" title="Текущее время">--:--</div>
@@ -120,6 +120,7 @@
       </button>
 
       <div class="menu menu-right hidden" id="userDropdown">
+      <button class="menu-item hidden" id="btnAnnounceUpdate">Объявить обновление</button>
       <button class="menu-item" id="btnAndroidApp">Приложение для Android</button>
       <button class="menu-item" id="btnNavPrefs">Пункты в шапке</button>
       <button class="menu-item" id="btnUiMode">Режим: обычный</button>

@@ -6014,6 +6014,7 @@ async function loadUsers() {
     $('#btnNewOrder').classList.toggle('hidden', !isManager());
     $('#navUsers').classList.toggle('hidden', user.role !== 'admin');
     if ($('#navLogins')) $('#navLogins').classList.toggle('hidden', user.role !== 'admin');
+    if ($('#btnAnnounceUpdate')) $('#btnAnnounceUpdate').classList.toggle('hidden', user.role !== 'admin');
 
     if ($('#navClients')) $('#navClients').classList.toggle('hidden', user.role === 'master');
 
@@ -6159,6 +6160,17 @@ async function loadUsers() {
 
     if ($('#btnLoginsRefresh')) $('#btnLoginsRefresh').addEventListener('click', loadLogins);
     if ($('#btnAndroidApp')) $('#btnAndroidApp').addEventListener('click', () => { window.open('/downloads/lonjeron.apk', '_blank'); });
+
+    if ($('#btnAnnounceUpdate')) {
+      $('#btnAnnounceUpdate').addEventListener('click', async () => {
+        try {
+          const res = await api('/api/app/announce', { method: 'POST', body: {} });
+          toast('Уведомление об обновлении отправлено' + (res.version ? ' (' + res.version + ')' : ''));
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+    }
 
     if ($('#btnNavPrefs')) $('#btnNavPrefs').addEventListener('click', openNavPrefs);
 

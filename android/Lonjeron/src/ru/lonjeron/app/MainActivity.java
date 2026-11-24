@@ -1,10 +1,16 @@
 package ru.lonjeron.app;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -90,6 +96,94 @@ public class MainActivity extends Activity {
 
         setupWeb();
         web.loadUrl(START_URL);
+
+        askNotificationPermission();
+        startPushService();
+        checkForUpdate();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Уведомления и обновления                                          */
+    /* ------------------------------------------------------------------ */
+
+    /** Android 13+ спрашивает разрешение на уведомления отдельно. */
+    private void askNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return;
+
+        if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] { "android.permission.POST_NOTIFICATIONS" }, 2001);
+        }
+    }
+
+    /** Запускаем службу, которая держит связь с сервером и показывает уведомления. */
+    private void startPushService() {
+        try {
+            Intent service = new Intent(this, PushService.class);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(service);
+            } else {
+                startService(service);
+            }
+        } catch (Exception error) {
+            /* телефон может запретить фоновую службу — приложение всё равно работает */
+        }
+    }
+
+    /** Спрашиваем у сервера последнюю версию приложения. */
+    private void checkForUpdate() {
+        new Thread(() -> {
+            try {
+                java.net.URL url = new java.net.URL(PushService.BASE + "/api/app/version");
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
+                connection.setUseCaches(false);
+
+                if (connection.getResponseCode() != 200) return;
+
+                StringBuilder text = new StringBuilder();
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(connection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) text.append(line);
+                }
+                connection.disconnect();
+
+                org.json.JSONObject data = new org.json.JSONObject(text.toString());
+                int remote = data.optInt("versionCode", 0);
+                int current = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+
+                if (remote > current) {
+                    String name = data.optString("versionName", "");
+                    runOnUiThread(() -> showUpdateDialog(name, remote));
+                }
+            } catch (Exception error) {
+                /* нет сети или сервер недоступен — не мешаем работать */
+            }
+        }).start();
+    }
+
+    private void showUpdateDialog(String versionName, int versionCode) {
+        if (isFinishing()) return;
+
+        String label = versionName == null || versionName.isEmpty() ? String.valueOf(versionCode) : versionName;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Доступно обновление " + label)
+                .setMessage("Выйдет новая версия приложения. Установить поверх — вход и данные сохранятся.")
+                .setPositiveButton("Скачать", (dialog, which) -> openUpdateUrl())
+                .setNegativeButton("Позже", null)
+                .show();
+    }
+
+    private void openUpdateUrl() {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse(PushService.BASE + "/downloads/lonjeron.apk")));
+        } catch (Exception error) {
+            Toast.makeText(this, "Откройте сайт и скачайте приложение заново", Toast.LENGTH_LONG).show();
+        }
     }
 
     private int dp(int value) {

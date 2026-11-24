@@ -4215,3 +4215,38 @@ body.ui-desk .top-right {
 :root:not([data-theme="dark"]) .topbar {
   box-shadow: 0 1px 0 rgba(15, 23, 42, .08), 0 6px 18px rgba(15, 23, 42, .06);
 }
+/* ---------- Пометка «эксперимент» у режима стола ------------------------- */
+
+.mode-seg .mode-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, .18);
+  color: #d97706;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: lowercase;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.mode-seg.active .mode-tag {
+  background: rgba(255, 255, 255, .25);
+  color: #fff;
+}
+
+.mode-tag-short { display: none; }
+
+@media (max-width: 780px) {
+  .mode-tag-full { display: none; }
+  .mode-tag-short { display: inline; }
+
+  .mode-seg .mode-tag {
+    margin-left: 4px;
+    font-size: 9px;
+    padding: 0 5px;
+  }
+}
