@@ -11,8 +11,15 @@
   // Тема применяется до отрисовки, чтобы не мигало белым
   (function () {
     try {
-      var saved = localStorage.getItem('theme');
-      var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      // По умолчанию — светлая тема. Тёмная включается только вручную.
+      // Один раз сбрасываем старый выбор, чтобы у всех стала светлая.
+      if (!localStorage.getItem('themeDefaultApplied')) {
+        localStorage.setItem('theme', 'light');
+        localStorage.setItem('themeDefaultApplied', '1');
+      }
+
+      var saved = localStorage.getItem('theme') || 'light';
+      var dark = saved === 'dark';
       if (dark) document.documentElement.setAttribute('data-theme', 'dark');
     } catch (e) { /* приватный режим — не страшно */ }
   })();
