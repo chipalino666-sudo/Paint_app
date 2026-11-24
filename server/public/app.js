@@ -2102,8 +2102,8 @@ async function openOrder(id) {
 
     // Один рисунок, два вида: сбоку и сверху
     const frame = isTop
-      ? { x: 236, y: 245, w: 528, h: 210 }
-      : { x: 200, y: 36, w: 600, h: 205 };
+      ? { x: 208, y: 240, w: 582, h: 220 }
+      : { x: 202, y: 40, w: 596, h: 200 };
 
     const marks = points
       .map((point, index) => ({ point, index }))
@@ -2120,22 +2120,21 @@ async function openOrder(id) {
       }).join('');
 
     const zonesSide = `
-        <rect class="zone" data-zone="передний бампер" x="202" y="132" width="60" height="109"></rect>
-        <rect class="zone" data-zone="капот" x="262" y="94" width="128" height="66"></rect>
-        <rect class="zone" data-zone="крыша" x="450" y="54" width="220" height="44"></rect>
-        <rect class="zone" data-zone="передняя дверь" x="390" y="94" width="140" height="130"></rect>
-        <rect class="zone" data-zone="задняя дверь" x="530" y="94" width="120" height="130"></rect>
-        <rect class="zone" data-zone="заднее крыло" x="650" y="94" width="110" height="66"></rect>
-        <rect class="zone" data-zone="задний бампер" x="760" y="132" width="40" height="109"></rect>
+        <rect class="zone" data-zone="передний бампер" x="202" y="70" width="62" height="170"></rect>
+        <rect class="zone" data-zone="капот" x="264" y="60" width="128" height="70"></rect>
+        <rect class="zone" data-zone="крыша" x="412" y="40" width="240" height="62"></rect>
+        <rect class="zone" data-zone="передняя дверь" x="392" y="95" width="130" height="145"></rect>
+        <rect class="zone" data-zone="задняя дверь" x="522" y="95" width="120" height="145"></rect>
+        <rect class="zone" data-zone="заднее крыло" x="632" y="95" width="120" height="70"></rect>
+        <rect class="zone" data-zone="задний бампер" x="747" y="70" width="51" height="170"></rect>
 `;
 
     const zonesTop = `
-        <rect class="zone" data-zone="передний бампер" x="236" y="245" width="76" height="210"></rect>
-        <rect class="zone" data-zone="капот" x="312" y="245" width="106" height="210"></rect>
-        <rect class="zone" data-zone="крыша" x="418" y="245" width="208" height="210"></rect>
-        <rect class="zone" data-zone="багажник" x="626" y="245" width="86" height="210"></rect>
-        <rect class="zone" data-zone="задний бампер" x="712" y="245" width="52" height="210"></rect>
-`;
+        <rect class="zone" data-zone="передний бампер" x="208" y="240" width="50" height="220"></rect>
+        <rect class="zone" data-zone="капот" x="258" y="240" width="95" height="220"></rect>
+        <rect class="zone" data-zone="крыша" x="353" y="240" width="245" height="220"></rect>
+        <rect class="zone" data-zone="багажник" x="598" y="240" width="120" height="220"></rect>
+        <rect class="zone" data-zone="задний бампер" x="718" y="240" width="72" height="220"></rect>`;
 
     return `
       <svg class="inspect-svg${canEdit ? ' editable' : ''}" data-inspect-view="${view}"
