@@ -2099,63 +2099,112 @@ async function openOrder(id) {
 
   function inspectionSvg(view, points, canEdit) {
     const isTop = view === 'top';
-    const width = isTop ? 180 : 360;
-    const height = isTop ? 340 : 150;
+    const width = isTop ? 200 : 420;
+    const height = isTop ? 360 : 180;
 
     const marks = points
       .map((point, index) => ({ point, index }))
       .filter((item) => item.point.view === view)
       .map((item) => `
         <g class="damage" transform="translate(${(item.point.x * width) / 100} ${(item.point.y * height) / 100})">
-          <circle r="8"></circle>
+          <circle r="9"></circle>
           <text text-anchor="middle" dy="4">${item.index + 1}</text>
         </g>`).join('');
 
-    const drawing = isTop
-      ? `
-        <path class="car-body" d="M50 12 C74 6 106 6 130 12 C142 18 146 42 146 64 L146 276 C146 298 142 322 130 328 C106 334 74 334 50 328 C38 322 34 298 34 276 L34 64 C34 42 38 18 50 12 Z"></path>
-        <path class="car-window" d="M56 112 L124 112 L120 134 L60 134 Z"></path>
-        <rect class="car-panel" x="60" y="134" width="60" height="76" rx="7"></rect>
-        <path class="car-window" d="M60 210 L120 210 L124 232 L56 232 Z"></path>
-        <path class="car-line" d="M52 70 C74 64 106 64 128 70"></path>
-        <path class="car-door" d="M38 188 L58 188"></path>
-        <path class="car-door" d="M122 188 L142 188"></path>
-        <path class="car-door" d="M38 256 L58 256"></path>
-        <path class="car-door" d="M122 256 L142 256"></path>
-        <path class="car-line" d="M52 272 C74 278 106 278 128 272"></path>
-        <rect class="car-lamp" x="12" y="116" width="20" height="9" rx="4"></rect>
-        <rect class="car-lamp" x="148" y="116" width="20" height="9" rx="4"></rect>
-        <rect class="zone" data-zone="капот" x="34" y="58" width="112" height="56"></rect>
-        <rect class="zone" data-zone="крыша" x="56" y="112" width="68" height="120"></rect>
-        <rect class="zone" data-zone="багажник" x="34" y="232" width="112" height="70"></rect>
-        <rect class="zone" data-zone="передний бампер" x="34" y="14" width="112" height="44"></rect>
-        <rect class="zone" data-zone="задний бампер" x="34" y="302" width="112" height="30"></rect>`
-      : `
-        <path class="car-body" d="M16 112 L16 96 C16 88 20 84 30 82 L88 72 C104 54 120 46 140 45 L232 45 C254 46 270 54 284 72 L336 82 C346 84 350 88 350 96 L350 112 Z"></path>
-        <path class="car-window" d="M104 70 L136 50 L176 50 L176 70 Z"></path>
-        <path class="car-window" d="M186 50 L230 50 C246 51 258 58 268 70 L186 70 Z"></path>
-        <path class="car-door" d="M104 70 L104 108 Q104 112 110 112 L181 112 L181 70"></path>
-        <path class="car-door" d="M181 70 L181 112 L262 112 Q268 112 268 108 L268 70"></path>
-        <rect class="car-line" x="150" y="78" width="16" height="4" rx="2"></rect>
-        <rect class="car-line" x="214" y="78" width="16" height="4" rx="2"></rect>
-        <circle class="car-wheel" cx="96" cy="112" r="24"></circle>
-        <circle class="car-wheel-inner" cx="96" cy="112" r="11"></circle>
-        <circle class="car-wheel" cx="272" cy="112" r="24"></circle>
-        <circle class="car-wheel-inner" cx="272" cy="112" r="11"></circle>
-        <rect class="car-lamp" x="18" y="88" width="14" height="9" rx="3"></rect>
-        <rect class="car-lamp" x="334" y="88" width="14" height="9" rx="3"></rect>
-        <rect class="zone" data-zone="капот" x="16" y="72" width="86" height="42"></rect>
-        <rect class="zone" data-zone="передняя дверь" x="104" y="44" width="77" height="70"></rect>
-        <rect class="zone" data-zone="задняя дверь" x="181" y="44" width="87" height="70"></rect>
-        <rect class="zone" data-zone="крыша" x="104" y="36" width="164" height="32"></rect>
-        <rect class="zone" data-zone="заднее крыло" x="268" y="72" width="82" height="42"></rect>
-        <rect class="zone" data-zone="передний бампер" x="10" y="82" width="28" height="32"></rect>
-        <rect class="zone" data-zone="задний бампер" x="326" y="82" width="30" height="32"></rect>`;
+    const topView = `
+      <g class="car-top">
+        <!-- колёса видны по бокам -->
+        <rect class="car-tire" x="18" y="84" width="18" height="52" rx="7"></rect>
+        <rect class="car-tire" x="164" y="84" width="18" height="52" rx="7"></rect>
+        <rect class="car-tire" x="18" y="218" width="18" height="52" rx="7"></rect>
+        <rect class="car-tire" x="164" y="218" width="18" height="52" rx="7"></rect>
+
+        <!-- корпус -->
+        <path class="car-body" d="M100 20 C118 20 132 26 140 44 C148 62 152 84 154 104 L166 118 L166 236 L154 250 C152 272 146 300 136 318 C126 336 114 344 100 344 C86 344 74 336 64 318 C54 300 48 272 46 250 L34 236 L34 118 L46 104 C48 84 52 62 60 44 C68 26 82 20 100 20 Z"></path>
+
+        <!-- зеркала -->
+        <rect class="car-mirror" x="24" y="146" width="18" height="11" rx="5"></rect>
+        <rect class="car-mirror" x="158" y="146" width="18" height="11" rx="5"></rect>
+
+        <!-- линии кузова -->
+        <path class="car-seam" d="M60 58 C74 52 126 52 140 58"></path>
+        <path class="car-seam" d="M52 108 C68 102 132 102 148 108"></path>
+        <path class="car-seam" d="M52 256 C68 262 132 262 148 256"></path>
+        <path class="car-seam" d="M60 302 C74 308 126 308 140 302"></path>
+
+        <!-- лобовое, крыша, заднее стекло -->
+        <path class="car-glass" d="M61 110 L139 110 L130 146 L70 146 Z"></path>
+        <rect class="car-glass" x="70" y="146" width="60" height="72" rx="12"></rect>
+        <path class="car-glass" d="M70 218 L130 218 L139 254 L61 254 Z"></path>
+
+        <!-- фары и фонари -->
+        <rect class="car-lamp" x="64" y="28" width="22" height="11" rx="5"></rect>
+        <rect class="car-lamp" x="114" y="28" width="22" height="11" rx="5"></rect>
+        <rect class="car-lamp-rear" x="64" y="321" width="22" height="11" rx="5"></rect>
+        <rect class="car-lamp-rear" x="114" y="321" width="22" height="11" rx="5"></rect>
+
+        <!-- зоны -->
+        <rect class="zone" data-zone="передний бампер" x="62" y="20" width="76" height="42"></rect>
+        <rect class="zone" data-zone="капот" x="52" y="60" width="96" height="46"></rect>
+        <rect class="zone" data-zone="крыша" x="66" y="108" width="68" height="146"></rect>
+        <rect class="zone" data-zone="багажник" x="52" y="256" width="96" height="46"></rect>
+        <rect class="zone" data-zone="задний бампер" x="62" y="302" width="76" height="40"></rect>
+      </g>`;
+
+    const sideView = `
+      <g class="car-side">
+        <!-- корпус -->
+        <path class="car-body" d="M20 128 L20 116 C20 108 25 103 34 101 L94 95 C106 93 118 84 130 72 C142 59 158 52 176 51 L258 51 C278 51 294 59 306 71 L322 84 C330 91 340 95 350 96 L388 100 C398 102 402 109 402 118 L402 128 Z"></path>
+
+        <!-- колёса: арки прорезают крыло, порог проходит поверх -->
+        <defs>
+          <clipPath id="sideBodyClip">
+            <path d="M20 128 L20 116 C20 108 25 103 34 101 L94 95 C106 93 118 84 130 72 C142 59 158 52 176 51 L258 51 C278 51 294 59 306 71 L322 84 C330 91 340 95 350 96 L388 100 C398 102 402 109 402 118 L402 128 Z"></path>
+          </clipPath>
+        </defs>
+
+        <g clip-path="url(#sideBodyClip)">
+          <circle class="car-arch" cx="112" cy="128" r="34"></circle>
+          <circle class="car-arch" cx="316" cy="128" r="34"></circle>
+        </g>
+
+        <circle class="car-tire" cx="112" cy="128" r="25"></circle>
+        <circle class="car-rim" cx="112" cy="128" r="12"></circle>
+        <circle class="car-tire" cx="316" cy="128" r="25"></circle>
+        <circle class="car-rim" cx="316" cy="128" r="12"></circle>
+
+        <path class="car-seam" d="M26 128 L398 128"></path>
+
+        <!-- стёкла -->
+        <path class="car-glass" d="M134 76 L172 57 L210 57 L210 80 L130 80 Z"></path>
+        <path class="car-glass" d="M220 57 L256 57 L290 78 L220 80 Z"></path>
+
+        <!-- стойки, двери, ручки -->
+        <path class="car-seam" d="M212 57 L212 128"></path>
+        <path class="car-seam" d="M130 80 L130 101"></path>
+        <path class="car-seam" d="M294 78 L294 100"></path>
+        <rect class="car-handle" x="150" y="94" width="20" height="6" rx="3"></rect>
+        <rect class="car-handle" x="238" y="94" width="20" height="6" rx="3"></rect>
+        <rect class="car-mirror" x="124" y="76" width="15" height="6" rx="3"></rect>
+
+        <!-- фары и фонари -->
+        <rect class="car-lamp" x="20" y="104" width="17" height="11" rx="5"></rect>
+        <rect class="car-lamp-rear" x="383" y="101" width="19" height="11" rx="5"></rect>
+
+        <!-- зоны -->
+        <rect class="zone" data-zone="передний бампер" x="14" y="100" width="32" height="28"></rect>
+        <rect class="zone" data-zone="капот" x="36" y="84" width="66" height="20"></rect>
+        <rect class="zone" data-zone="передняя дверь" x="130" y="74" width="82" height="54"></rect>
+        <rect class="zone" data-zone="задняя дверь" x="212" y="74" width="84" height="54"></rect>
+        <rect class="zone" data-zone="крыша" x="176" y="51" width="82" height="26"></rect>
+        <rect class="zone" data-zone="заднее крыло" x="296" y="74" width="90" height="30"></rect>
+        <rect class="zone" data-zone="задний бампер" x="386" y="100" width="30" height="28"></rect>
+      </g>`;
 
     return `
       <svg class="inspect-svg${canEdit ? ' editable' : ''}" data-inspect-view="${view}"
            viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
-        ${drawing}
+        ${isTop ? topView : sideView}
         ${marks}
       </svg>`;
   }

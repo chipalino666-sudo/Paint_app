@@ -1633,14 +1633,47 @@ td.empty-line,
 
 .inspect-svg.editable { cursor: crosshair; }
 
-.car-body { fill: none; stroke: currentColor; stroke-width: 2; opacity: .8; }
-.car-line { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .4; }
-.car-door { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .55; }
-.car-window { fill: currentColor; opacity: .12; stroke: currentColor; stroke-width: 1.2; }
-.car-panel { fill: none; stroke: currentColor; stroke-width: 1.2; opacity: .3; }
-.car-mirror { fill: currentColor; opacity: .35; }
-.car-lamp { fill: currentColor; opacity: .3; }
-.car-wheel { fill: none; stroke: currentColor; stroke-width: 2.2; opacity: .6; }
+.car-body {
+  fill: var(--surface-2);
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.car-glass {
+  fill: color-mix(in srgb, var(--ink-soft) 14%, var(--surface));
+  stroke: var(--ink-soft);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.car-seam {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.3;
+  opacity: .45;
+  stroke-linecap: round;
+}
+
+.car-mirror {
+  fill: var(--surface);
+  stroke: var(--ink-soft);
+  stroke-width: 1.4;
+}
+
+.car-handle {
+  fill: var(--ink-soft);
+  opacity: .5;
+}
+
+.car-lamp { fill: #f0b429; stroke: #c98d12; stroke-width: .8; }
+.car-lamp-rear { fill: #e2574c; stroke: #b23a31; stroke-width: .8; }
+
+.car-tire { fill: #333d52; }
+.car-rim { fill: var(--surface); stroke: #333d52; stroke-width: 1.5; }
+/* арка: круг цветом фона «прорезает» крыло над колесом */
+.car-arch { fill: var(--surface); }
+
 .car-wheel-inner { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .4; }
 
 /* Кликабельные детали: подсвечиваются при наведении */
