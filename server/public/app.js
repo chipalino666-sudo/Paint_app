@@ -3929,6 +3929,117 @@ async function openOrder(id) {
      Новый заказ
      ------------------------------------------------------------------------ */
 
+  /* ------------------------------------------------------------------------
+     Черновик нового заказа: сохраняется сам, чтобы не терять заполненное
+     ------------------------------------------------------------------------ */
+
+  const DRAFT_FIELDS = ['carPlate', 'carVin', 'carMake', 'carModel', 'carColor',
+    'ownerName', 'ownerPhone', 'masterSelect', 'bodyworkerSelect', 'plannedDate', 'orderComment'];
+
+  function draftKey() {
+    return 'paintShopNewOrderDraft:' + ((state.user && state.user.id) || 'guest');
+  }
+
+  function readNewOrderDraft() {
+    try {
+      const raw = localStorage.getItem(draftKey());
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function draftHasContent(draft) {
+    if (!draft) return false;
+    if (Array.isArray(draft.works) && draft.works.length) return true;
+
+    return Object.values(draft.fields || {}).some((value) => String(value || '').trim() !== '');
+  }
+
+  /** Пишем черновик при каждом изменении полей. */
+  function saveNewOrderDraft() {
+    const form = $('#newOrderForm');
+    if (!form) return;
+
+    const draft = { at: new Date().toISOString(), fields: {}, works: state.newWorks };
+
+    DRAFT_FIELDS.forEach((id) => {
+      const field = $('#' + id);
+      if (field) draft.fields[id] = field.value;
+    });
+
+    try {
+      if (draftHasContent(draft)) {
+        localStorage.setItem(draftKey(), JSON.stringify(draft));
+      } else {
+        localStorage.removeItem(draftKey());
+      }
+    } catch (error) {
+      /* место в браузере могло кончиться — не ломаем форму */
+    }
+
+    paintDraftBar(draft);
+  }
+
+  let draftTimer = null;
+
+  function scheduleDraftSave() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveNewOrderDraft, 400);
+  }
+
+  function paintDraftBar(draft) {
+    const bar = $('#draftBar');
+    const text = $('#draftText');
+    if (!bar) return;
+
+    if (!draftHasContent(draft)) {
+      bar.classList.add('hidden');
+      return;
+    }
+
+    bar.classList.remove('hidden');
+
+    if (text) {
+      const at = draft.at ? new Date(draft.at) : new Date();
+      const time = at.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      text.textContent = 'Черновик сохранён в ' + time + ' — можно уйти и вернуться';
+    }
+  }
+
+  function clearNewOrderDraft() {
+    try {
+      localStorage.removeItem(draftKey());
+    } catch (error) {
+      /* ничего */
+    }
+
+    const bar = $('#draftBar');
+    if (bar) bar.classList.add('hidden');
+  }
+
+  /** Возвращаем заполненное, когда снова открыли новый заказ. */
+  function restoreNewOrderDraft() {
+    const draft = readNewOrderDraft();
+
+    if (!draftHasContent(draft)) {
+      const bar = $('#draftBar');
+      if (bar) bar.classList.add('hidden');
+      return false;
+    }
+
+    DRAFT_FIELDS.forEach((id) => {
+      const field = $('#' + id);
+      if (field && draft.fields && draft.fields[id] != null) field.value = draft.fields[id];
+    });
+
+    state.newWorks = Array.isArray(draft.works) ? draft.works : [];
+    renderNewWorks();
+    paintDraftBar(draft);
+
+    return true;
+  }
+
   function resetNewOrder() {
     state.newWorks = [];
     $('#newOrderForm').reset();
@@ -3955,6 +4066,9 @@ async function openOrder(id) {
 
     workSelect.addEventListener('change', applyWorkParts);
     applyWorkParts();
+
+    // Если есть недозаполненный заказ — возвращаем его
+    restoreNewOrderDraft();
 
     $('#carPlate').focus();
   }
@@ -4083,6 +4197,8 @@ async function openOrder(id) {
           works: state.newWorks.map((row) => ({ work_id: row.work_id, qty: row.qty, price: row.price }))
         }
       });
+
+      clearNewOrderDraft();
 
       state.order = data.order;
       showView('order');
@@ -6053,7 +6169,10 @@ async function loadUsers() {
     });
 
     $('#btnNewOrder').addEventListener('click', () => showView('new'));
-    $('#btnCancelNew').addEventListener('click', () => showView('orders'));
+    $('#btnCancelNew').addEventListener('click', () => {
+      clearNewOrderDraft();
+      showView('orders');
+    });
 
     let searchTimer = null;
     let searchTouched = false;
@@ -6125,6 +6244,19 @@ async function loadUsers() {
 
     $('#carPlate').addEventListener('blur', (event) => prefillCar(event.target.value));
     $('#newOrderForm').addEventListener('submit', submitNewOrder);
+
+    // Черновик: сохраняем на каждый ввод и при уходе со страницы
+    $('#newOrderForm').addEventListener('input', scheduleDraftSave);
+    $('#newOrderForm').addEventListener('change', scheduleDraftSave);
+    window.addEventListener('beforeunload', saveNewOrderDraft);
+
+    if ($('#btnDraftClear')) {
+      $('#btnDraftClear').addEventListener('click', () => {
+        clearNewOrderDraft();
+        resetNewOrder();
+        toast('Черновик очищен');
+      });
+    }
 
     $('#btnReport').addEventListener('click', loadReport);
 

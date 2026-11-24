@@ -4020,3 +4020,22 @@ body.ui-desk .top-right {
 .login-ok { color: var(--green); font-weight: 700; }
 .login-fail { color: var(--red); font-weight: 700; }
 .login-agent { font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* ---------- Черновик нового заказа ---------------------------------------- */
+
+.draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(91, 155, 255, .45);
+  border-radius: 10px;
+  background: rgba(91, 155, 255, .10);
+  font-size: 13px;
+}
+
+.draft-bar .draft-text { color: var(--ink-soft); }
+.draft-bar .btn { margin-left: auto; }
