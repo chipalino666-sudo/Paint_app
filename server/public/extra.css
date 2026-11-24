@@ -4086,3 +4086,59 @@ body.ui-desk .top-right {
     max-width: 100%;
   }
 }
+
+
+/* ---------- Кнопка скачивания приложения -------------------------------- */
+
+.android-download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+
+.android-download:hover {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, var(--surface-2));
+}
+
+.android-download-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.android-download-sub {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--grey);
+  margin-top: 2px;
+}
+
+@media (max-width: 780px) {
+  .android-download {
+    font-size: 13.5px;
+    padding: 10px 12px;
+  }
+}
+
+
+/* На телефоне выпадающий список не шире экрана */
+.menu-mobile-fix {
+  box-sizing: border-box;
+}

@@ -6059,25 +6059,52 @@ async function loadUsers() {
       if (userDropdown) userDropdown.classList.add('hidden');
     };
 
-    const toggleMenu = (menu) => {
+    /**
+     * На телефоне список открываем во всю ширину экрана под кнопкой,
+     * чтобы он не уезжал вбок и не обрезался снизу.
+     */
+    const placeMenu = (menu, anchor) => {
+      menu.removeAttribute('style');
+
+      if (!anchor || window.innerWidth > 780) return;
+
+      const rect = anchor.getBoundingClientRect();
+      const top = Math.round(rect.bottom + 6);
+      const room = window.innerHeight - top - 10;
+
+      menu.style.position = 'fixed';
+      menu.style.left = '8px';
+      menu.style.right = '8px';
+      menu.style.width = 'auto';
+      menu.style.minWidth = '0';
+      menu.style.top = top + 'px';
+      menu.style.maxHeight = Math.max(140, room) + 'px';
+      menu.style.overflowY = 'auto';
+    };
+
+    const toggleMenu = (menu, anchor) => {
       if (!menu) return;
 
       const willOpen = menu.classList.contains('hidden');
       closeMenus();
-      if (willOpen) menu.classList.remove('hidden');
+
+      if (willOpen) {
+        placeMenu(menu, anchor);
+        menu.classList.remove('hidden');
+      }
     };
 
     if (moreButton) {
       moreButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        toggleMenu(moreMenu);
+        toggleMenu(moreMenu, moreButton);
       });
     }
 
     if (userButton) {
       userButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        toggleMenu(userDropdown);
+        toggleMenu(userDropdown, userButton);
       });
     }
 
@@ -6098,6 +6125,10 @@ async function loadUsers() {
       if (event.target.closest('.nav-more') || event.target.closest('.user-menu')) return;
       closeMenus();
     });
+
+    // Прокрутка и поворот экрана: место меню могло устареть
+    window.addEventListener('resize', closeMenus);
+    window.addEventListener('scroll', closeMenus, { passive: true });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
