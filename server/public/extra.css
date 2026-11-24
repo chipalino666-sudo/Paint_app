@@ -4142,3 +4142,36 @@ body.ui-desk .top-right {
 .menu-mobile-fix {
   box-sizing: border-box;
 }
+/* ---------- Кнопки шапки на телефоне: одинаковые, с рамкой --------------- */
+
+@media (max-width: 780px) {
+  .nav {
+    row-gap: 6px;
+  }
+
+  .nav-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+
+  .nav-btn.active {
+    background: var(--blue-soft);
+    border-color: var(--blue);
+  }
+
+  .nav-more {
+    display: inline-flex;
+    align-items: stretch;
+  }
+
+  .nav-more > .nav-btn {
+    border-radius: 10px;
+    padding-right: 12px;
+  }
+
+  .nav-more .chev {
+    flex: 0 0 auto;
+  }
+}
