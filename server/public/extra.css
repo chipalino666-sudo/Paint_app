@@ -4250,3 +4250,23 @@ body.ui-desk .top-right {
     padding: 0 5px;
   }
 }
+/* ---------- Телефон: списки меню не должны обрезаться -------------------- */
+
+@media (max-width: 780px) {
+  /*
+    У шапки есть backdrop-filter, а он делает её «рамкой» для position: fixed.
+    Из-за этого выпадающий список прилипал к шапке и обрезался снизу.
+    На телефоне убираем размытие — фон делаем плотным.
+  */
+  .topbar {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface);
+  }
+
+  .menu {
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
