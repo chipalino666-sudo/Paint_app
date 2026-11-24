@@ -15,6 +15,10 @@ $knownHosts = Join-Path $env:TEMP 'known_hosts_tmp'
 $backupDir = 'C:\Backups\Лонжерон'
 $logFile = Join-Path $backupDir 'backup.log'
 
+# Сетевая папка на диске Z: (\\Asus\d). UNC надёжнее буквы диска:
+# в задачах планировщика буква Z: может быть не подключена.
+$networkDir = '\\Asus\d\Лонжерон-бэкапы'
+
 New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
 
 $stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
@@ -49,6 +53,32 @@ try {
 
   $size = (Get-Item $localFile).Length
   Write-Log "скачано: $localFile ($([math]::Round($size / 1KB)) КБ)"
+
+  # 2.1. Копия на сетевой диск
+  try {
+    if (-not (Test-Path $networkDir)) {
+      New-Item -ItemType Directory -Path $networkDir -Force | Out-Null
+    }
+
+    Copy-Item -Path $localFile -Destination $networkDir -Force
+    $netTarget = Join-Path $networkDir (Split-Path $localFile -Leaf)
+
+    if (Test-Path $netTarget) {
+      Write-Log "сетевая копия: $netTarget"
+    } else {
+      Write-Log "сетевая копия не появилась: $netTarget"
+    }
+
+    # чистим сетевые копии старше 30 дней
+    Get-ChildItem -Path $networkDir -Filter 'paint-*.db' -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
+      ForEach-Object {
+        Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+        Write-Log "удалена старая сетевая копия: $($_.Name)"
+      }
+  } catch {
+    Write-Log "сетевая копия не удалась: $($_.Exception.Message)"
+  }
 
   # 3. Убираем временный файл на сервере
   & ssh @sshOptions $host_ "rm -f $remoteFile" 2>$null | Out-Null
