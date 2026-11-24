@@ -240,6 +240,7 @@
   }
 
   const state = {
+    statusChanges: {},
     user: null,
     view: 'orders',
     orders: [],
@@ -391,6 +392,9 @@
   if (name === 'logins') loadLogins();
     if (name === 'tasks') loadTasks();
     if (name === 'new') resetNewOrder();
+
+    // На телефоне после перехода страница не должна оставаться прокрученной
+    window.scrollTo(0, 0);
   }
 
   /* ------------------------------------------------------------------------
@@ -408,19 +412,64 @@
 
   function renderStatusChips() {
     const box = $('#statusChips');
+    if (!box) return;
+
+    const changes = state.statusChanges || {};
     box.innerHTML = '';
 
     FILTERS.forEach((filter) => {
       const chip = document.createElement('button');
       chip.className = 'chip' + (state.orderFilter.status === filter.id ? ' active' : '');
-      chip.textContent = filter.label;
+
+      const label = document.createElement('span');
+      label.textContent = filter.label;
+      chip.appendChild(label);
+
+      // Цифра подсказывает, в какую именно вкладку попали изменённые заказы
+      const count = filter.id === 'open'
+        ? (Number(changes.accepted) || 0) + (Number(changes.in_work) || 0) + (Number(changes.ready) || 0)
+        : Number(changes[filter.id]) || 0;
+
+      if (count > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'chip-badge';
+        badge.textContent = count > 99 ? '99+' : String(count);
+        chip.appendChild(badge);
+      }
+
       chip.addEventListener('click', () => {
         state.orderFilter.status = filter.id;
         renderStatusChips();
         loadOrders();
+        markStatusSeen(filter.id);
       });
+
       box.appendChild(chip);
     });
+  }
+
+  /** Открыли вкладку статуса — её изменения больше не «новые». */
+  async function markStatusSeen(status) {
+    const changes = state.statusChanges || {};
+    const affected = status === 'open'
+      ? ['accepted', 'in_work', 'ready']
+      : [status];
+
+    if (!affected.some((key) => Number(changes[key]) > 0)) return;
+
+    try {
+      for (const key of affected) {
+        if (Number(changes[key]) > 0) {
+          await api('/api/orders/status-seen', { method: 'POST', body: { status: key } });
+          delete changes[key];
+        }
+      }
+
+      state.statusChanges = changes;
+      renderStatusChips();
+    } catch (error) {
+      /* не критично */
+    }
   }
 
   /** silent = true — обновить в фоне, без надписи «Загрузка…» */
@@ -2731,6 +2780,14 @@ async function openOrder(id) {
 
       setBadge(generalBadge, channels.general || 0);
       setBadge(ordersBadge, ordersTotal);
+
+      // Разбивка по статусам: где именно новые изменения
+      const byStatus = data.by_status || {};
+      const before = JSON.stringify(state.statusChanges || {});
+
+      state.statusChanges = byStatus;
+
+      if (JSON.stringify(byStatus) !== before) renderStatusChips();
 
       // Непрочитанных стало больше — подаём сигнал
       const total = (Number(channels.general) || 0) + ordersTotal;

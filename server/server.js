@@ -563,6 +563,29 @@ route('GET', '/api/orders', async ({ user, url }) => {
   return { orders: orderList(user, query) };
 });
 
+/** Пользователь посмотрел вкладку статуса — эти изменения считаем увиденными. */
+route('POST', '/api/orders/status-seen', async ({ user, body }) => {
+  const status = String(body.status || '');
+  if (!status) return { ok: true, marked: 0 };
+
+  const scope = user.role === 'master' ? ' AND (master_id = ? OR bodyworker_id = ?)' : '';
+  const params = user.role === 'master' ? [user.id, user.id] : [];
+
+  const ids = db.prepare(`SELECT id FROM orders WHERE status = ?${scope}`).all(status, ...params);
+
+  const stamp = nowISO();
+  let marked = 0;
+
+  for (const row of ids) {
+    db.prepare(`INSERT INTO order_reads (user_id, order_id, seen_at) VALUES (?, ?, ?)
+                ON CONFLICT(user_id, order_id) DO UPDATE SET seen_at = excluded.seen_at`)
+      .run(user.id, row.id, stamp);
+    marked += 1;
+  }
+
+  return { ok: true, marked };
+});
+
 route('GET', '/api/orders/:id', async ({ user, params }) => {
   const order = orderView(params.id);
   if (!order) throw new ApiError(404, 'Заказ не найден');
@@ -2983,7 +3006,25 @@ route('GET', '/api/chat/unread', async ({ user }) => {
        ${masterScope}
   `).get(user.id, user.id, ...masterParams).n;
 
-  return { total, channels: perChannel, changes };
+  // Разбивка изменений по статусам: чтобы подсказать, в какую вкладку попал заказ
+  const byStatusRows = db.prepare(`
+    SELECT o.status AS status, COUNT(*) AS n
+      FROM audit a
+      JOIN orders o ON CAST(o.id AS TEXT) = a.entity_id
+     WHERE a.entity = 'order'
+       AND a.user_id <> ?
+       AND a.action IN ('create', 'change', 'work_add', 'work_edit', 'work_remove', 'photo_add')
+       AND a.at > COALESCE((SELECT r.seen_at FROM order_reads r WHERE r.user_id = ? AND r.order_id = o.id), '')
+       ${masterScope}
+     GROUP BY o.status
+  `).all(user.id, user.id, ...masterParams);
+
+  const byStatus = {};
+
+  for (const row of byStatusRows) byStatus[row.status] = row.n;
+
+
+  return { total, channels: perChannel, changes, by_status: byStatus };
 });
 
 /* --------------------------------------------------------------------------
