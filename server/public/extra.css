@@ -4175,3 +4175,43 @@ body.ui-desk .top-right {
     flex: 0 0 auto;
   }
 }
+/* ---------- Светлая тема: пункты шапки заметнее --------------------------- */
+
+:root:not([data-theme="dark"]) .nav-btn {
+  color: #33415c;
+  font-weight: 600;
+}
+
+:root:not([data-theme="dark"]) .nav-btn:hover {
+  background: #e6ecf7;
+  color: #16233a;
+}
+
+:root:not([data-theme="dark"]) .nav-btn.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+@media (max-width: 780px) {
+  :root:not([data-theme="dark"]) .nav-btn {
+    background: #e6ecf7;
+    border-color: #b3c1d6;
+    color: #2a3a54;
+  }
+
+  :root:not([data-theme="dark"]) .nav-btn.active {
+    background: #d3e4ff;
+    border-color: #2563eb;
+    color: #1745b3;
+  }
+
+  :root:not([data-theme="dark"]) .nav-more > .nav-btn {
+    background: #e6ecf7;
+    border-color: #b3c1d6;
+  }
+}
+
+/* Шапка на светлом фоне: тень снизу, чтобы кнопки не сливались */
+:root:not([data-theme="dark"]) .topbar {
+  box-shadow: 0 1px 0 rgba(15, 23, 42, .08), 0 6px 18px rgba(15, 23, 42, .06);
+}
