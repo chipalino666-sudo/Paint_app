@@ -6127,6 +6127,8 @@ async function loadUsers() {
     if ($('#btnUiMode')) $('#btnUiMode').addEventListener('click', toggleUiMode);
 
     if ($('#btnLoginsRefresh')) $('#btnLoginsRefresh').addEventListener('click', loadLogins);
+    if ($('#btnAndroidApp')) $('#btnAndroidApp').addEventListener('click', () => { window.open('/downloads/lonjeron.apk', '_blank'); });
+
     if ($('#btnNavPrefs')) $('#btnNavPrefs').addEventListener('click', openNavPrefs);
 
     if ($('#btnDeskPrefsSave')) $('#btnDeskPrefsSave').addEventListener('click', saveDeskPrefs);
