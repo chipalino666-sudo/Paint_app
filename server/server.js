@@ -690,6 +690,52 @@ route('GET', '/api/push/watch', async ({ user, url }) => {
 });
 
 /** Сколько событий ждёт пользователя (для проверки и бейджа). */
+/**
+ * События для общего экрана мастеров: экран ПИН-кода тоже должен
+ * показывать уведомления, хотя человек ещё не вошёл.
+ */
+route('GET', '/api/push/workstation', async ({ sessionData, url }) => {
+  if (!sessionData) throw new ApiError(401, 'Нужно войти');
+
+  const rawSince = url.searchParams.get('since');
+
+  // Первый запрос: отдаём только точку отсчёта, старые события не показываем
+  if (rawSince === null) {
+    const maxId = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM push_events').get().id;
+    return { events: [], last: Number(maxId) };
+  }
+
+  const since = Number(rawSince) || 0;
+  const wait = Math.min(Math.max(Number(url.searchParams.get('timeout')) || 25, 5), 50);
+  const deadline = Date.now() + wait * 1000;
+
+  while (true) {
+    // Одно изменение статуса создаёт по событию на каждого получателя —
+    // на общем экране показываем только одно из них
+    const rows = db.prepare(`
+      SELECT MIN(id) AS id, kind, title, body, MIN(created_at) AS created_at
+        FROM push_events
+       WHERE id > ?
+       GROUP BY kind, title, body
+       ORDER BY id ASC
+       LIMIT 20
+    `).all(since);
+
+    const lastRow = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM push_events WHERE id > ?').get(since);
+
+    if (rows.length) {
+      return { events: rows, last: Number(lastRow.id) || since };
+    }
+
+    if (Date.now() > deadline) {
+      const maxId = db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM push_events').get().id;
+      return { events: [], last: Math.max(Number(maxId), since) };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+});
+
 route('GET', '/api/push/pending', async ({ user, url }) => {
   const since = Number(url.searchParams.get('since')) || 0;
 
@@ -3315,7 +3361,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Эти запросы работают и на запертом рабочем месте — иначе с него не выйти
-      const alwaysAllowed = ['/api/login', '/api/unlock', '/api/lock', '/api/me', '/api/logout', '/api/app/version'].includes(pathname);
+      const alwaysAllowed = ['/api/login', '/api/unlock', '/api/lock', '/api/me', '/api/logout', '/api/app/version', '/api/push/workstation'].includes(pathname);
 
       if (!alwaysAllowed && !user) {
         if (sessionData && sessionData.account.is_workstation) {

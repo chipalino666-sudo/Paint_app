@@ -4327,3 +4327,56 @@ body.ui-desk .top-right {
 .inspect-svg.editable .zone:hover {
   fill: rgba(37, 99, 235, .16);
 }
+
+/* ---------- Уведомления на экране ПИН-кода ------------------------------- */
+
+.pin-notices {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.pin-notice {
+  padding: 14px 16px 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--blue);
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .22);
+  animation: pinNoticeIn .25s ease-out;
+  transition: opacity .5s ease;
+}
+
+.pin-notice.fade-out { opacity: 0; }
+
+.pin-notice-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.pin-notice-body {
+  font-size: 15px;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+
+@keyframes pinNoticeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 780px) {
+  .pin-notices { bottom: 10px; width: calc(100% - 16px); }
+  .pin-notice { padding: 12px 13px 12px 15px; }
+  .pin-notice-title { font-size: 15.5px; }
+  .pin-notice-body { font-size: 14px; }
+}

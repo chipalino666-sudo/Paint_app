@@ -7265,8 +7265,77 @@ async function loadUsers() {
 
   let pinInput = '';
 
+  /* Уведомления на экране ПИН-кода: экран общий, поэтому показываем всё подряд */
+
+  let lockWatchSince = localStorage.getItem('paintShopLockSince');
+  let lockWatchTimer = null;
+
+  function startLockNotices() {
+    if (lockWatchTimer) return;
+    lockWatchTimer = setTimeout(runLockNotices, 300);
+  }
+
+  function stopLockNotices() {
+    clearTimeout(lockWatchTimer);
+    lockWatchTimer = null;
+  }
+
+  async function runLockNotices() {
+    const screen = $('#pinScreen');
+
+    if (!screen || screen.classList.contains('hidden')) {
+      lockWatchTimer = null;
+      return;
+    }
+
+    try {
+      const query = lockWatchSince === null ? '' : '?since=' + lockWatchSince;
+      const data = await api('/api/push/workstation' + query + (query ? '&' : '?') + 'timeout=25');
+
+      for (const event of data.events || []) showLockNotice(event);
+
+      if (data.last !== undefined && data.last !== null) {
+        lockWatchSince = Number(data.last);
+        localStorage.setItem('paintShopLockSince', String(lockWatchSince));
+      }
+    } catch (error) {
+      /* нет связи — попробуем позже */
+    }
+
+    lockWatchTimer = setTimeout(runLockNotices, 1200);
+  }
+
+  /** Крупная плашка поверх экрана ПИН-кода. */
+  function showLockNotice(event) {
+    const box = $('#pinNotices');
+    if (!box) return;
+
+    const card = document.createElement('div');
+    card.className = 'pin-notice';
+
+    const title = document.createElement('div');
+    title.className = 'pin-notice-title';
+    title.textContent = event.title || 'Лонжерон';
+
+    const body = document.createElement('div');
+    body.className = 'pin-notice-body';
+    body.textContent = event.body || '';
+
+    card.appendChild(title);
+    card.appendChild(body);
+    box.prepend(card);
+
+    while (box.children.length > 3) box.lastElementChild.remove();
+
+    playPing();
+
+    setTimeout(() => card.classList.add('fade-out'), 25000);
+    setTimeout(() => card.remove(), 27000);
+  }
+
   function showPinScreen() {
     $('#pinScreen').classList.remove('hidden');
+    startLockNotices();
     pinInput = '';
     renderPinDots();
 

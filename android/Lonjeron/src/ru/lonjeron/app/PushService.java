@@ -88,6 +88,7 @@ public class PushService extends Service {
                 CHANNEL_EVENTS, "Заказы и материалы", NotificationManager.IMPORTANCE_HIGH);
         events.setDescription("Новые заказы, смена статуса, остатки на складе");
         events.enableVibration(true);
+        events.setShowBadge(true);
         manager.createNotificationChannel(events);
     }
 
@@ -201,6 +202,11 @@ public class PushService extends Service {
             String body = event.optString("body", "");
             int id = event.optInt("id", EVENT_ID_BASE);
 
+            // Счётчик для значка на иконке приложения
+            SharedPreferences prefs = getSharedPreferences("lonjeron_push", Context.MODE_PRIVATE);
+            int unread = prefs.getInt("unread", 0) + 1;
+            prefs.edit().putInt("unread", unread).apply();
+
             Intent open = new Intent(this, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
@@ -217,6 +223,8 @@ public class PushService extends Service {
                     .setStyle(new Notification.BigTextStyle().bigText(body))
                     .setSmallIcon(android.R.drawable.stat_notify_chat)
                     .setAutoCancel(true)
+                    .setNumber(unread)
+                    .setOnlyAlertOnce(false)
                     .setContentIntent(pending);
 
             if (large != null) builder.setLargeIcon(large);

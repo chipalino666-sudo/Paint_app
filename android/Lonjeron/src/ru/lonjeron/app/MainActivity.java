@@ -427,6 +427,21 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) web.onResume();
+
+        // Человек открыл приложение — значит уведомления увидел
+        markNotificationsRead();
+    }
+
+    /** Убираем уведомления и обнуляем счётчик на значке. */
+    private void markNotificationsRead() {
+        try {
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.cancelAll();
+
+            getSharedPreferences("lonjeron_push", Context.MODE_PRIVATE).edit().putInt("unread", 0).apply();
+        } catch (Exception error) {
+            /* не критично */
+        }
     }
 
     @Override
