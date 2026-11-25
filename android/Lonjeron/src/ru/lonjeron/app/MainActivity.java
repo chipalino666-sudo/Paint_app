@@ -10,7 +10,9 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.ContentValues;
 import android.content.pm.PackageManager;
+import android.provider.MediaStore;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -52,6 +54,10 @@ public class MainActivity extends Activity {
     private ProgressBar bar;
     private TextView offline;
     private ValueCallback<Uri[]> filePathCallback;
+    private Uri pendingCameraUri;
+
+    private static final int CAMERA_REQ = 1002;
+    private static final int GALLERY_REQ = 1003;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -281,15 +287,19 @@ public class MainActivity extends Activity {
 
                 filePathCallback = callback;
 
-                try {
-                    Intent intent = params.createIntent();
-                    startActivityForResult(intent, FILE_REQ);
-                    return true;
-                } catch (Exception error) {
-                    filePathCallback = null;
-                    Toast.makeText(MainActivity.this, "Не удалось открыть выбор файла", Toast.LENGTH_SHORT).show();
-                    return false;
-                }
+                // Своё меню: на разных телефонах системный выбор файла работает по-разному
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Добавить фотографию")
+                        .setItems(new String[] { "Снять на камеру", "Выбрать из галереи" },
+                                (dialog, which) -> {
+                                    if (which == 0) openCamera();
+                                    else openGallery();
+                                })
+                        .setNegativeButton("Отмена", (dialog, which) -> cancelFileChoice())
+                        .setOnCancelListener(dialog -> cancelFileChoice())
+                        .show();
+
+                return true;
             }
 
             /** Ссылки с target="_blank" открываем в этом же окне. */
@@ -394,15 +404,77 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void cancelFileChoice() {
+        if (filePathCallback != null) {
+            filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
+    }
+
+    /** Съёмка на камеру: снимок сразу попадает в галерею и отдаётся странице. */
+    private void openCamera() {
+        try {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, "lonjeron-" + System.currentTimeMillis() + ".jpg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+
+            pendingCameraUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+
+            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
+            if (pendingCameraUri != null) {
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+
+            startActivityForResult(intent, CAMERA_REQ);
+        } catch (Exception error) {
+            cancelFileChoice();
+            Toast.makeText(this, "Камера недоступна: " + error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Галерея: системный выбор файла, но с явной категорией «открыть». */
+    private void openGallery() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("image/*");
+
+            startActivityForResult(Intent.createChooser(intent, "Выберите фотографию"), GALLERY_REQ);
+        } catch (Exception error) {
+            cancelFileChoice();
+            Toast.makeText(this, "Не удалось открыть галерею", Toast.LENGTH_LONG).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == FILE_REQ) {
+        if (requestCode == CAMERA_REQ) {
+            if (filePathCallback == null) return;
+
+            Uri[] result = null;
+
+            if (resultCode == RESULT_OK) {
+                if (pendingCameraUri != null) result = new Uri[] { pendingCameraUri };
+                else if (data != null) result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+            }
+
+            filePathCallback.onReceiveValue(result);
+            filePathCallback = null;
+            pendingCameraUri = null;
+            return;
+        }
+
+        if (requestCode == GALLERY_REQ || requestCode == FILE_REQ) {
             if (filePathCallback == null) return;
 
             Uri[] result = null;
 
             if (resultCode == RESULT_OK && data != null) {
                 result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+
+                if (result == null && data.getData() != null) result = new Uri[] { data.getData() };
             }
 
             filePathCallback.onReceiveValue(result);
@@ -423,6 +495,18 @@ public class MainActivity extends Activity {
         super.onBackPressed();
     }
 
+    private long lastUpdateCheck = 0;
+
+    /** Проверяем обновления при запуске, но не чаще раза в 6 часов. */
+    private void checkUpdateOnResume() {
+        long now = System.currentTimeMillis();
+
+        if (now - lastUpdateCheck < 6 * 60 * 60 * 1000L) return;
+
+        lastUpdateCheck = now;
+        checkForUpdate();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -430,6 +514,7 @@ public class MainActivity extends Activity {
 
         // Человек открыл приложение — значит уведомления увидел
         markNotificationsRead();
+        checkUpdateOnResume();
     }
 
     /** Убираем уведомления и обнуляем счётчик на значке. */
