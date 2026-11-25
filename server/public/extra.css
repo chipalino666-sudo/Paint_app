@@ -4380,3 +4380,21 @@ body.ui-desk .top-right {
   .pin-notice-title { font-size: 15.5px; }
   .pin-notice-body { font-size: 14px; }
 }
+
+
+/* Задачу закрывает её автор: чужая галочка неактивна */
+.task-check.is-locked {
+  opacity: .45;
+  cursor: default;
+}
+
+.task-due.is-locked {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--grey);
+  font-size: 12.5px;
+}

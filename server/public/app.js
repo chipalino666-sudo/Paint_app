@@ -1745,13 +1745,16 @@ async function loadTasks() {
 
     const me = state.user || {};
     const canRemove = (task) => me.role === 'admin' || Number(task.owner_id) === Number(me.id);
+    const canToggle = canRemove;
 
     host.innerHTML = tasks.map((task) => {
       const label = taskDateLabel(task.due_date);
 
       return `
         <div class="task-row ${task.done ? 'is-done' : ''}" data-task="${task.id}">
-          <button class="task-check ${task.done ? 'checked' : ''}" data-task-toggle="${task.id}" title="Готово">✓</button>
+          ${canToggle(task)
+            ? `<button class="task-check ${task.done ? 'checked' : ''}" data-task-toggle="${task.id}" title="Готово">✓</button>`
+            : `<span class="task-check is-locked ${task.done ? 'checked' : ''}" title="Закрывает автор задачи">✓</span>`}
           <div class="task-main">
             <div class="task-title">${esc(task.title)}</div>
             <div class="task-meta">
@@ -1761,7 +1764,9 @@ async function loadTasks() {
               ${task.owner ? `<span class="muted">поставил: ${esc(task.owner.split(' ')[0])}</span>` : ''}
             </div>
           </div>
-          <input type="date" class="task-due" value="${task.due_date || ''}" data-task-due="${task.id}" title="Срок">
+          ${canToggle(task)
+            ? `<input type="date" class="task-due" value="${task.due_date || ''}" data-task-due="${task.id}" title="Срок">`
+            : `<span class="task-due is-locked" title="Срок ставит автор задачи">${task.due_date || '—'}</span>`}
           ${canRemove(task) ? `<button class="row-del" data-task-del="${task.id}" title="Снять задачу">×</button>` : ''}
         </div>`;
     }).join('');
@@ -2044,6 +2049,9 @@ async function openOrder(id) {
         <div class="actions-row" style="margin-top:12px">
           <button class="btn btn-outline" id="btnOrderPhoto">Добавить фото</button>
           <input type="file" id="orderPhotoInput" accept="image/*" multiple hidden>
+
+          <button class="btn btn-primary" id="btnOrderCamera">Снять фото</button>
+          <input type="file" id="orderCameraInput" accept="image/*" capture="environment" hidden>
         </div>
       </div>
       </section>
@@ -2602,6 +2610,31 @@ async function openOrder(id) {
     if (!button || !input) return;
 
     button.addEventListener('click', () => input.click());
+
+    // Сразу камера: на телефоне это быстрее, чем искать файл
+    const cameraButton = $('#btnOrderCamera');
+    const cameraInput = $('#orderCameraInput');
+
+    if (cameraButton && cameraInput) {
+      cameraButton.addEventListener('click', () => cameraInput.click());
+
+      cameraInput.addEventListener('change', async () => {
+        const files = [...cameraInput.files];
+        cameraInput.value = '';
+        if (!files.length) return;
+
+        toast('Загружаем фотографию…');
+
+        try {
+          await uploadPhoto(files[0], { orderId: order.id });
+        } catch (error) {
+          toast(error.message);
+        }
+
+        await loadOrderPhotos(order.id);
+        loadHistory(order.id);
+      });
+    }
 
     input.addEventListener('change', async () => {
       const files = [...input.files];

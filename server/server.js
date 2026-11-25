@@ -159,6 +159,14 @@ function canSeeOrder(user, order) {
 
 /** Списание правится, только пока заказ не сдан. */
 
+/** Фото заказа — общая история цеха: смотреть и добавлять может любой мастер. */
+function canUseOrderMedia(user, order) {
+  if (isStaff(user)) return true;
+  if (!user) return false;
+
+  return user.role === 'master';
+}
+
 function assertEditable(order) {
   if (order.status !== 'accepted' && order.status !== 'in_work') {
     throw new ApiError(400, 'Заказ уже сдан — верните его в работу, чтобы менять списание');
@@ -1883,6 +1891,15 @@ route('PATCH', '/api/tasks/:id', async ({ user, params, body }) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
   if (!task) throw new ApiError(404, 'Задача не найдена');
 
+  // Задачу закрывает только её автор (или администратор)
+  const isAdmin = user.role === 'admin';
+  const isOwner = Number(task.owner_id) === Number(user.id);
+
+  if (!isAdmin && !isOwner) {
+    throw new ApiError(403, 'Закрыть задачу может только её автор или администратор');
+  }
+
+
   const sets = [];
   const values = [];
 
@@ -2984,7 +3001,7 @@ route('POST', '/api/photos', async ({ user, body }) => {
   if (body.orderId) {
     const order = orderView(body.orderId);
     if (!order) throw new ApiError(404, 'Заказ не найден');
-    if (!canSeeOrder(user, order)) throw new ApiError(403, 'Это не ваш заказ');
+    if (!canUseOrderMedia(user, order)) throw new ApiError(403, 'Нет доступа к фотографиям заказа');
     orderId = order.id;
   } else if (body.channel) {
     const resolved = resolveChannel(user, body.channel);
@@ -3048,7 +3065,7 @@ route('DELETE', '/api/photos/:id', async ({ user, params }) => {
 route('GET', '/api/orders/:id/photos', async ({ user, params }) => {
   const order = orderView(params.id);
   if (!order) throw new ApiError(404, 'Заказ не найден');
-  if (!canSeeOrder(user, order)) throw new ApiError(403, 'Это не ваш заказ');
+  if (!canUseOrderMedia(user, order)) throw new ApiError(403, 'Нет доступа к фотографиям заказа');
 
   const rows = db.prepare(`
     SELECT p.*, u.full_name AS user_name
