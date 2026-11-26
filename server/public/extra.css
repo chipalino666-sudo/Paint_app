@@ -4398,3 +4398,23 @@ body.ui-desk .top-right {
   color: var(--grey);
   font-size: 12.5px;
 }
+/* ---------- Поля количества материала: шире, чтобы цифры не обрезались ---- */
+
+table.lines input[type="number"] {
+  width: 116px;
+  min-width: 116px;
+}
+
+.material-workspace table.lines input[type="number"],
+.material-workspace table.lines input[type=number] {
+  width: 112px;
+  min-width: 112px;
+}
+
+@media (max-width: 780px) {
+  table.lines input[type="number"],
+  .material-workspace table.lines input[type="number"] {
+    width: 96px;
+    min-width: 96px;
+  }
+}
