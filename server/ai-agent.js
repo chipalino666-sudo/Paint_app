@@ -12,6 +12,8 @@ const ai = require('./ai');
 const SYSTEM = `Ты — ИИ-помощник малярного цеха «Лонжерон». Помогаешь малярам, приёмщикам и кладовщику.
 
 Правила:
+
+Перечисление материалов: когда просят «покажи все краски», «все материалы с остатками», «что есть на складе» — вызывай stock_report (category: paint / all) и выведи ВСЕ позиции из ответа, без сокращений. Указывай, сколько всего (total), и если has_more — предложи продолжить, вызвав stock_report с offset. Никогда не отвечай «больше не могу найти», пока has_more.
 1. Никогда не выдумывай названия, коды, количество и остатки. Всё берётся инструментами.
 2. Если непонятно, какой заказ или материал — задай один короткий вопрос, не угадывай.
 3. Для списания вызывай propose_write_off. Запись в базу делает человек кнопкой «Списать» — сам не списывай.
@@ -89,6 +91,26 @@ const TOOLS = [
         type: 'object',
         properties: { code: { type: 'string', description: 'код материала' } },
         required: ['code']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'stock_report',
+      description: 'Полный список материалов с остатками. Используй, когда просят перечислить все краски, лаки, порошки, материалы — с остатками или без.',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: {
+            type: 'string',
+            enum: ['paint', 'clear', 'hardener', 'thinner', 'primer', 'putty', 'abrasive', 'consumable', 'other', 'all'],
+            description: 'категория: paint — краски, clear — лаки, hardener — отвердители, thinner — разбавители, all — всё подряд'
+          },
+          only_with_stock: { type: 'boolean', description: 'только те, где остаток больше нуля' },
+          offset: { type: 'integer', description: 'с какой позиции начать (для продолжения списка)' },
+          limit: { type: 'integer', description: 'сколько вернуть за раз, по умолчанию 60' }
+        }
       }
     }
   },
@@ -640,7 +662,7 @@ function makeContext(env) {
               FROM materials
              WHERE active = 1${paintFilter} AND (search LIKE ? OR paint_code IN (${codeList.map(() => '?').join(',')}))
              ORDER BY CASE WHEN category = 'paint' THEN 0 ELSE 1 END, name
-             LIMIT 8
+             LIMIT 25
           `).all(like, ...codeList)
         : db.prepare(`
             SELECT code, name, unit, category, price, stock, paint_code,
@@ -648,7 +670,7 @@ function makeContext(env) {
               FROM materials
              WHERE active = 1${paintFilter} AND (search LIKE ? OR lower(code) LIKE ?)
              ORDER BY name
-             LIMIT 8
+             LIMIT 25
           `).all(like, like);
 
       // Ничего не нашли запросом — пробуем по транслиту («lada» ↔ «Лада», «skoda» ↔ «Шкода»)
@@ -664,7 +686,7 @@ function makeContext(env) {
            WHERE active = 1${paintFilter}
         `).all()
           .filter((row) => matchesText(row.name, needle) || matchesText(row.code, needle) || matchesText(row.paint_code || '', needle))
-          .slice(0, 8);
+          .slice(0, 25);
       }
 
       const materials = finalRows.map((row) => ({
@@ -676,6 +698,40 @@ function makeContext(env) {
       }));
 
       return { materials };
+    },
+
+    stock_report({ category, only_with_stock, offset, limit } = {}) {
+      const cat = String(category || 'paint');
+      const where = cat && cat !== 'all' ? " AND category = '" + cat.replace(/[^a-z]/g, '') + "'" : '';
+      const start = Math.max(0, Number(offset) || 0);
+      const take = Math.min(Math.max(Number(limit) || 60, 1), 300);
+
+      const rows = db.prepare(`
+        SELECT code, name, unit, category, paint_code, stock,
+               COALESCE((SELECT SUM(om.qty) FROM order_materials om WHERE om.code = materials.code), 0) AS used
+          FROM materials
+         WHERE active = 1${where}
+         ORDER BY name
+      `).all();
+
+      const all = rows.map((row) => ({
+        code: row.code,
+        name: row.name,
+        unit: row.unit,
+        paint_code: row.paint_code || null,
+        left: round2((Number(row.stock) || 0) - (Number(row.used) || 0))
+      }));
+
+      const filtered = only_with_stock ? all.filter((row) => row.left > 0) : all;
+      const items = filtered.slice(start, start + take);
+
+      return {
+        total: filtered.length,
+        offset: start,
+        count: items.length,
+        has_more: start + items.length < filtered.length,
+        items
+      };
     },
 
     low_stock() {

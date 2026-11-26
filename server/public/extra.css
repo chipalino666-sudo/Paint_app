@@ -493,7 +493,7 @@ table.lines td {
 table.lines tbody tr:hover { background: var(--surface-2); }
 
 table.lines input[type=number] {
-  width: 90px;
+  width: 112px;
   padding: 6px 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1489,7 +1489,7 @@ td.empty-line,
 .material-workspace table.lines th:nth-child(5),
 .material-workspace table.lines td:nth-child(5) { width: 58px; text-align: center; padding-right: 10px; }
 
-.material-workspace table.lines input[type="number"] { width: 68px; }
+.material-workspace table.lines input[type="number"] { width: 104px; }
 
 .material-workspace table.lines th { white-space: nowrap; }
 /* Кнопка-иконка (тема, звук) */
